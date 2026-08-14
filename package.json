@@ -1,0 +1,25 @@
+{
+  "name": "aws-visual-learn",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Visual, animated lessons for the AWS Cloud Practitioner and Solutions Architect Associate exams.",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "check:iam": "node src/lib/iam.check.ts"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^7.0.5",
+    "@astrojs/sitemap": "^3.7.3",
+    "astro": "^7.2.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "typescript": "^7.0.2"
+  }
+}

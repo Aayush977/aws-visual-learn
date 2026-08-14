@@ -1,0 +1,255 @@
+---
+title: Regions, Availability Zones and Edge Locations
+summary: Where your data physically sits, why AWS splits every Region into isolated zones, and what changes when you spread across them.
+exams: [CCP, SAA]
+track: foundations
+order: 10
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 2 — Design Resilient Architectures'
+minutes: 9
+hook: A Region is a city. An Availability Zone is a building in that city, on its own power supply. An Edge Location is a corner shop near your house.
+updated: 2026-08-07
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Callout from '../../components/Callout.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+"The cloud" is a rented computer in someone else's building. Everything else in AWS
+is a consequence of that one fact — including the three words that show up on
+almost every exam question: **Region**, **Availability Zone**, and **Edge Location**.
+
+Play the diagram below once before reading on. It zooms in from a place on the map
+down to an actual rack of servers.
+
+<Diagram
+  title="Zooming in: from a Region to a rack"
+  viewBox="0 0 1000 520"
+  steps={[
+    {
+      title: 'A Region is a geographic area',
+      body: 'You choose one when you create almost anything. <code>eu-west-2</code> is London; <code>us-east-1</code> is Northern Virginia. Your data stays in the Region you picked unless you deliberately copy it out.',
+      flow: 'w-user-region',
+    },
+    {
+      title: 'Each Region contains Availability Zones',
+      body: 'At least three, in most Regions. They are separate physical sites — separate power, separate cooling, separate flood risk — far enough apart to fail independently.',
+    },
+    {
+      title: 'An AZ is one or more datacentres',
+      body: 'When you launch an EC2 instance, it lands in exactly one AZ. That is the level at which things break.',
+    },
+    {
+      title: 'AZs are joined by private, low-latency fibre',
+      body: 'Single-digit milliseconds between zones. Close enough to run one application across all three; far apart enough that one losing power does not take the others with it.',
+      flow: ['w-az-ab', 'w-az-bc'],
+      duration: 1500,
+    },
+    {
+      title: 'Edge Locations sit outside the Regions',
+      body: 'Hundreds of small sites in cities worldwide. They cache content close to users, so a request often never travels to the Region at all.',
+      flow: ['w-user-edge', 'w-edge-region'],
+    },
+  ]}
+  caption="Simplified. A Region has 3–6 AZs, and an AZ can be several datacentres."
+>
+  <Node x={110} y={70} w={140} label="Your user" sub="in Manchester" icon="user" tone="muted" step={1} />
+  <Node x={330} y={70} w={190} label="Edge Location" sub="600+ worldwide" icon="cdn" tone="orange" step={5} />
+
+  <Wire id="w-user-region" from={[110, 110]} to={[110, 154]} step={1} tone="blue" />
+  <Wire id="w-user-edge" from={[180, 70]} to={[229, 70]} step={5} tone="orange" />
+  <Wire id="w-edge-region" from={[330, 110]} to={[330, 154]} step={5} tone="orange" dashed label="on cache miss" labelDy={-2} labelDx={72} />
+
+  <Boundary x={60} y={160} w={880} h={320} label="AWS Region — eu-west-2 (London)" icon="region" tone="blue" step={1} />
+
+  <Boundary x={100} y={230} w={250} h={200} label="Availability Zone 2a" icon="zone" tone="teal" step={2} />
+  <Boundary x={380} y={230} w={250} h={200} label="Availability Zone 2b" icon="zone" tone="teal" step={2} />
+  <Boundary x={660} y={230} w={250} h={200} label="Availability Zone 2c" icon="zone" tone="teal" step={2} />
+
+  <Node x={225} y={330} w={190} h={90} label="Datacentre" sub="own power & cooling" icon="server" tone="teal" step={3} />
+  <Node x={505} y={330} w={190} h={90} label="Datacentre" sub="own power & cooling" icon="server" tone="teal" step={3} />
+  <Node x={785} y={330} w={190} h={90} label="Datacentre" sub="own power & cooling" icon="server" tone="teal" step={3} />
+
+  <Wire id="w-az-ab" from={[225, 430]} to={[505, 430]} shape="arc" bow={38} tone="green" step={4} both label="< 1 ms private fibre" labelDy={44} />
+  <Wire id="w-az-bc" from={[505, 430]} to={[785, 430]} shape="arc" bow={38} tone="green" step={4} both label="< 1 ms private fibre" labelDy={44} />
+</Diagram>
+
+## The three words, precisely
+
+**A Region** is a named geographic area containing a cluster of Availability Zones.
+Regions are fully isolated from one another by design: an outage in `us-east-1` does
+not spread to `eu-west-2`, and data does not move between Regions unless you
+explicitly set up replication.
+
+**An Availability Zone (AZ)** is one or more discrete datacentres inside a Region,
+each with independent power, cooling and physical security. AZs in a Region are
+connected by high-bandwidth, low-latency private links. They are close enough for
+synchronous replication and far enough apart that a single fire, flood or power
+failure hits only one.
+
+**An Edge Location** is a much smaller site — there are hundreds of them, in far more
+cities than there are Regions. Edge Locations run CloudFront (content caching),
+Route 53 (DNS) and AWS Global Accelerator. They exist to shorten the physical
+distance between a user and the first AWS machine that answers them.
+
+<Callout type="analogy">
+A Region is **a city**. An Availability Zone is **a building in that city with its own
+generator**. An Edge Location is **a corner shop near your house** — it does not stock
+everything, but what it does stock, you get in seconds instead of driving into town.
+</Callout>
+
+## Why the split exists
+
+If AWS had built one enormous datacentre per Region, a single power failure would take
+down every customer in that Region at once. Splitting a Region into independent zones
+means you can run the same application in two or three of them, and survive losing one.
+
+That is the whole idea behind the phrase **high availability**, and it is why
+almost every "how do I make this resilient?" answer on the exam involves the words
+*across multiple Availability Zones*.
+
+<Mnemonic
+  title="What lives at each level"
+  phrase="Regions Are Countries, Zones Are Buildings, Edges Are Shops"
+  tone="orange"
+  items={[
+    { key: 'R', term: 'Region', note: 'a geographic area — you pick it, your data stays in it' },
+    { key: 'Z', term: 'Availability Zone', note: 'isolated datacentre(s) — the unit of failure' },
+    { key: 'E', term: 'Edge Location', note: 'a cache near the user — CloudFront, Route 53' },
+  ]}
+/>
+
+## Choosing a Region
+
+Four things decide it, and the exam tests all four:
+
+| Factor | The question you are really asking |
+| --- | --- |
+| **Compliance** | Does the law require this data to stay inside a country or bloc? This one overrides everything else. |
+| **Latency** | How far are my users from this Region? Distance is physics — you cannot configure it away. |
+| **Service availability** | New services launch in a handful of Regions first. Not everything is everywhere. |
+| **Cost** | The same instance costs different amounts in different Regions. `us-east-1` is usually cheapest. |
+
+<Mnemonic
+  title="Picking a Region"
+  phrase="Cheap Latte, Serve Cold"
+  tone="teal"
+  items={[
+    { key: 'C', term: 'Compliance', note: 'legal and data-residency requirements — check first' },
+    { key: 'L', term: 'Latency', note: 'proximity to your users' },
+    { key: 'S', term: 'Service availability', note: 'is the service you need even offered there?' },
+    { key: 'C', term: 'Cost', note: 'pricing varies Region to Region' },
+  ]}
+/>
+
+## Multi-AZ vs Multi-Region
+
+These sound similar and get confused constantly. They solve different problems.
+
+| | Multi-AZ | Multi-Region |
+| --- | --- | --- |
+| **Solves** | One datacentre fails | An entire Region fails, or users are on another continent |
+| **Distance** | Tens of kilometres | Thousands of kilometres |
+| **Replication** | Can be synchronous | Almost always asynchronous |
+| **Typical cost** | Modest — often just a second instance | High — a duplicate of your stack |
+| **The phrase that signals it** | "highly available", "fault tolerant" | "disaster recovery", "global users", "data residency" |
+
+<Callout type="gotcha">
+Multi-AZ is **high availability**. Multi-Region is **disaster recovery**. If an exam
+question says a workload must survive the loss of a datacentre, the answer is multiple
+AZs — reaching for multiple Regions is over-engineering, and the cheaper correct answer
+is usually the one being tested.
+</Callout>
+
+<Scenario
+  who="A UK council running a permit-application portal"
+  problem="The portal runs on one server in one datacentre. When that datacentre lost power for four hours last winter, residents could not file anything, and the data must legally stay in the UK."
+  solution="Keep everything in eu-west-2 (London) to satisfy data residency, but run the application on instances in eu-west-2a, 2b and 2c behind a load balancer, with a Multi-AZ database."
+  outcome="Survives losing a whole datacentre with no data leaving the UK — and no second Region to pay for."
+>
+Note what this scenario does *not* need: a second Region. The requirement was
+"survive a datacentre failure", not "survive losing London". Multi-Region would cost
+several times more and would push data outside the UK, breaking the actual constraint.
+</Scenario>
+
+## Things that are global, not regional
+
+A few AWS services are not tied to a Region at all. These come up as trick answers:
+
+- **IAM** — users, groups, roles and policies are global.
+- **Route 53** — DNS, served from Edge Locations worldwide.
+- **CloudFront** — the CDN itself is global (though its origins are regional).
+- **AWS WAF** and **Shield** — attached at the edge.
+- **S3** — the *service* is global and bucket names are globally unique, but every
+  bucket lives in one Region you choose. This distinction is a favourite exam trap.
+
+<Quiz
+  question="A media company must serve video to viewers across Europe and Asia with the lowest possible start-up latency, while the master files remain stored in a single Region for cost reasons. Which approach meets the requirement?"
+  choose={1}
+  options={[
+    {
+      text: 'Store the files in one Region and distribute them through Amazon CloudFront',
+      correct: true,
+      why: 'CloudFront caches copies at Edge Locations near viewers, so playback starts from a nearby site while the master files stay in one Region. This is exactly what Edge Locations are for.',
+    },
+    {
+      text: 'Replicate the files into a Region on every continent',
+      why: 'It would work, but it multiplies storage cost and operational complexity — and the question explicitly says the masters must stay in a single Region for cost reasons.',
+    },
+    {
+      text: 'Spread the files across three Availability Zones in one Region',
+      why: 'Multi-AZ improves availability inside a Region. It does nothing for a viewer in Singapore, who is still thousands of kilometres away.',
+    },
+    {
+      text: 'Use an AWS Local Zone in each country',
+      why: 'Local Zones place compute closer to users in specific metros, but they are not a content-caching network and are available in far fewer places than Edge Locations.',
+    },
+  ]}
+  explain="Latency to <em>users</em> → CloudFront and Edge Locations. Availability within a Region → Availability Zones. Surviving the loss of a Region → a second Region. Match the AWS concept to the word the question emphasises."
+/>
+
+<Quiz
+  question="Which statements about Availability Zones are correct? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'Each AZ has independent power, cooling and physical security',
+      correct: true,
+      why: 'This is the definition. Independence is the whole point — it is what makes losing one survivable.',
+    },
+    {
+      text: 'AZs within a Region are connected by low-latency private links',
+      correct: true,
+      why: 'Single-digit millisecond latency over AWS-owned fibre, which is what makes synchronous replication between AZs practical.',
+    },
+    {
+      text: 'An AZ is always exactly one datacentre',
+      why: 'An AZ is one *or more* datacentres. AWS does not publish the exact count, and it varies.',
+    },
+    {
+      text: 'Every Region has exactly two Availability Zones',
+      why: 'Most Regions have three or more. Two is the minimum in a small number of older Regions, and AWS builds new Regions with at least three.',
+    },
+    {
+      text: 'Resources automatically replicate across all AZs in a Region',
+      why: 'Only some managed services do this by default (S3, for example). An EC2 instance or an EBS volume lives in one AZ, and it is your job to spread them.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    '<strong>Region</strong> = a geographic area you choose. <strong>Availability Zone</strong> = isolated datacentre(s) inside it. <strong>Edge Location</strong> = a cache near the user.',
+    'The AZ is the <strong>unit of failure</strong>. Design so that losing one changes nothing.',
+    '<strong>Multi-AZ = high availability. Multi-Region = disaster recovery.</strong> Do not reach for the second when the question asks for the first.',
+    'Pick a Region on <strong>Compliance, Latency, Service availability, Cost</strong> — in that order.',
+    'IAM, Route 53 and CloudFront are <strong>global</strong>. An S3 bucket has a globally unique name but lives in one Region.',
+  ]}
+/>

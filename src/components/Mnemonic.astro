@@ -1,0 +1,142 @@
+---
+/**
+ * A memory hook. Big letter chips down the left, what each one stands for on
+ * the right, plus the silly sentence that makes it stick.
+ *
+ *   <Mnemonic
+ *     title="The 6 pillars of the Well-Architected Framework"
+ *     phrase="Some Reliable People Cook Optimal Steak"
+ *     items={[{ key: 'S', term: 'Security', note: 'protect data and systems' }]}
+ *   />
+ */
+interface Item {
+  key: string;
+  term: string;
+  note?: string;
+}
+
+interface Props {
+  title?: string;
+  /** The sentence that spells the acronym. Shown above the breakdown. */
+  phrase?: string;
+  items: Item[];
+  tone?: 'orange' | 'purple' | 'teal';
+}
+
+const { title, phrase, items, tone = 'orange' } = Astro.props;
+---
+
+<aside class={`mn mn--${tone}`} aria-label={title ?? 'Mnemonic'}>
+  <p class="mn__eyebrow">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 21h6M10 18h4c0-3 4-4 4-8a6 6 0 1 0-12 0c0 4 4 5 4 8Z"></path>
+    </svg>
+    Remember it as
+  </p>
+  {title && <h4 class="mn__title">{title}</h4>}
+  {phrase && <p class="mn__phrase">“{phrase}”</p>}
+  <ol class="mn__list">
+    {
+      items.map((it) => (
+        <li class="mn__item">
+          <span class="mn__key" aria-hidden="true">
+            {it.key}
+          </span>
+          <span>
+            <strong class="mn__term">{it.term}</strong>
+            {it.note && <span class="mn__note"> — {it.note}</span>}
+          </span>
+        </li>
+      ))
+    }
+  </ol>
+</aside>
+
+<style>
+  .mn {
+    --mn-tone: var(--aws-orange);
+    margin: var(--sp-6) 0;
+    padding: var(--sp-5);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--mn-tone);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--mn-tone) 6%, var(--bg-raised));
+  }
+  .mn--purple {
+    --mn-tone: var(--aws-purple);
+  }
+  .mn--teal {
+    --mn-tone: var(--aws-teal);
+  }
+
+  .mn__eyebrow {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--mn-tone) 70%, var(--text));
+  }
+  .mn__eyebrow svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .mn__title {
+    margin: 0 0 var(--sp-2);
+    font-size: var(--step-0);
+  }
+
+  .mn__phrase {
+    margin: 0 0 var(--sp-4);
+    font-size: var(--step-1);
+    font-weight: 650;
+    font-style: italic;
+    line-height: 1.35;
+    color: var(--text);
+  }
+
+  .mn__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .mn__item {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .mn__key {
+    flex: none;
+    display: grid;
+    place-items: center;
+    min-width: 1.9rem;
+    height: 1.9rem;
+    padding-inline: 0.35rem;
+    border-radius: 6px;
+    background: var(--mn-tone);
+    color: #16191f;
+    font-weight: 800;
+    font-size: 0.95rem;
+    line-height: 1;
+    align-self: center;
+  }
+
+  .mn__term {
+    color: var(--text);
+  }
+</style>

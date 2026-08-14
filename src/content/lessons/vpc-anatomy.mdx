@@ -1,0 +1,309 @@
+---
+title: Anatomy of a VPC
+summary: Build a network from nothing — address range, subnets, gateways, route tables and two different firewalls — and see exactly what makes a subnet public or private.
+exams: [CCP, SAA]
+track: networking
+order: 20
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 1 — Design Secure Architectures'
+minutes: 13
+hook: There is no "public subnet" setting. A subnet is public because its route table points at an internet gateway. That is the whole secret.
+updated: 2026-08-08
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+A **VPC** — Virtual Private Cloud — is your own isolated network inside an AWS Region. Nothing
+in it can talk to the internet, or to anything else, until you say so. That default isolation
+is the point, and every piece you add afterwards is a deliberate hole in it.
+
+Watch it get built one piece at a time.
+
+<Diagram
+  title="Building a VPC, one decision at a time"
+  viewBox="0 50 1020 540"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'A VPC is an address range in one Region',
+      body: 'You choose a private CIDR block — here <code>10.0.0.0/16</code>, which is 65,536 addresses. A VPC spans <strong>every Availability Zone in its Region</strong>, and nothing inside it is reachable from anywhere yet.',
+    },
+    {
+      title: 'Subnets carve it up, one AZ each',
+      body: 'A subnet is a slice of the range that lives in <strong>exactly one Availability Zone</strong>. Using two zones is what makes an architecture survive losing one. Nothing here is “public” yet — they are all just address ranges.',
+    },
+    {
+      title: 'An internet gateway, and a route to it',
+      body: 'Attach an <strong>internet gateway</strong> to the VPC, then add <code>0.0.0.0/0 → igw</code> to a subnet’s route table. <strong>That route is what makes the subnet public.</strong> The subnet has no setting called “public”.',
+      flow: 'w-net-igw',
+    },
+    {
+      title: 'A NAT gateway for outbound-only',
+      body: 'Instances in private subnets have no public address. Route their <code>0.0.0.0/0</code> to a <strong>NAT gateway</strong> sitting in the public subnet and they can reach out — for patches, for APIs — while nothing on the internet can start a connection to them.',
+      flow: ['w-ec2-nat-a', 'w-ec2-nat-b', 'w-igw-nat-a', 'w-igw-nat-b'],
+      duration: 1500,
+    },
+    {
+      title: 'Two firewalls, at two different levels',
+      body: '<strong>Security groups</strong> wrap the instance: stateful, allow-rules only. <strong>Network ACLs</strong> wrap the subnet: stateless, and they can explicitly deny. Most designs lean on security groups and leave NACLs open.',
+    },
+  ]}
+  caption="One NAT gateway per Availability Zone. A NAT gateway lives in a single zone, so a shared one becomes a single point of failure for the other zone's outbound traffic."
+>
+  <Node x={95} y={300} w={140} h={70} label="Internet" icon="globe" tone="muted" step={3} />
+
+  <Boundary x={200} y={70} w={800} h={500} label="VPC — 10.0.0.0/16" icon="firewall" tone="purple" step={1} />
+  <Node x={600} y={110} w={200} h={56} label="Internet Gateway" icon="router" tone="orange" step={3} />
+
+  <Boundary x={235} y={180} w={360} h={360} label="Availability Zone 2a" icon="zone" tone="teal" step={2} />
+  <Boundary x={625} y={180} w={360} h={360} label="Availability Zone 2b" icon="zone" tone="teal" step={2} />
+
+  <Boundary x={258} y={222} w={314} h={112} label="Public subnet · 10.0.1.0/24" tone="green" step={2} />
+  <Boundary x={648} y={222} w={314} h={112} label="Public subnet · 10.0.3.0/24" tone="green" step={2} />
+  <Boundary x={258} y={360} w={314} h={150} label="Private subnet · 10.0.2.0/24" tone="blue" step={2} />
+  <Boundary x={648} y={360} w={314} h={150} label="Private subnet · 10.0.4.0/24" tone="blue" step={2} />
+
+  <Node x={415} y={292} w={190} h={56} label="NAT Gateway" icon="router" tone="orange" step={4} />
+  <Node x={805} y={292} w={190} h={56} label="NAT Gateway" icon="router" tone="orange" step={4} />
+
+  <Boundary x={310} y={398} w={210} h={94} label="Security group" tone="red" step={5} />
+  <Boundary x={700} y={398} w={210} h={94} label="Security group" tone="red" step={5} />
+  <Node x={415} y={455} w={180} h={64} label="EC2" sub="no public IP" icon="server" tone="blue" step={2} />
+  <Node x={805} y={455} w={180} h={64} label="EC2" sub="no public IP" icon="server" tone="blue" step={2} />
+
+  <Wire id="w-net-igw" from={[165, 300]} to={[498, 110]} shape="elbow-h" mid={180} tone="orange" step={3} />
+  <Wire id="w-igw-nat-a" from={[560, 138]} to={[415, 264]} shape="elbow-v" mid={160} tone="orange" step={4} />
+  <Wire id="w-igw-nat-b" from={[640, 138]} to={[805, 264]} shape="elbow-v" mid={160} tone="orange" step={4} />
+  <Wire id="w-ec2-nat-a" from={[415, 426]} to={[415, 322]} tone="blue" step={4} />
+  <Wire id="w-ec2-nat-b" from={[805, 426]} to={[805, 322]} tone="blue" step={4} />
+</Diagram>
+
+## The address range, and why it is worth thinking about once
+
+You pick a **CIDR block** when you create the VPC, from the private ranges (`10.0.0.0/8`,
+`172.16.0.0/12`, `192.168.0.0/16`). The number after the slash is how many bits are fixed, so
+a smaller number means a bigger network:
+
+| CIDR | Addresses | In practice |
+| --- | --- | --- |
+| `/16` | 65,536 | A whole VPC. The usual choice |
+| `/24` | 256 | A comfortable subnet |
+| `/28` | 16 | The smallest subnet AWS allows |
+
+Two details that catch people out:
+
+- **AWS reserves five addresses in every subnet** — the network address, the VPC router, DNS,
+  one for future use, and the broadcast address. A `/24` gives you 251 usable, not 256.
+- **You cannot shrink a VPC's CIDR later.** You can add additional ranges, but you cannot make
+  the original one smaller. Pick a range that will not overlap with your office network, or
+  with a company you might one day acquire — overlapping ranges make VPC peering impossible.
+
+## What actually makes a subnet public
+
+This is the concept most beginners get wrong, and it is worth being very precise about.
+
+A subnet is **public** if its route table contains a route sending `0.0.0.0/0` to an **internet
+gateway**. That is the entire definition. There is no checkbox called "public", and calling a
+subnet "public" in the console is a naming convention, not a setting.
+
+Every subnet is associated with exactly one **route table**, and a route table is a list that
+says "traffic for *this* destination goes to *that* target":
+
+| Destination | Target | Meaning |
+| --- | --- | --- |
+| `10.0.0.0/16` | `local` | Anything inside the VPC stays inside. Always present, cannot be removed |
+| `0.0.0.0/0` | `igw-…` | **Public subnet** — everything else goes out to the internet |
+| `0.0.0.0/0` | `nat-…` | **Private subnet** — everything else goes out via NAT, and cannot come back unbidden |
+
+An instance in a public subnet also needs a **public IP address** to actually be reachable —
+either auto-assigned or an **Elastic IP** (a static public address you own and can move
+between instances).
+
+<Callout type="gotcha">
+"I gave the instance a public IP and it still is not reachable" has three usual causes, and it
+is worth checking them in order: the subnet's <strong>route table</strong> has no route to an
+internet gateway; the <strong>security group</strong> has no inbound rule for the port; or the
+<strong>network ACL</strong> is blocking the return traffic. Exam questions describing a
+connectivity failure are almost always testing one of these three.
+</Callout>
+
+## NAT gateways: out, but not in
+
+Instances in private subnets often still need to reach the internet — to download operating
+system patches, or to call a third-party payment API. A **NAT gateway** gives them that,
+one-directionally: connections your instance starts will work; connections the internet starts
+will not.
+
+Things to know:
+
+- It lives in a **public subnet** and needs an Elastic IP.
+- It exists in **one Availability Zone**. Route both zones' private subnets to a single NAT
+  gateway and losing that zone takes down outbound traffic for the other zone too. For high
+  availability, **one NAT gateway per AZ**.
+- It is managed, scales automatically, and **it is not free** — you pay per hour plus per
+  gigabyte processed, which makes it a recognisable line on many AWS bills.
+- The older **NAT instance** is an EC2 instance doing the same job by hand. It appears in exam
+  questions mainly as the wrong answer, though it can be cheaper at very small scale.
+
+<Callout type="cost">
+NAT gateway data-processing charges are a classic surprise. If your private instances are
+mostly talking to <strong>S3 or DynamoDB</strong>, a <strong>gateway VPC endpoint</strong> routes
+that traffic over the AWS network instead — it costs nothing, and it keeps the traffic off the
+internet entirely. Free, faster and more secure is a rare combination, and the exam likes it.
+</Callout>
+
+## Two firewalls, and the difference between them
+
+AWS gives you filtering at two levels, and the exam tests whether you know which is which.
+
+| | **Security group** | **Network ACL** |
+| --- | --- | --- |
+| Wraps | An instance (its network interface) | A whole subnet |
+| Rules | **Allow only** | **Allow and Deny** |
+| State | **Stateful** — return traffic is automatically permitted | **Stateless** — you must allow the return traffic yourself |
+| Evaluation | All rules together | In numbered order, first match wins |
+| Default | Denies all inbound, allows all outbound | The default one allows everything both ways |
+
+**Stateful** is the word that matters. With a security group, if you allow inbound port 443,
+the reply goes out automatically — you do not write an outbound rule. With a NACL, you must
+also allow the outbound **ephemeral port range** (1024–65535), because it has no memory of the
+request that came in.
+
+<Mnemonic
+  title="Security group or NACL?"
+  phrase="Groups Guard the Guest, ACLs Arrest the Area"
+  tone="teal"
+  items={[
+    { key: 'G', term: 'Security Group — the instance', note: 'stateful, allow-only, all rules evaluated together. Your everyday tool' },
+    { key: 'A', term: 'Network ACL — the subnet', note: 'stateless, allow and deny, numbered order. Reach for it to block a specific IP address' },
+  ]}
+/>
+
+<Callout type="exam">
+"Block a specific malicious IP address from reaching the application" → <strong>network ACL</strong>,
+because security groups have no Deny rules at all. "Allow the web tier to reach the database
+tier" → <strong>security groups</strong>, and the neat way is to make the database's security
+group allow port 3306 <em>from the web tier's security group</em> rather than from an IP range.
+</Callout>
+
+## Connecting a VPC to other things
+
+You will not need to configure these, but you must recognise the phrase that points at each:
+
+- **VPC endpoints** — reach AWS services without crossing the internet. *Gateway endpoints*
+  (free) serve **S3 and DynamoDB only**; *interface endpoints* (PrivateLink, hourly charge)
+  serve almost everything else.
+- **VPC peering** — a private one-to-one link between two VPCs. It is **not transitive**: if A
+  peers with B and B peers with C, A still cannot reach C.
+- **AWS Transit Gateway** — a hub that connects many VPCs and on-premises networks. The answer
+  whenever a question describes a mesh of peering connections that has become unmanageable.
+- **Site-to-Site VPN** — an encrypted tunnel to your office over the public internet. Quick to
+  set up, and bandwidth depends on the internet.
+- **AWS Direct Connect** — a dedicated physical circuit into AWS. Consistent, private,
+  high-bandwidth, and it takes weeks to provision. The answer when a question stresses
+  **consistent latency** or **dedicated bandwidth**.
+
+<Scenario
+  who="A healthcare company moving a patient-records system to AWS"
+  problem="The application servers need to download security patches and call an external e-prescribing API, but an auditor has ruled that no server holding patient data may be directly reachable from the internet. The database must be unreachable from anywhere except the application tier."
+  solution="A VPC across two Availability Zones. Public subnets hold only the load balancer and one NAT gateway per zone. The application servers sit in private subnets with a route to NAT for outbound calls. The database sits in its own private subnets with a security group that accepts port 5432 from exactly one source: the application tier's security group. A gateway VPC endpoint keeps S3 traffic off the NAT gateway entirely."
+  outcome="Nothing holding patient data has a public IP address or an inbound internet route. Patching and the e-prescribing API work normally, and the database is unreachable even from the load balancer."
+>
+Every requirement in the auditor's ruling maps onto exactly one VPC construct. That is the
+usual shape of an SAA networking question — read the constraints, and place each one.
+</Scenario>
+
+<Quiz
+  question="A solutions architect has launched an EC2 instance in a subnet and assigned it a public IP address, but cannot reach it from the internet. The security group allows inbound TCP port 22 from 0.0.0.0/0. What should be checked next?"
+  choose={1}
+  options={[
+    {
+      text: 'Whether the subnet’s route table has a route for 0.0.0.0/0 to an internet gateway',
+      correct: true,
+      why: 'Without that route the subnet is private no matter what public IP the instance holds. A public IP address makes an instance addressable; the route table makes it reachable.',
+    },
+    {
+      text: 'Whether the instance has an IAM role attached',
+      why: 'IAM roles grant an instance permission to call AWS APIs. They have nothing to do with network reachability.',
+    },
+    {
+      text: 'Whether the instance type supports enhanced networking',
+      why: 'Enhanced networking affects throughput and packets per second on an established path. It cannot be the reason no connection is possible at all.',
+    },
+    {
+      text: 'Whether the VPC has a NAT gateway',
+      why: 'A NAT gateway provides outbound access for private subnets. It never makes an instance reachable from the internet — that is the one thing it is designed to prevent.',
+    },
+  ]}
+  explain="Work the checklist in order: <strong>route table → public IP → security group → NACL.</strong> Public IP plus a working security group but no internet-gateway route is the most common wiring mistake there is."
+/>
+
+<Quiz
+  question="A company must block all traffic from a specific range of IP addresses that has been attacking their application. The application runs on EC2 instances across several subnets. Which VPC feature should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'A network ACL with a deny rule for that IP range',
+      correct: true,
+      why: 'Network ACLs are the only VPC firewall that supports explicit Deny rules, and they apply to an entire subnet, so one rule covers every instance in it.',
+    },
+    {
+      text: 'A security group rule denying that IP range',
+      why: 'Security groups contain allow rules only. There is no way to express a deny in a security group, which is exactly why NACLs exist.',
+    },
+    {
+      text: 'A route table entry sending that range to a blackhole',
+      why: 'Route tables direct traffic by destination, not by source. They cannot filter based on where traffic came from.',
+    },
+    {
+      text: 'Remove the internet gateway from the VPC',
+      why: 'This would block the attackers and every legitimate user at the same time, taking the application offline.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="EC2 instances in private subnets across two Availability Zones need to download software updates from the internet. The design must remain available if one Availability Zone fails. What should a solutions architect implement?"
+  choose={1}
+  options={[
+    {
+      text: 'A NAT gateway in each Availability Zone, with each private subnet routing to the one in its own zone',
+      correct: true,
+      why: 'A NAT gateway is a zonal resource. One per Availability Zone, with matching routes, means the loss of a zone removes only that zone’s outbound path — which is already gone anyway.',
+    },
+    {
+      text: 'A single NAT gateway in one Availability Zone, with both private subnets routing to it',
+      why: 'This works until that Availability Zone fails, at which point the surviving zone also loses outbound internet access. It is the specific single point of failure the question is asking you to remove.',
+    },
+    {
+      text: 'An internet gateway attached to each private subnet',
+      why: 'Internet gateways attach to a VPC, not to subnets, and routing to one would make the subnets public — which contradicts the requirement that they stay private.',
+    },
+    {
+      text: 'A NAT gateway in one AZ and a NAT instance in the other',
+      why: 'This technically provides redundancy, but the NAT instance must be sized, patched and monitored by you, and needs its own failover handling. There is no reason to accept that when a second NAT gateway is available.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'A VPC is a private address range in one Region and spans <strong>all its Availability Zones</strong>. A <strong>subnet lives in exactly one</strong>.',
+    'A subnet is public <strong>only because its route table sends 0.0.0.0/0 to an internet gateway</strong>. There is no other definition.',
+    'AWS reserves <strong>five addresses per subnet</strong>, and a VPC CIDR can never be shrunk — choose one that will not overlap other networks.',
+    '<strong>NAT gateway</strong> = outbound only, lives in a public subnet, is <strong>zonal</strong> — deploy one per AZ, and watch the data-processing charges.',
+    '<strong>Gateway VPC endpoints for S3 and DynamoDB are free</strong> and keep that traffic off the NAT gateway and off the internet.',
+    '<strong>Security group</strong>: instance, stateful, allow-only. <strong>NACL</strong>: subnet, stateless, allow <em>and</em> deny. Blocking an IP address needs a NACL.',
+    'Connectivity vocabulary: <strong>peering</strong> is one-to-one and not transitive · <strong>Transit Gateway</strong> is the hub · <strong>VPN</strong> is quick over the internet · <strong>Direct Connect</strong> is a dedicated circuit with consistent latency.',
+  ]}
+/>

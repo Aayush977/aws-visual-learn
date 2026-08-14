@@ -1,0 +1,181 @@
+---
+/**
+ * A real-world situation, so the service stops being an acronym and starts
+ * being a thing that solves someone's actual problem.
+ *
+ *   <Scenario
+ *     who="A two-person photography startup"
+ *     problem="Customers upload 40 MB RAW files. The single server keeps filling up."
+ *     solution="Upload straight to S3 …"
+ *   >
+ *     Optional extra detail in the slot.
+ *   </Scenario>
+ */
+interface Props {
+  who: string;
+  problem: string;
+  solution: string;
+  /** e.g. "£4,200/yr → £310/yr" */
+  outcome?: string;
+}
+
+const { who, problem, solution, outcome } = Astro.props;
+const hasExtra = Astro.slots.has('default');
+---
+
+<section class="sc">
+  <p class="sc__eyebrow">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 21v-6a9 9 0 1 1 9 6H3Z"></path>
+    </svg>
+    Real-world scenario
+  </p>
+  <p class="sc__who">{who}</p>
+
+  <div class="sc__grid">
+    <div class="sc__cell sc__cell--problem">
+      <p class="sc__label">The problem</p>
+      <p class="sc__text">{problem}</p>
+    </div>
+    <div class="sc__arrow" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"></path></svg>
+    </div>
+    <div class="sc__cell sc__cell--solution">
+      <p class="sc__label">What you build on AWS</p>
+      <p class="sc__text">{solution}</p>
+    </div>
+  </div>
+
+  {
+    outcome && (
+      <p class="sc__outcome">
+        <span>Result</span>
+        {outcome}
+      </p>
+    )
+  }
+  {hasExtra && <div class="sc__extra"><slot /></div>}
+</section>
+
+<style>
+  .sc {
+    margin: var(--sp-6) 0;
+    padding: var(--sp-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+  }
+
+  .sc__eyebrow {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--aws-teal);
+  }
+  .sc__eyebrow svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .sc__who {
+    margin: 0 0 var(--sp-4);
+    font-size: var(--step-1);
+    font-weight: 650;
+  }
+
+  .sc__grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: var(--sp-3);
+    align-items: stretch;
+  }
+
+  .sc__cell {
+    padding: var(--sp-3);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .sc__cell--problem {
+    border-left: 3px solid var(--aws-red);
+  }
+  .sc__cell--solution {
+    border-left: 3px solid var(--aws-green);
+  }
+
+  .sc__label {
+    margin: 0 0 var(--sp-1);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .sc__text {
+    margin: 0;
+    font-size: var(--step--1);
+    line-height: 1.55;
+  }
+
+  .sc__arrow {
+    display: grid;
+    place-items: center;
+    color: var(--text-muted);
+  }
+  .sc__arrow svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .sc__outcome {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: var(--sp-4) 0 0;
+    padding: var(--sp-3);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--aws-green) 9%, var(--bg));
+    font-size: var(--step--1);
+    font-weight: 600;
+  }
+  .sc__outcome span {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .sc__extra {
+    margin-top: var(--sp-4);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .sc__extra :global(> :last-child) {
+    margin-bottom: 0;
+  }
+
+  @media (max-width: 620px) {
+    .sc__grid {
+      grid-template-columns: 1fr;
+    }
+    .sc__arrow svg {
+      transform: rotate(90deg);
+    }
+  }
+</style>

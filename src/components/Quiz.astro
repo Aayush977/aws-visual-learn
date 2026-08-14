@@ -1,0 +1,353 @@
+---
+/**
+ * A single practice question written in the style the real exam uses.
+ *
+ * Every option carries a `why` — the explanation for the *wrong* answers is
+ * where most of the learning is, so fill those in too.
+ *
+ *   <Quiz
+ *     question="A company needs to store … Which service should a solutions architect recommend?"
+ *     choose={1}
+ *     options={[
+ *       { text: 'Amazon S3', correct: true, why: 'Object storage, 11 nines of durability.' },
+ *       { text: 'Amazon EBS', why: 'Block storage, attaches to one EC2 instance in one AZ.' },
+ *     ]}
+ *   />
+ */
+interface Option {
+  text: string;
+  correct?: boolean;
+  why?: string;
+}
+
+interface Props {
+  question: string;
+  options: Option[];
+  /** How many answers the reader should select. Matches "(Choose TWO.)" style questions. */
+  choose?: number;
+  /** Extra teaching after the answer is revealed. Supports inline HTML. */
+  explain?: string;
+}
+
+const { question, options, choose = 1, explain } = Astro.props;
+
+const uid = 'qz-' + Math.random().toString(36).slice(2, 9);
+const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+const correctLetters = options
+  .map((o, i) => (o.correct ? letters[i] : null))
+  .filter(Boolean)
+  .join(' and ');
+---
+
+<section class="qz" data-choose={choose} aria-labelledby={`${uid}-q`}>
+  <p class="qz__eyebrow">
+    Practice question{choose > 1 && <span> · choose {choose}</span>}
+  </p>
+  <p class="qz__question" id={`${uid}-q`}>{question}</p>
+
+  <ul class="qz__options">
+    {
+      options.map((o, i) => (
+        <li>
+          <button
+            type="button"
+            class="qz__option"
+            data-correct={o.correct ? 'true' : 'false'}
+            aria-pressed="false"
+          >
+            <span class="qz__letter" aria-hidden="true">
+              {letters[i]}
+            </span>
+            <span class="qz__optionBody">
+              <span class="qz__text">{o.text}</span>
+              {o.why && <span class="qz__why">{o.why}</span>}
+            </span>
+            <span class="qz__mark" aria-hidden="true" />
+          </button>
+        </li>
+      ))
+    }
+  </ul>
+
+  <div class="qz__actions">
+    <button type="button" class="qz__check" data-act="check">Check answer</button>
+    <button type="button" class="qz__reset" data-act="reset">Try again</button>
+  </div>
+
+  <p class="qz__verdict" data-role="verdict" role="status"></p>
+
+  {explain && <div class="qz__explain" data-role="explain" set:html={explain} />}
+
+  <details class="qz__fallback">
+    <summary>Show the answer</summary>
+    <p>
+      Correct: <strong>{correctLetters || '—'}</strong>
+    </p>
+  </details>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLElement>('.qz').forEach((quiz) => {
+    const choose = Number(quiz.dataset.choose || 1);
+    const opts = Array.from(quiz.querySelectorAll<HTMLButtonElement>('.qz__option'));
+    const checkBtn = quiz.querySelector<HTMLButtonElement>('[data-act="check"]')!;
+    const resetBtn = quiz.querySelector<HTMLButtonElement>('[data-act="reset"]')!;
+    const verdict = quiz.querySelector<HTMLElement>('[data-role="verdict"]')!;
+    let revealed = false;
+
+    quiz.classList.add('is-ready');
+    checkBtn.hidden = choose === 1;
+
+    const selected = () => opts.filter((o) => o.getAttribute('aria-pressed') === 'true');
+
+    function reveal() {
+      revealed = true;
+      quiz.classList.add('is-revealed');
+      const picked = selected();
+      const gotAll =
+        picked.length > 0 &&
+        picked.every((o) => o.dataset.correct === 'true') &&
+        picked.length === opts.filter((o) => o.dataset.correct === 'true').length;
+
+      for (const o of opts) {
+        o.classList.add(o.dataset.correct === 'true' ? 'is-answer' : 'is-distractor');
+        o.disabled = true;
+      }
+      verdict.textContent = gotAll
+        ? 'Correct.'
+        : picked.length === 0
+          ? 'Here are the answers.'
+          : 'Not quite — read the explanations below each option.';
+      verdict.classList.toggle('is-good', gotAll);
+      verdict.classList.toggle('is-bad', !gotAll && picked.length > 0);
+      checkBtn.hidden = true;
+      resetBtn.hidden = false;
+    }
+
+    quiz.addEventListener('click', (e) => {
+      const opt = (e.target as HTMLElement).closest<HTMLButtonElement>('.qz__option');
+      if (opt && !revealed) {
+        const on = opt.getAttribute('aria-pressed') === 'true';
+        if (choose === 1) {
+          for (const o of opts) o.setAttribute('aria-pressed', 'false');
+          opt.setAttribute('aria-pressed', String(!on));
+          reveal();
+        } else {
+          if (!on && selected().length >= choose) return;
+          opt.setAttribute('aria-pressed', String(!on));
+          checkBtn.disabled = selected().length !== choose;
+        }
+        return;
+      }
+      const act = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-act]')?.dataset.act;
+      if (act === 'check') reveal();
+      if (act === 'reset') {
+        revealed = false;
+        quiz.classList.remove('is-revealed');
+        for (const o of opts) {
+          o.disabled = false;
+          o.classList.remove('is-answer', 'is-distractor');
+          o.setAttribute('aria-pressed', 'false');
+        }
+        verdict.textContent = '';
+        verdict.classList.remove('is-good', 'is-bad');
+        checkBtn.hidden = choose === 1;
+        checkBtn.disabled = true;
+        resetBtn.hidden = true;
+      }
+    });
+
+    checkBtn.disabled = true;
+    resetBtn.hidden = true;
+  });
+</script>
+
+<style>
+  .qz {
+    margin: var(--sp-6) 0;
+    padding: var(--sp-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+  }
+
+  .qz__eyebrow {
+    margin: 0 0 var(--sp-2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--aws-purple);
+  }
+
+  .qz__question {
+    margin: 0 0 var(--sp-4);
+    font-size: var(--step-0);
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .qz__options {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .qz__option {
+    --q-tone: var(--border-strong);
+    display: flex;
+    gap: var(--sp-3);
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    font-size: var(--step--1);
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--q-tone);
+    border-radius: var(--radius);
+    padding: var(--sp-3);
+    cursor: pointer;
+  }
+  .qz.is-ready .qz__option:not(:disabled):hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .qz__option:disabled {
+    cursor: default;
+  }
+
+  .qz__letter {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    border: 1px solid var(--q-tone);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .qz__optionBody {
+    display: block;
+  }
+  .qz__text {
+    display: block;
+  }
+
+  /* Explanations only appear after the answer is revealed. */
+  .qz__why {
+    display: none;
+    margin-top: var(--sp-2);
+    color: var(--text-muted);
+    font-size: 0.85em;
+    line-height: 1.5;
+  }
+  .qz.is-revealed .qz__why {
+    display: block;
+  }
+  .qz:not(.is-ready) .qz__why {
+    display: block;
+  }
+
+  .qz__mark {
+    margin-left: auto;
+    flex: none;
+    align-self: center;
+    font-weight: 800;
+  }
+
+  .qz__option[aria-pressed='true'] {
+    --q-tone: var(--accent);
+    background: var(--accent-soft);
+  }
+  .qz__option.is-answer {
+    --q-tone: var(--aws-green);
+    background: color-mix(in srgb, var(--aws-green) 10%, var(--bg));
+    opacity: 1;
+  }
+  .qz__option.is-answer .qz__mark::after {
+    content: '✓';
+    color: var(--aws-green);
+  }
+  .qz__option.is-distractor[aria-pressed='true'] {
+    --q-tone: var(--aws-red);
+    background: color-mix(in srgb, var(--aws-red) 10%, var(--bg));
+  }
+  .qz__option.is-distractor[aria-pressed='true'] .qz__mark::after {
+    content: '✕';
+    color: var(--aws-red);
+  }
+  .qz__option.is-distractor[aria-pressed='false'] {
+    opacity: 0.72;
+  }
+
+  .qz__actions {
+    display: flex;
+    gap: var(--sp-2);
+    margin-top: var(--sp-4);
+  }
+  .qz__check,
+  .qz__reset {
+    font: inherit;
+    font-size: var(--step--1);
+    font-weight: 600;
+    padding: 0.4rem 0.85rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .qz__check {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .qz__check:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .qz__verdict {
+    margin: var(--sp-3) 0 0;
+    font-weight: 650;
+    font-size: var(--step--1);
+    min-height: 1lh;
+  }
+  .qz__verdict.is-good {
+    color: var(--aws-green);
+  }
+  .qz__verdict.is-bad {
+    color: var(--aws-red);
+  }
+
+  .qz__explain {
+    display: none;
+    margin-top: var(--sp-3);
+    padding-top: var(--sp-3);
+    border-top: 1px dashed var(--border);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .qz.is-revealed .qz__explain,
+  .qz:not(.is-ready) .qz__explain {
+    display: block;
+  }
+  .qz__explain :global(> :last-child) {
+    margin-bottom: 0;
+  }
+
+  /* Only useful when JS has not run. */
+  .qz__fallback {
+    margin-top: var(--sp-3);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .qz.is-ready .qz__fallback {
+    display: none;
+  }
+</style>

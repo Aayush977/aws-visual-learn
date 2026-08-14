@@ -1,0 +1,250 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { url } from '../../lib/paths';
+import { QUESTIONS, countByTrack, ccpDomainMix } from '../../lib/questions';
+import { EXAMS, EXAM_META, TRACKS, TRACK_META } from '../../content.config';
+
+const perTrack = countByTrack();
+const domainMix = ccpDomainMix();
+const trackSets = TRACKS.filter((t) => perTrack[t] > 0);
+
+const examSets = EXAMS.map((exam) => ({
+  exam,
+  meta: EXAM_META[exam],
+  count: QUESTIONS.filter((q) => q.exams.includes(exam)).length,
+}));
+---
+
+<BaseLayout
+  title="Practice questions"
+  description="Check what has actually stuck. Scored practice tests for the AWS Cloud Practitioner and Solutions Architect Associate exams, with an explanation on every option and a link back to the lesson behind each question."
+>
+  <div class="wrap page">
+    <header class="page__head">
+      <p class="page__eyebrow">Test yourself</p>
+      <h1>Practice questions</h1>
+      <p class="page__lead">
+        Reading a lesson and being able to answer a question about it under time pressure are two
+        different skills. These are scored, shuffled, and written in the style the real exams use
+        — with an explanation on every option, including the wrong ones.
+      </p>
+      <p class="page__count">{QUESTIONS.length} questions in the bank</p>
+    </header>
+
+    <section class="band">
+      <h2>Full practice tests</h2>
+      <p class="band__lead">Everything on the blueprint for one exam, in one sitting.</p>
+      <ul class="grid">
+        {
+          examSets.map((s) => (
+            <li class="card card--exam">
+              <p class="card__eyebrow">{s.meta.label}</p>
+              <h3 class="card__title">
+                <a href={url(`/quiz/${s.exam.toLowerCase()}`)}>{s.meta.full}</a>
+              </h3>
+              <p class="card__body">
+                {s.count} questions across every topic on the blueprint, scored with a breakdown by
+                subject at the end.
+              </p>
+              <p class="card__meta">{s.count} questions</p>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="band">
+      <h2>How the Cloud Practitioner bank is weighted</h2>
+      <p class="band__lead">
+        The real CLF-C02 exam weights its four domains unevenly, so this bank is built to match.
+        Security and Compliance is the largest and the one most people under-prepare.
+      </p>
+      <ul class="mix">
+        {
+          domainMix.map((d) => (
+            <li class="mix__row">
+              <span class="mix__name">
+                <strong>Domain {d.domain}</strong> {d.label}
+              </span>
+              <span class="mix__bar">
+                <span style={`width:${d.share}%`} />
+              </span>
+              <span class="mix__num">
+                {d.count} · {d.share}%
+                <span class="mix__target"> (exam: {d.weight}%)</span>
+              </span>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="band">
+      <h2>By topic</h2>
+      <p class="band__lead">
+        Shorter sets when you have just finished a track and want to check it landed.
+      </p>
+      <ul class="grid">
+        {
+          trackSets.map((t) => (
+            <li class="card">
+              <h3 class="card__title">
+                <a href={url(`/quiz/${t}`)}>{TRACK_META[t].label}</a>
+              </h3>
+              <p class="card__body">{TRACK_META[t].blurb}</p>
+              <p class="card__meta">
+                {perTrack[t]} question{perTrack[t] === 1 ? '' : 's'}
+              </p>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .page {
+    padding: var(--sp-7) 0;
+  }
+  .page__head {
+    max-width: 46rem;
+    margin-bottom: var(--sp-7);
+  }
+  .page__eyebrow {
+    margin: 0 0 var(--sp-2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .page__lead {
+    font-size: var(--step-1);
+    color: var(--text-muted);
+  }
+  .page__count {
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .band {
+    margin-bottom: var(--sp-7);
+  }
+  .band h2 {
+    margin: 0 0 var(--sp-1);
+  }
+  .band__lead {
+    margin: 0 0 var(--sp-4);
+    color: var(--text-muted);
+    font-size: var(--step--1);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+    gap: var(--sp-3);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  .card {
+    padding: var(--sp-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+  .card:hover {
+    border-color: var(--accent);
+  }
+  .card--exam {
+    border-left: 4px solid var(--aws-orange);
+  }
+  .card__eyebrow {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--aws-orange);
+  }
+  .card__title {
+    margin: 0;
+    font-size: var(--step-0);
+  }
+  .card__title a {
+    color: inherit;
+    text-decoration: none;
+  }
+  /* Make the whole card clickable without nesting interactive elements. */
+  .card__title a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  .card {
+    position: relative;
+  }
+  .card__body {
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+    flex: 1;
+  }
+  .card__meta {
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .mix {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--sp-2);
+    max-width: 46rem;
+  }
+  .mix__row {
+    display: grid;
+    grid-template-columns: minmax(10rem, 20rem) 1fr auto;
+    align-items: center;
+    gap: var(--sp-3);
+    font-size: var(--step--1);
+  }
+  .mix__bar {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .mix__bar span {
+    display: block;
+    height: 100%;
+    background: var(--aws-orange);
+  }
+  .mix__num {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .mix__target {
+    opacity: 0.7;
+  }
+
+  @media (max-width: 40rem) {
+    .mix__row {
+      grid-template-columns: 1fr auto;
+    }
+    .mix__bar {
+      grid-column: 1 / -1;
+      order: 3;
+    }
+  }
+</style>

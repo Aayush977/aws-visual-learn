@@ -1,0 +1,289 @@
+---
+title: What AWS Charges For, and How to Watch It
+summary: Three things drive nearly every bill, and one of them surprises everybody. Plus which cost tool answers which question — before, during and after the money is spent.
+exams: [CCP, SAA]
+track: billing
+order: 10
+domains:
+  CCP: 'Domain 4 — Billing, Pricing, and Support'
+  SAA: 'Domain 4 — Design Cost-Optimized Architectures'
+minutes: 12
+hook: Data going in is free. Data coming out is not. Most shocking AWS bills are that sentence, learned late.
+updated: 2026-08-09
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+AWS publishes hundreds of price lists, which makes the pricing model look impossibly complex.
+It is not. Almost every line on almost every bill is one of three things:
+
+1. **Compute** — how long something ran, and how big it was.
+2. **Storage** — how many gigabytes you kept, and for how long.
+3. **Data transfer** — specifically, data going **out**.
+
+The third is the one that catches people, because it is invisible until it is not.
+
+<Mnemonic
+  title="The three drivers of an AWS bill"
+  phrase="Compute, Storage, and the Way Out"
+  tone="orange"
+  items={[
+    { key: 'C', term: 'Compute', note: 'billed per second or per millisecond, scaled by instance size' },
+    { key: 'S', term: 'Storage', note: 'billed per GB-month, plus request charges on some services' },
+    { key: 'O', term: 'Out', note: 'data transfer OUT of AWS to the internet. In is free' },
+  ]}
+/>
+
+## Data transfer: the rule that saves the most money
+
+Learn this shape, because it is directly examinable and it explains an enormous number of
+architectural decisions:
+
+- **Data IN from the internet — free.** Always. Upload as much as you like.
+- **Data OUT to the internet — charged per GB**, and it is the single most common surprise on a
+  bill. There is a modest free allowance each month.
+- **Between Availability Zones in the same Region — charged**, in both directions. This is why
+  chatty cross-AZ traffic quietly costs money.
+- **Within the same Availability Zone using private IP addresses — free.**
+- **Between Regions — charged**, at a higher rate than cross-AZ.
+- **Out to CloudFront, and from CloudFront to users — cheaper** than straight from the origin,
+  which is one reason a CDN often pays for itself.
+
+<Callout type="cost">
+Two specific tricks the exam likes. A <strong>gateway VPC endpoint for S3 or DynamoDB</strong>
+is free and keeps that traffic off your NAT gateway, removing both the NAT data-processing
+charge and the internet path. And putting <strong>CloudFront</strong> in front of an origin cuts
+egress cost as well as latency — a rare case where the fast answer is also the cheap one.
+</Callout>
+
+## The Free Tier has three different shapes
+
+Beginners conflate these, and questions occasionally test the difference:
+
+- **Always free** — permanent, for every account. 1 million Lambda requests a month, 25 GB of
+  DynamoDB storage, 10 CloudWatch metrics.
+- **12 months free** — from the day you open the account. 750 hours a month of a `t2.micro` or
+  `t3.micro`, 5 GB of S3 Standard, 750 hours of RDS.
+- **Trials** — short-term, starting when you activate the service. A few months of Amazon
+  Inspector, for instance.
+
+<Callout type="gotcha">
+750 hours per month is <strong>one</strong> instance running continuously — not two. Run two
+<code>t3.micro</code> instances all month and roughly half of that usage is billed. The free
+tier also does not stop you spending: there is no cap, which is why setting up a
+<strong>budget alert on day one</strong> is genuinely good advice.
+</Callout>
+
+## Which tool answers which question
+
+The cost tools all sound similar. They are not — each one belongs at a different moment in the
+life of a spend.
+
+<Diagram
+  title="The cost tools, in the order you need them"
+  viewBox="0 90 1000 290"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Before you build — estimate it',
+      body: 'The <strong>AWS Pricing Calculator</strong> models an architecture you have not built yet and produces a monthly figure you can put in a business case. It is the only tool here that works on hypotheticals.',
+      flow: 'w-1',
+    },
+    {
+      title: 'While it runs — get warned',
+      body: '<strong>AWS Budgets</strong> alerts you when spend (or forecast spend) crosses a threshold you set. <strong>Cost Anomaly Detection</strong> uses machine learning to flag unusual spikes you did not think to set a threshold for.',
+      flow: 'w-2',
+    },
+    {
+      title: 'After the fact — understand it',
+      body: '<strong>Cost Explorer</strong> visualises and filters historical spend by service, tag, account or Region, and forecasts forward. The <strong>Cost and Usage Report</strong> is the raw, line-by-line data for finance teams.',
+      flow: 'w-3',
+    },
+    {
+      title: 'Then — reduce it',
+      body: '<strong>Trusted Advisor</strong> checks live resources against best practice, including idle and under-used ones. <strong>Compute Optimizer</strong> recommends right-sized instances from your actual CloudWatch metrics.',
+    },
+  ]}
+  caption="If a question asks you to estimate, it is the Pricing Calculator. To be alerted, Budgets. To analyse, Cost Explorer. To be told what to fix, Trusted Advisor."
+>
+  <Node x={130} y={140} w={210} h={56} label="Before you build" tone="muted" step={1} />
+  <Node x={370} y={140} w={210} h={56} label="While it runs" tone="muted" step={2} />
+  <Node x={610} y={140} w={210} h={56} label="After the bill" tone="muted" step={3} />
+  <Node x={850} y={140} w={210} h={56} label="To reduce it" tone="muted" step={4} />
+
+  <Node x={130} y={225} w={210} h={66} label="Pricing Calculator" sub="estimate a design" icon="chart" tone="blue" step={1} />
+  <Node x={370} y={225} w={210} h={66} label="AWS Budgets" sub="alert on a threshold" icon="mail" tone="orange" step={2} />
+  <Node x={610} y={225} w={210} h={66} label="Cost Explorer" sub="visualise and filter" icon="eye" tone="teal" step={3} />
+  <Node x={850} y={225} w={210} h={66} label="Trusted Advisor" sub="what to fix" icon="allow" tone="green" step={4} />
+
+  <Node x={370} y={300} w={210} h={66} label="Anomaly Detection" sub="spot odd spikes" icon="chart" tone="orange" step={2} />
+  <Node x={610} y={300} w={210} h={66} label="Cost & Usage Report" sub="raw line items" icon="table" tone="teal" step={3} />
+  <Node x={850} y={300} w={210} h={66} label="Compute Optimizer" sub="right-size instances" icon="scale" tone="green" step={4} />
+
+  <Wire id="w-1" from={[235, 140]} to={[263, 140]} tone="muted" step={2} />
+  <Wire id="w-2" from={[475, 140]} to={[503, 140]} tone="muted" step={3} />
+  <Wire id="w-3" from={[715, 140]} to={[743, 140]} tone="muted" step={4} />
+</Diagram>
+
+A summary you can revise from:
+
+| Tool | The question it answers |
+| --- | --- |
+| **AWS Pricing Calculator** | "What will this cost if we build it?" |
+| **AWS Budgets** | "Tell me when we go over £5,000." |
+| **Cost Anomaly Detection** | "Tell me when something is weird, without me guessing a number." |
+| **Cost Explorer** | "Why was last month higher? Which team, which service?" |
+| **Cost and Usage Report** | "Give finance every line item, hour by hour." |
+| **AWS Trusted Advisor** | "What should we fix — idle resources, security gaps, limits?" |
+| **AWS Compute Optimizer** | "Which instances are the wrong size for their actual load?" |
+| **AWS Cost Allocation Tags** | "Which department does this cost belong to?" |
+
+<Callout type="exam">
+Budgets versus Cost Explorer is a favourite pairing. <strong>Budgets</strong> is proactive — it
+notifies you when a threshold is crossed. <strong>Cost Explorer</strong> is retrospective — it
+shows you charts of what already happened. If the question contains "notify", "alert" or
+"before it exceeds", the answer is Budgets.
+</Callout>
+
+## Organizations and consolidated billing
+
+**AWS Organizations** lets you run many AWS accounts under one roof — which is the recommended
+structure, because separate accounts are the strongest isolation boundary AWS offers. Put
+production in one account and development in another and a mistake in one cannot touch the other.
+
+What it does for money:
+
+- **One bill** for every account.
+- **Volume discounts aggregate.** Tiered pricing (S3 storage, data transfer) is calculated on
+  the *combined* usage, so the whole organisation reaches cheaper tiers sooner.
+- **Reserved Instances and Savings Plans are shared.** An unused reservation in one account
+  automatically applies to matching usage in another.
+
+And for control, **Service Control Policies** set the maximum permissions any member account can
+have — the guardrail covered in the IAM lesson.
+
+<Callout type="cost">
+<strong>Cost allocation tags</strong> are how a single bill becomes useful. Tag every resource
+with something like <code>Project</code>, <code>Environment</code> and <code>Owner</code>,
+activate those tags in the billing console, and Cost Explorer can then break spend down by them.
+Untagged resources are where unexplained cost hides, and a tagging policy applied early is worth
+far more than one applied later.
+</Callout>
+
+## Where the savings usually are
+
+For the exam, and for real life, in rough order of how much they typically return:
+
+1. **Turn off what nobody uses.** Dev and test environments outside working hours; forgotten
+   instances; unattached EBS volumes and Elastic IPs still being billed.
+2. **Right-size.** Compute Optimizer routinely finds instances at 5% CPU.
+3. **Commit** — Savings Plans on the steady baseline, once it is genuinely steady.
+4. **Move interruptible work to Spot.**
+5. **Apply S3 lifecycle rules** so cold data drifts into cheaper storage classes automatically.
+6. **Cut data-transfer cost** with CloudFront and VPC endpoints.
+7. **Go serverless** where the workload is spiky, so the idle hours cost nothing at all.
+
+<Scenario
+  who="A media company whose AWS bill doubled in one month"
+  problem="Nobody could say why. The bill was a single 400-page invoice covering nine teams, and the largest line was simply 'data transfer'. Suspicion fell on a new video feature, but there was no way to prove it, and the finance director wanted the feature switched off."
+  solution="They enabled Cost Explorer with tag-based grouping, then applied a tagging policy through Organizations so every resource carried Team and Project. Within two weeks the increase was traced to video files being served directly from S3 to viewers worldwide — pure egress. CloudFront went in front of the bucket, an AWS Budget was set per team with alerts at 80% of forecast, and Cost Anomaly Detection was enabled account-wide."
+  outcome="Data transfer costs fell by about 60% once traffic was served from edge locations. More importantly, each team can now see its own spend, and the next anomaly was flagged automatically within a day rather than discovered on an invoice five weeks later."
+>
+Two separate lessons here, and both are examinable. The <strong>architectural</strong> fix was
+CloudFront reducing egress. The <strong>operational</strong> fix was tags plus Budgets, so the
+next surprise arrives as an alert instead of an invoice.
+</Scenario>
+
+<Quiz
+  question="A company wants to be notified by email when their monthly AWS spend is forecast to exceed $10,000, so they can act before the month ends. Which service should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'AWS Budgets',
+      correct: true,
+      why: 'Budgets lets you set a cost threshold and alerts on both actual and forecast spend, which is exactly the proactive notification described.',
+    },
+    {
+      text: 'AWS Cost Explorer',
+      why: 'Cost Explorer visualises and forecasts historical spend, but it is something you go and look at. It does not send threshold alerts.',
+    },
+    {
+      text: 'AWS Pricing Calculator',
+      why: 'The Pricing Calculator estimates the cost of an architecture before you build it. It has no visibility of actual account spend at all.',
+    },
+    {
+      text: 'AWS Cost and Usage Report',
+      why: 'The CUR delivers detailed line-item billing data to S3 for analysis. It is raw data, not an alerting mechanism.',
+    },
+  ]}
+  explain="Sort them by tense. <strong>Future hypothetical → Pricing Calculator. Future actual → Budgets. Past → Cost Explorer and the CUR.</strong>"
+/>
+
+<Quiz
+  question="An application in a private subnet transfers large volumes of data to Amazon S3 through a NAT gateway. The team wants to reduce cost. What is the most effective change?"
+  choose={1}
+  options={[
+    {
+      text: 'Create a gateway VPC endpoint for S3 and route the traffic through it',
+      correct: true,
+      why: 'Gateway endpoints for S3 and DynamoDB are free and route traffic over the AWS network, removing the NAT gateway’s per-gigabyte processing charge entirely — and improving security, since the traffic never touches the internet.',
+    },
+    {
+      text: 'Move the application to a public subnet with a public IP address',
+      why: 'It would avoid the NAT charge but expose the instances directly to the internet, trading a modest saving for a serious security regression.',
+    },
+    {
+      text: 'Enable S3 Transfer Acceleration',
+      why: 'Transfer Acceleration speeds up long-distance uploads over the internet by routing them via edge locations, and it costs extra. It does not remove NAT charges.',
+    },
+    {
+      text: 'Compress the data before uploading it',
+      why: 'This genuinely helps and is a reasonable secondary step, but it reduces the charge rather than eliminating it. The endpoint removes the NAT data-processing cost completely and is free.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="Which statements about AWS data transfer pricing are correct? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'Data transferred into AWS from the internet is free',
+      correct: true,
+      why: 'Inbound data transfer from the internet carries no charge on AWS. This is why uploading large datasets costs nothing and downloading them costs a great deal.',
+    },
+    {
+      text: 'Data transferred between Availability Zones in the same Region is charged',
+      correct: true,
+      why: 'Cross-AZ traffic is billed in both directions. It is a common hidden cost in chatty multi-AZ architectures, and a reason to keep high-volume traffic zone-local where availability permits.',
+    },
+    {
+      text: 'Data transferred out to the internet is free up to 100 TB per month',
+      why: 'There is a modest monthly free allowance, but it is measured in gigabytes rather than 100 terabytes. Egress beyond it is one of the largest costs on many bills.',
+    },
+    {
+      text: 'Data transferred between two instances in the same Availability Zone using private IP addresses is charged',
+      why: 'This is the case that is free. Traffic within one Availability Zone over private IPs carries no data-transfer charge.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Nearly every bill is <strong>compute + storage + data transfer out</strong>. In is free; out is the surprise.',
+    'Cross-<strong>AZ</strong> traffic is charged. Same-AZ over <strong>private IPs</strong> is free. Cross-Region costs more still.',
+    'Free tier has three shapes: <strong>always free</strong>, <strong>12 months</strong>, and <strong>short trials</strong>. 750 hours is one instance, and nothing caps your spend.',
+    '<strong>Pricing Calculator</strong> before · <strong>Budgets</strong> and <strong>Anomaly Detection</strong> during · <strong>Cost Explorer</strong> and <strong>CUR</strong> after · <strong>Trusted Advisor</strong> and <strong>Compute Optimizer</strong> to fix.',
+    '"Notify me before it exceeds" is always <strong>Budgets</strong>. "Show me why last month was high" is <strong>Cost Explorer</strong>.',
+    '<strong>Organizations</strong> gives one bill, aggregated volume discounts, and shared Savings Plans across accounts.',
+    '<strong>Cost allocation tags</strong> turn one invoice into per-team accountability. Untagged resources are where waste hides.',
+  ]}
+/>

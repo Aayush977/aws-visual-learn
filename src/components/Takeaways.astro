@@ -1,0 +1,79 @@
+---
+/**
+ * The "if you remember nothing else" box. Put one at the end of every lesson.
+ *
+ *   <Takeaways items={[
+ *     'A Region is a geographic area; an AZ is one or more datacentres inside it.',
+ *     'Multi-AZ = high availability. Multi-Region = disaster recovery + latency.',
+ *   ]} />
+ */
+interface Props {
+  title?: string;
+  items: string[];
+}
+
+const { title = 'If you remember nothing else', items } = Astro.props;
+---
+
+<aside class="tk" aria-labelledby="tk-h">
+  <h4 class="tk__title" id="tk-h">{title}</h4>
+  <ul class="tk__list">
+    {items.map((t) => <li set:html={t} />)}
+  </ul>
+</aside>
+
+<style>
+  .tk {
+    margin: var(--sp-7) 0 var(--sp-6);
+    padding: var(--sp-5);
+    border-radius: var(--radius-lg);
+    background: var(--aws-squid);
+    color: #eef2f6;
+  }
+  :global(:root[data-theme='dark']) .tk {
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+  }
+
+  .tk__title {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--step-0);
+    color: var(--aws-orange);
+    letter-spacing: 0.01em;
+  }
+
+  .tk__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: var(--sp-3);
+    font-size: var(--step--1);
+    line-height: 1.55;
+  }
+  .tk__list li {
+    position: relative;
+    padding-left: 1.6rem;
+  }
+  .tk__list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.55em;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 2px;
+    background: var(--aws-orange);
+  }
+  .tk__list :global(strong) {
+    color: #fff;
+  }
+  :global(:root[data-theme='dark']) .tk__list :global(strong) {
+    color: var(--text);
+  }
+  .tk__list :global(code) {
+    background: rgb(255 255 255 / 0.1);
+    border-color: rgb(255 255 255 / 0.18);
+    color: inherit;
+  }
+</style>

@@ -1,0 +1,130 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import LessonCard from '../../components/LessonCard.astro';
+import { lessonsForExam, groupByTrack } from '../../lib/lessons';
+import { EXAMS, EXAM_META, TRACK_META } from '../../content.config';
+
+export function getStaticPaths() {
+  return EXAMS.map((exam) => ({ params: { exam: exam.toLowerCase() }, props: { exam } }));
+}
+
+const { exam } = Astro.props;
+const meta = EXAM_META[exam];
+const lessons = await lessonsForExam(exam);
+const groups = groupByTrack(lessons);
+const totalMinutes = lessons.reduce((sum, l) => sum + l.data.minutes, 0);
+
+const BLURB: Record<typeof exam, string> = {
+  CCP: 'The entry-level exam. It asks what AWS services do, when you would reach for them, how the pricing and support model works, and who is responsible for what. Breadth over depth — you are not expected to configure anything.',
+  SAA: 'The first architect exam. Same services, much deeper: it gives you a scenario with constraints (cost, latency, availability, compliance) and asks which combination of services meets them. Knowing what a service does is not enough — you need to know what it does better than the alternatives.',
+};
+---
+
+<BaseLayout
+  title={meta.full}
+  description={`A visual study path for the AWS ${meta.full} exam: ${lessons.length} lessons with animated diagrams, mnemonics and practice questions.`}
+>
+  <div class="wrap page">
+    <header class="page__head">
+      <p class="page__eyebrow">Study path</p>
+      <h1>{meta.full}</h1>
+      <p class="page__lead">{BLURB[exam]}</p>
+      <p class="page__count">
+        {lessons.length} lessons · about {Math.round(totalMinutes / 60)} hour{
+          Math.round(totalMinutes / 60) === 1 ? '' : 's'
+        } of reading
+      </p>
+    </header>
+
+    {
+      groups.length === 0 ? (
+        <p>No lessons tagged for this exam yet.</p>
+      ) : (
+        groups.map((g, gi) => (
+          <section class="trk">
+            <div class="trk__head">
+              <h2>
+                <span class="trk__num">{String(gi + 1).padStart(2, '0')}</span>
+                {TRACK_META[g.track].label}
+              </h2>
+              <p>{TRACK_META[g.track].blurb}</p>
+            </div>
+            <ul class="grid">
+              {g.lessons.map((l, i) => (
+                <LessonCard
+                  id={l.id}
+                  title={l.data.title}
+                  summary={l.data.summary}
+                  exams={l.data.exams}
+                  minutes={l.data.minutes}
+                  n={i + 1}
+                />
+              ))}
+            </ul>
+          </section>
+        ))
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .page {
+    padding: var(--sp-7) 0;
+  }
+  .page__head {
+    max-width: 48rem;
+    margin-bottom: var(--sp-7);
+  }
+  .page__eyebrow {
+    margin: 0 0 var(--sp-1);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--aws-orange);
+  }
+  .page__lead {
+    font-size: var(--step-0);
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .page__count {
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .trk {
+    margin-bottom: var(--sp-7);
+  }
+  .trk__head {
+    margin-bottom: var(--sp-4);
+    padding-bottom: var(--sp-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .trk__head h2 {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    margin: 0 0 var(--sp-1);
+  }
+  .trk__num {
+    font-size: var(--step-0);
+    font-variant-numeric: tabular-nums;
+    color: var(--aws-orange);
+  }
+  .trk__head p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--step--1);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+    gap: var(--sp-3);
+    padding: 0;
+    margin: 0;
+  }
+</style>

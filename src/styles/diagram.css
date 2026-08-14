@@ -1,0 +1,409 @@
+/* =========================================================================
+   Animated diagram player.
+   Class prefix `dg__` = player chrome. `dg-` = shapes inside the SVG.
+   ========================================================================= */
+
+.dg {
+  margin: var(--sp-6) 0;
+}
+
+.dg__root {
+  display: block;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+/* ---- Header + controls ---- */
+
+.dg__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--border);
+}
+
+.dg__title {
+  margin: 0;
+  font-size: var(--step-0);
+  font-weight: 650;
+}
+
+.dg__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.dg__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.dg__btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.dg__btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dg__btn--play {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  padding-inline: 0.75rem;
+}
+.dg__btn--play:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: #fff;
+}
+.dg__btn--play svg {
+  fill: currentColor;
+  stroke: none;
+}
+.dg__ico-pause,
+.dg__btn--play.is-playing .dg__ico-play {
+  display: none;
+}
+.dg__btn--play.is-playing .dg__ico-pause {
+  display: inline;
+}
+.dg__btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.dg__count {
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  min-width: 3.2em;
+  text-align: center;
+}
+
+/* ---- Stage ---- */
+
+.dg__stage {
+  background: var(--diagram-bg);
+  padding: var(--sp-4);
+}
+
+.dg__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font-sans);
+}
+
+/* ---- Step list ---- */
+
+.dg__steps {
+  list-style: none;
+  margin: 0;
+  padding: var(--sp-2);
+  display: grid;
+  gap: 2px;
+  border-top: 1px solid var(--border);
+  counter-reset: none;
+}
+
+.dg__stepBtn {
+  display: flex;
+  gap: var(--sp-3);
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: var(--step--1);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.dg__stepBtn:hover {
+  background: var(--bg-sunken);
+}
+
+.dg__num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dg__stepText {
+  display: block;
+}
+.dg__stepTitle {
+  display: block;
+  color: var(--text);
+  font-weight: 650;
+}
+.dg__stepBody {
+  display: block;
+}
+
+.dg__step.is-done .dg__num {
+  background: var(--border);
+  border-color: var(--border);
+}
+.dg__step.is-current .dg__stepBtn {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.dg__step.is-current .dg__num {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.dg__caption {
+  margin-top: var(--sp-2);
+  font-size: var(--step--1);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* =========================================================================
+   Shapes inside the SVG
+   ========================================================================= */
+
+.dg-node--orange,
+.dg-bound--orange,
+.dg-wire--orange {
+  --tone: var(--aws-orange);
+}
+.dg-node--blue,
+.dg-bound--blue,
+.dg-wire--blue {
+  --tone: var(--aws-blue);
+}
+.dg-node--teal,
+.dg-bound--teal,
+.dg-wire--teal {
+  --tone: var(--aws-teal);
+}
+.dg-node--purple,
+.dg-bound--purple,
+.dg-wire--purple {
+  --tone: var(--aws-purple);
+}
+.dg-node--green,
+.dg-bound--green,
+.dg-wire--green {
+  --tone: var(--aws-green);
+}
+.dg-node--red,
+.dg-bound--red,
+.dg-wire--red {
+  --tone: var(--aws-red);
+}
+.dg-node--navy,
+.dg-bound--navy,
+.dg-wire--navy {
+  --tone: var(--diagram-boundary);
+}
+.dg-node--muted,
+.dg-bound--muted,
+.dg-wire--muted {
+  --tone: var(--diagram-boundary);
+}
+
+/* Anything with a step is hidden-ish until its step plays. */
+.dg__svg [data-step] {
+  opacity: var(--diagram-dim);
+  transition:
+    opacity 0.4s ease,
+    filter 0.4s ease;
+}
+.dg__svg [data-step].is-lit {
+  opacity: 1;
+}
+
+/* Nodes */
+.dg-node__box {
+  fill: color-mix(in srgb, var(--tone) 10%, var(--diagram-bg));
+  stroke: var(--tone);
+  stroke-width: 1.75;
+}
+.dg-node.is-current .dg-node__box {
+  stroke-width: 3;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--tone) 55%, transparent));
+}
+.dg-node__icon {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dg-node__label {
+  fill: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+  text-anchor: middle;
+}
+.dg-node__sub {
+  fill: var(--text-muted);
+  font-size: 11px;
+  text-anchor: middle;
+}
+
+/* Boundaries */
+.dg-bound__box {
+  fill: color-mix(in srgb, var(--tone) 5%, transparent);
+  stroke: var(--tone);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 5;
+}
+.dg-bound.is-solid .dg-bound__box {
+  stroke-dasharray: none;
+}
+.dg-bound.is-current .dg-bound__box {
+  stroke-width: 2.5;
+}
+.dg-bound__icon {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dg-bound__label {
+  fill: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+/* Wires */
+.dg-wire__path {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.dg-wire__path.is-dashed {
+  stroke-dasharray: 6 5;
+}
+.dg-wire.is-current .dg-wire__path {
+  stroke-width: 3;
+}
+.dg-wire__label {
+  fill: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--diagram-bg);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.dg-arrowhead {
+  fill: var(--diagram-boundary);
+}
+.dg-arrowhead--orange {
+  fill: var(--aws-orange);
+}
+.dg-arrowhead--blue {
+  fill: var(--aws-blue);
+}
+.dg-arrowhead--teal {
+  fill: var(--aws-teal);
+}
+.dg-arrowhead--purple {
+  fill: var(--aws-purple);
+}
+.dg-arrowhead--green {
+  fill: var(--aws-green);
+}
+.dg-arrowhead--red {
+  fill: var(--aws-red);
+}
+.dg-arrowhead--navy,
+.dg-arrowhead--muted {
+  fill: var(--diagram-boundary);
+}
+
+/* Free-text labels authors can drop into a diagram */
+.dg-text {
+  fill: var(--text);
+  font-size: 13px;
+}
+.dg-text--muted {
+  fill: var(--text-muted);
+  font-size: 11.5px;
+}
+.dg-text--mid {
+  text-anchor: middle;
+}
+.dg-text--alert {
+  fill: var(--aws-red);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* The travelling packet */
+.dg__packet {
+  fill: var(--aws-orange);
+  stroke: var(--diagram-bg);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--aws-orange) 70%, transparent));
+  pointer-events: none;
+}
+.dg__packet.is-landing {
+  animation: dg-land 0.26s ease-out forwards;
+}
+@keyframes dg-land {
+  to {
+    r: 14;
+    opacity: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .dg__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dg__controls {
+    justify-content: space-between;
+  }
+  .dg__stage {
+    padding: var(--sp-2);
+  }
+}

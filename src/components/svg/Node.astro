@@ -1,0 +1,80 @@
+---
+/**
+ * A single box in a diagram: icon + label (+ optional sub-label).
+ *
+ * Coordinates are the CENTRE of the box, which makes it much easier to line
+ * boxes up with the <Wire /> arrows that connect them.
+ *
+ *   <Node x={120} y={80} label="EC2" sub="t3.micro" icon="server" tone="orange" step={2} />
+ */
+import { GLYPHS, type GlyphName } from '../../lib/glyphs';
+
+interface Props {
+  x: number;
+  y: number;
+  label: string;
+  sub?: string;
+  icon?: GlyphName;
+  /** Colour family. Matches the AWS console's service-category colours. */
+  tone?: 'orange' | 'blue' | 'teal' | 'purple' | 'green' | 'red' | 'navy' | 'muted';
+  /** Which playback step reveals this node. Omit to always show it. */
+  step?: number;
+  w?: number;
+  h?: number;
+  id?: string;
+}
+
+const { x, y, label, sub, icon, tone = 'blue', step, w = 128, h = 80, id } = Astro.props;
+
+const left = x - w / 2;
+const top = y - h / 2;
+const paths: readonly string[] = icon ? GLYPHS[icon] : [];
+
+// Stack icon → label → sub as a block and centre that block in the box, so the
+// same component works for a tall service tile and a thin horizontal bar.
+const GAP = 7;
+const LABEL_H = 14;
+const SUB_H = 13;
+const PAD = 6;
+const textH = LABEL_H + (sub ? SUB_H : 0);
+
+// Fit the icon to whatever vertical room the text leaves. Without this, a short
+// box (a matrix cell, a thin bar) pushes its sub-label straight through the
+// bottom border. Below ~14px the icon is unreadable anyway, so drop it and let
+// the text have the whole box.
+const room = h - PAD * 2 - textH - GAP;
+const iconSize = Math.min(26, Math.max(0, room));
+const showIcon = paths.length > 0 && iconSize >= 14;
+
+const iconScale = iconSize / 24;
+const iconX = x - iconSize / 2;
+
+const stackH = (showIcon ? iconSize + GAP : 0) + textH;
+const stackTop = y - stackH / 2;
+
+const iconY = stackTop;
+// SVG text sits on its baseline, so nudge down by the cap height.
+const labelY = stackTop + (showIcon ? iconSize + GAP : 0) + 12;
+const subY = labelY + SUB_H;
+---
+
+<g
+  class={`dg-node dg-node--${tone}`}
+  data-step={step}
+  id={id}
+  role="img"
+  aria-label={sub ? `${label}, ${sub}` : label}
+>
+  <rect class="dg-node__box" x={left} y={top} width={w} height={h} rx="10"></rect>
+  {
+    showIcon && (
+      <g class="dg-node__icon" transform={`translate(${iconX} ${iconY}) scale(${iconScale})`}>
+        {paths.map((d) => (
+          <path d={d} />
+        ))}
+      </g>
+    )
+  }
+  <text class="dg-node__label" x={x} y={labelY}>{label}</text>
+  {sub && <text class="dg-node__sub" x={x} y={subY}>{sub}</text>}
+</g>

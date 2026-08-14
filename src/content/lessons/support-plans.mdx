@@ -1,0 +1,237 @@
+---
+title: Which AWS Support Plan?
+summary: Five plans, and only a handful of details separate them. Who you may contact, how fast they answer, and at which rung a human is assigned to your account.
+exams: [CCP]
+track: billing
+order: 20
+domains:
+  CCP: 'Domain 4 — Billing, Pricing, and Support'
+minutes: 8
+hook: Business is the rung where you may phone about your own application. Enterprise is the rung where someone already knows who you are.
+updated: 2026-08-09
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+This is one of the few genuinely list-shaped topics on the Cloud Practitioner exam, and there
+is no clever framing that removes the need to know it. The good news is that the plans form a
+ladder, each rung adding to the one below, and only about four facts actually get tested.
+
+<Diagram
+  title="The support ladder"
+  viewBox="0 90 1020 400"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Basic — free, and everyone has it',
+      body: 'Documentation, whitepapers, the support forums, and the <strong>AWS Health Dashboard</strong>. You can raise <strong>account and billing</strong> cases only — nothing technical. Seven core Trusted Advisor checks.',
+    },
+    {
+      title: 'Developer — you may ask a technical question',
+      body: 'From about $29/month. <strong>Business-hours email</strong> access to a Cloud Support Associate, with a &lt;24 hour response for general guidance and &lt;12 hours for an impaired system. One contact person. Suited to experimenting and building, not to running production.',
+    },
+    {
+      title: 'Business — the first production-ready plan',
+      body: 'From about $100/month. <strong>24/7 phone, email and chat</strong> with Cloud Support Engineers, <strong>unlimited contacts</strong>, and <strong>&lt;1 hour</strong> response for a production system down. The <strong>full set of Trusted Advisor checks</strong> arrives here, as does support for third-party software.',
+    },
+    {
+      title: 'Enterprise On-Ramp — a step up, and a pooled TAM',
+      body: 'From about $5,500/month. <strong>&lt;30 minutes</strong> for a business-critical system down, a <strong>pool</strong> of Technical Account Managers, and access to Support Concierge for billing.',
+    },
+    {
+      title: 'Enterprise — a named human who knows you',
+      body: 'From about $15,000/month. <strong>&lt;15 minutes</strong> for business-critical systems down, and a <strong>designated Technical Account Manager</strong> — a named person who knows your architecture, plus Infrastructure Event Management for launches and migrations.',
+    },
+  ]}
+  caption="Response times are the fastest tier each plan offers. Only the top two plans include a Technical Account Manager at all."
+>
+  <Node x={130} y={400} w={190} h={80} label="Basic" sub="free · billing cases only" icon="file" tone="muted" step={1} />
+  <Node x={340} y={340} w={190} h={80} label="Developer" sub="business hours · email" icon="code" tone="blue" step={2} />
+  <Node x={550} y={280} w={190} h={80} label="Business" sub="24/7 · &lt; 1 hour" icon="headset" tone="teal" step={3} />
+  <Node x={760} y={220} w={190} h={80} label="Ent. On-Ramp" sub="&lt; 30 min · pooled TAM" icon="users" tone="purple" step={4} />
+  <Node x={860} y={140} w={230} h={80} label="Enterprise" sub="&lt; 15 min · named TAM" icon="shield" tone="orange" step={5} />
+</Diagram>
+
+## The four facts that actually get tested
+
+Almost every support-plan question turns on one of these:
+
+**1. Who may open a technical case?**
+Basic cannot open technical cases at all — only billing and account ones. Every paid plan can.
+
+**2. When is the phone available?**
+Developer is **email only, business hours**. **Business** and above get **24/7 phone, chat and
+email**. If a scenario mentions needing to phone someone at 3am, Developer is eliminated.
+
+**3. How fast, for a system that is down?**
+
+| Plan | Production system down | Business-critical system down |
+| --- | --- | --- |
+| Developer | *not offered* | *not offered* |
+| **Business** | **&lt; 1 hour** | *not offered* |
+| **Enterprise On-Ramp** | &lt; 1 hour | **&lt; 30 minutes** |
+| **Enterprise** | &lt; 1 hour | **&lt; 15 minutes** |
+
+**4. Who gets a Technical Account Manager?**
+Only the top two. **Enterprise On-Ramp** gets a **pool** of TAMs; **Enterprise** gets a
+**designated** TAM — an assigned individual. Business and below get none.
+
+<Mnemonic
+  title="The five plans, cheapest first"
+  phrase="Big Dogs Bark, Everyone Escapes"
+  tone="teal"
+  items={[
+    { key: 'B', term: 'Basic', note: 'free · billing cases only · 7 Trusted Advisor checks' },
+    { key: 'D', term: 'Developer', note: 'email, business hours · one contact · for experimenting' },
+    { key: 'B', term: 'Business', note: '24/7 phone · unlimited contacts · &lt;1h · full Trusted Advisor' },
+    { key: 'E', term: 'Enterprise On-Ramp', note: '&lt;30 min · pool of TAMs · Concierge' },
+    { key: 'E', term: 'Enterprise', note: '&lt;15 min · designated TAM · Infrastructure Event Management' },
+  ]}
+/>
+
+<Callout type="exam">
+<strong>Business</strong> is the answer to most support questions, because it is the cheapest
+plan a real production workload can sit on: 24/7 phone access, unlimited contacts, a
+&lt;1 hour response when production is down, and the full Trusted Advisor check set. Reach past
+it only when the question mentions a <strong>Technical Account Manager</strong>, a
+<strong>&lt;15 or &lt;30 minute</strong> response, or a major launch needing hands-on help.
+</Callout>
+
+## Trusted Advisor, and where it changes
+
+**AWS Trusted Advisor** inspects your live account and reports against best practice in five
+categories:
+
+- **Cost optimisation** — idle instances, unattached volumes, under-used reservations
+- **Performance** — over-utilised instances, poor configuration
+- **Security** — open security groups, exposed access keys, MFA on the root account
+- **Fault tolerance** — resources without backups, workloads in a single AZ
+- **Service limits** — quotas you are approaching
+
+With **Basic** and **Developer** you get **seven core checks** — the security and service-limit
+essentials. With **Business and above** you get the **full set**, plus programmatic access
+through the API. That jump is a favourite exam detail.
+
+<Callout type="gotcha">
+Do not confuse the two halves of the <strong>AWS Health Dashboard</strong>.
+<strong>Service health</strong> shows the general status of AWS services, publicly, for
+everyone. <strong>Your account health</strong> shows events affecting <em>your specific
+resources</em> — and it is available on every plan including Basic. Older material calls this
+second one the "Personal Health Dashboard"; AWS retired that name, so treat the two as
+question wording you might still meet rather than as two separate services.
+</Callout>
+
+## The extras at the top
+
+Worth recognising by name:
+
+- **Technical Account Manager (TAM)** — a named technical contact who knows your architecture,
+  reviews it proactively, and escalates for you. The single defining feature of Enterprise.
+- **Infrastructure Event Management (IEM)** — hands-on AWS help planning and running a major
+  event: a product launch, a migration cutover, a Black Friday. Included with Enterprise, and
+  available for a fee with Business.
+- **Support Concierge** — a billing and account specialist team, from Enterprise On-Ramp up.
+- **Well-Architected reviews with AWS** — included at the Enterprise tiers.
+
+<Scenario
+  who="A retailer running its store on AWS, with one enormous trading day a year"
+  problem="They were on the Developer plan because it looked adequate — until an outage at 2am on a Saturday left them emailing support and waiting until Monday morning for a reply. They were also planning a televised advertising campaign expected to bring twenty times normal traffic in ten minutes, with no way to have AWS review the plan beforehand."
+  solution="They moved to Business immediately: 24/7 phone access, a &lt;1 hour response for production-down, unlimited contacts so any on-call engineer can raise a case, and the full Trusted Advisor check set which promptly flagged two single-AZ databases. For the campaign specifically they purchased Infrastructure Event Management, giving them an AWS engineer engaged in advance and on standby during the launch."
+  outcome="The next incident was answered in eleven minutes. The campaign ran with AWS on the call and pre-raised service quotas, and the site did not fall over."
+>
+Note that they did not need Enterprise. The question to ask is whether you need a
+<strong>designated TAM</strong> and a <strong>15-minute</strong> response — for most companies
+the honest answer is no, and Business plus IEM for the one big day is the proportionate choice.
+</Scenario>
+
+<Quiz
+  question="A company runs a production workload on AWS. They need 24/7 phone access to support engineers, a response within one hour if production goes down, and the ability for any of their engineers to open cases. Cost should be kept as low as possible. Which support plan meets these requirements?"
+  choose={1}
+  options={[
+    {
+      text: 'Business',
+      correct: true,
+      why: 'Business is the cheapest plan offering 24/7 phone, email and chat, a <1 hour response for a production system down, and unlimited contacts. Every requirement is met at the lowest price point.',
+    },
+    {
+      text: 'Developer',
+      why: 'Developer is email only during business hours, permits one contact, and offers no production-down response commitment. It fails three of the four requirements.',
+    },
+    {
+      text: 'Enterprise On-Ramp',
+      why: 'It meets the requirements comfortably but costs roughly fifty times more, and adds a pooled TAM and a 30-minute business-critical response that the question never asks for.',
+    },
+    {
+      text: 'Enterprise',
+      why: 'The most expensive plan available. Its distinguishing features — a designated TAM and a 15-minute response — are not among the stated requirements.',
+    },
+  ]}
+  explain="When a question lists production needs and then says <strong>“lowest cost”</strong>, the answer is nearly always <strong>Business</strong>. Only jump higher if a TAM or a sub-hour response time is explicitly required."
+/>
+
+<Quiz
+  question="Which AWS Support plan is the least expensive that includes a designated Technical Account Manager?"
+  choose={1}
+  options={[
+    {
+      text: 'Enterprise',
+      correct: true,
+      why: 'Enterprise is the only plan that includes a designated — that is, individually assigned — Technical Account Manager. Enterprise On-Ramp provides access to a pool of TAMs rather than a designated one.',
+    },
+    {
+      text: 'Enterprise On-Ramp',
+      why: 'On-Ramp gives access to a pool of Technical Account Managers. The word "designated" is what separates it from Enterprise, and questions use that word deliberately.',
+    },
+    {
+      text: 'Business',
+      why: 'Business includes 24/7 engineer access and the full Trusted Advisor check set, but no Technical Account Manager of any kind.',
+    },
+    {
+      text: 'Developer',
+      why: 'Developer provides business-hours email access to a Cloud Support Associate and nothing resembling an account manager.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="A company on the Basic support plan wants the full set of AWS Trusted Advisor checks across all five categories. What must they do?"
+  choose={1}
+  options={[
+    {
+      text: 'Upgrade to the Business support plan or higher',
+      correct: true,
+      why: 'Basic and Developer include only the seven core checks. The complete set across cost, performance, security, fault tolerance and service limits — plus API access — begins at Business.',
+    },
+    {
+      text: 'Enable Trusted Advisor in the AWS Management Console at no extra cost',
+      why: 'Trusted Advisor is already available on Basic, but restricted to seven core checks. There is no free switch that unlocks the rest.',
+    },
+    {
+      text: 'Purchase Infrastructure Event Management',
+      why: 'IEM provides hands-on AWS engineering help around a specific planned event. It has nothing to do with which Trusted Advisor checks are visible.',
+    },
+    {
+      text: 'Join AWS Organizations and enable consolidated billing',
+      why: 'Organizations affects billing, account structure and Service Control Policies. Trusted Advisor check availability follows the support plan, not the organisation.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'The ladder: <strong>Basic → Developer → Business → Enterprise On-Ramp → Enterprise</strong>. Each rung includes everything below it.',
+    '<strong>Basic</strong> can raise <em>billing and account cases only</em> — never a technical one.',
+    '<strong>Developer</strong> is email, business hours, one contact. <strong>Business</strong> is 24/7 phone, unlimited contacts — the first production-grade plan.',
+    'Response times when a system is down: <strong>Business &lt;1 hour · On-Ramp &lt;30 min · Enterprise &lt;15 min</strong>.',
+    'A <strong>Technical Account Manager</strong> exists only at the top two: <strong>pooled</strong> on On-Ramp, <strong>designated</strong> on Enterprise.',
+    'The <strong>full Trusted Advisor check set</strong> starts at Business; Basic and Developer get seven core checks.',
+    'The <strong>AWS Health Dashboard</strong> — your account health (events affecting <em>your</em> resources) is on every plan, including Basic.',
+  ]}
+/>

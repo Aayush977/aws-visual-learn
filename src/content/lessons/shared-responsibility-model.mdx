@@ -1,0 +1,286 @@
+---
+title: The Shared Responsibility Model
+summary: AWS secures the cloud; you secure what you put in it. Where exactly that line falls depends on the service — and the exam tests the edges.
+exams: [CCP, SAA]
+track: security
+order: 10
+domains:
+  CCP: 'Domain 2 — Security and Compliance'
+  SAA: 'Domain 1 — Design Secure Architectures'
+minutes: 8
+hook: AWS locks the building. You are still the one who has to lock your own office door.
+updated: 2026-08-07
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Callout from '../../components/Callout.astro';
+import DecisionTree from '../../components/DecisionTree.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+Almost every AWS security breach you read about is not AWS being broken into. It is a
+customer leaving a bucket public, or an access key in a public repository, or a
+database open to the whole internet. The Shared Responsibility Model is AWS writing
+down, in advance, exactly whose fault each of those is.
+
+The one-line version: **AWS is responsible for security *of* the cloud. You are
+responsible for security *in* the cloud.**
+
+<Diagram
+  title="Where the line falls"
+  viewBox="0 0 900 560"
+  mode="build"
+  steps={[
+    {
+      title: 'Two halves, one line',
+      body: 'Everything in an AWS deployment belongs to one side or the other. Nothing is unowned, and nothing is shared in the sense of "someone will get to it".',
+    },
+    {
+      title: 'You own your data',
+      body: 'What you store, how it is classified, whether it is encrypted, how long you keep it. AWS will never look at it and will never delete it for you.',
+    },
+    {
+      title: 'You own your identities',
+      body: 'IAM users, roles, groups and policies. AWS gives you the tool; who gets a key and how strong it is are entirely your call.',
+    },
+    {
+      title: 'You own your configuration',
+      body: 'Guest operating systems, patching, security groups, network ACLs, firewall rules. A security group open to 0.0.0.0/0 is a customer decision.',
+    },
+    {
+      title: 'AWS owns the service software',
+      body: 'The hypervisor, the managed database engine, the storage layer, the internal networking that makes those services work.',
+    },
+    {
+      title: 'AWS owns the hardware and the buildings',
+      body: 'Physical servers, racks, cabling, power, cooling, and the guards on the door of every Region, Availability Zone and Edge Location.',
+    },
+    {
+      title: 'The line moves per service',
+      body: 'On EC2 you patch the operating system. On RDS, AWS does. On Lambda there is no operating system for you to see at all. Same model, different boundary.',
+    },
+  ]}
+  caption="The higher up the stack the service is, the more of it AWS takes care of."
+>
+  <Boundary x={50} y={40} w={800} h={240} label="YOU — SECURITY IN THE CLOUD" icon="user" tone="orange" solid step={1} />
+  <Node x={450} y={100} w={740} h={46} label="Your data — classification, retention, encryption keys" tone="orange" step={2} />
+  <Node x={450} y={158} w={740} h={46} label="Identity & access — IAM users, roles, policies, MFA" tone="orange" step={3} />
+  <Node x={450} y={216} w={740} h={46} label="Configuration — guest OS, patching, security groups, firewall rules" tone="orange" step={4} />
+
+  <Boundary x={50} y={320} w={800} h={200} label="AWS — SECURITY OF THE CLOUD" icon="cloud" tone="blue" solid step={1} />
+  <Node x={450} y={382} w={740} h={46} label="Service software — compute, storage, database, networking" tone="blue" step={5} />
+  <Node x={450} y={440} w={740} h={46} label="Global infrastructure — Regions, Availability Zones, Edge Locations" tone="blue" step={6} />
+
+  {/* Keep SVG <text> content on one line — MDX wraps multi-line content in a <p>. */}
+  <g data-step={7}>
+    <line x1="50" y1="300" x2="850" y2="300" stroke="var(--aws-red)" stroke-width="2" stroke-dasharray="8 6" />
+    <text class="dg-text dg-text--mid dg-text--alert" x="450" y="294">↕ this line sits higher or lower depending on the service</text>
+  </g>
+</Diagram>
+
+<Mnemonic
+  title="What is always yours, no matter the service"
+  phrase="DIANE always locks her own front door"
+  tone="orange"
+  items={[
+    { key: 'D', term: 'Data', note: 'you classify it, you encrypt it, you decide how long it lives' },
+    { key: 'I', term: 'Identity', note: 'IAM users, roles, policies, MFA, key rotation' },
+    { key: 'A', term: 'Applications', note: 'your code, your dependencies, your bugs' },
+    { key: 'N', term: 'Network configuration', note: 'security groups, NACLs, what you expose publicly' },
+    { key: 'E', term: 'Encryption choices', note: 'in transit and at rest — AWS offers it, you switch it on' },
+  ]}
+/>
+
+## The line moves with the service model
+
+This is the part people skip, and it is the part the exam actually tests. "Who patches
+the operating system?" has no single answer — it depends entirely on which service you
+are using.
+
+| You are using | Who patches the OS | Who patches the database engine | Who scales it |
+| --- | --- | --- | --- |
+| **EC2** (IaaS) | You | You | You |
+| **RDS** (PaaS) | AWS | AWS applies it, you choose the window | You pick the size; AWS does the work |
+| **Lambda** (FaaS) | AWS | n/a | AWS, automatically |
+| **S3** (managed storage) | AWS | n/a | AWS, invisibly |
+
+Read that table top to bottom: as you move to more managed services, you hand more
+responsibility to AWS — and give up more control in exchange.
+
+<Callout type="gotcha">
+Moving to a managed service never transfers responsibility for **your data or your
+access controls**. AWS patches RDS for you, but if you put the database in a public
+subnet with an open security group, that is still on you. Amazon S3 encrypts every
+object at rest by default, but making the bucket public is a customer action.
+</Callout>
+
+## Try it: who is responsible?
+
+<DecisionTree
+  title="Who is responsible for this?"
+  intro="Pick the situation closest to the one you are reasoning about."
+  tree={{
+    q: 'What kind of thing has gone wrong?',
+    options: [
+      {
+        label: 'Something physical or infrastructural',
+        note: 'hardware, power, buildings, the hypervisor',
+        next: {
+          result: 'AWS',
+          detail:
+            'Physical security, power, cooling, network cabling, hardware disposal and the virtualisation layer are always AWS. You have no access to any of it, which is precisely why it is not your responsibility.',
+        },
+      },
+      {
+        label: 'Something about the data itself',
+        note: 'exposure, loss, encryption, retention',
+        next: {
+          q: 'Was the data exposed by a setting you control?',
+          hint: 'Bucket policy, security group, IAM policy, public snapshot.',
+          options: [
+            {
+              label: 'Yes — a setting made it public or reachable',
+              next: {
+                result: 'You',
+                tone: 'bad',
+                detail:
+                  'Access configuration is a customer responsibility on every AWS service without exception. S3 Block Public Access is on by default; turning it off is a decision you make.',
+              },
+            },
+            {
+              label: 'No — the storage hardware failed',
+              next: {
+                result: 'AWS',
+                detail:
+                  'Durability of the storage layer is AWS. S3 is designed for 99.999999999% durability across at least three AZs. Note this covers hardware failure, not you deleting the object — which is why versioning exists.',
+              },
+            },
+          ],
+        },
+      },
+      {
+        label: 'Software needs patching',
+        next: {
+          q: 'Which service is the software running on?',
+          options: [
+            {
+              label: 'An EC2 instance I launched',
+              next: {
+                result: 'You',
+                tone: 'warn',
+                detail:
+                  'The guest operating system and everything above it is yours: patching, antivirus, hardening. AWS patches the hypervisor underneath, which you never see. Systems Manager Patch Manager can automate your side.',
+              },
+            },
+            {
+              label: 'An RDS database engine',
+              next: {
+                result: 'Both — mostly AWS',
+                tone: 'warn',
+                detail:
+                  'AWS produces and applies the patches. You choose the maintenance window and decide when to accept a major version upgrade. You still own the database users and the network placement.',
+              },
+            },
+            {
+              label: 'My own application code',
+              next: {
+                result: 'You',
+                tone: 'bad',
+                detail:
+                  'Always. Your code and its dependencies are yours on every service, including Lambda, where AWS manages everything underneath the function but nothing inside it.',
+              },
+            },
+          ],
+        },
+      },
+      {
+        label: 'Someone used stolen credentials',
+        next: {
+          result: 'You',
+          tone: 'bad',
+          detail:
+            'Credential management is a customer responsibility. AWS provides IAM, MFA, roles, short-lived credentials and GuardDuty to detect misuse — using them is your call. This is the single most common cause of real AWS incidents.',
+        },
+      },
+    ],
+  }}
+/>
+
+<Scenario
+  who="A fintech startup preparing for its first security audit"
+  problem="The auditor asks who is accountable for patching, physical access to servers, and encryption of customer records. The team has been answering “AWS handles security” and the auditor is not satisfied."
+  solution="Split the answer along the model: pull AWS's audit reports (SOC 2, ISO 27001, PCI DSS) from AWS Artifact to evidence the AWS half, and produce their own evidence — IAM policies, KMS key policies, Patch Manager compliance reports, Config rules — for the customer half."
+  outcome="One question, two evidence packs. The auditor gets a boundary they can sign off, instead of a shrug."
+>
+**AWS Artifact** is the service that matters here, and it appears on both exams: it is
+the self-service portal where you download AWS's compliance reports and certifications.
+You cannot audit AWS's datacentres yourself — you download the report of someone who did.
+</Scenario>
+
+<Quiz
+  question="A solutions architect deploys an application on Amazon EC2 instances. Which task is the responsibility of AWS under the shared responsibility model?"
+  choose={1}
+  options={[
+    {
+      text: 'Maintaining the physical security of the datacentre hosting the instances',
+      correct: true,
+      why: 'Physical infrastructure is always AWS. You cannot even find out which building your instance is in, let alone secure it.',
+    },
+    {
+      text: 'Applying operating system security patches to the instances',
+      why: 'On EC2 the guest OS is yours. This is the classic distinction between EC2 and a managed service like RDS or Lambda.',
+    },
+    {
+      text: 'Configuring security group rules for the instances',
+      why: 'Network access configuration is a customer responsibility on every service. AWS provides the firewall; you decide what it allows.',
+    },
+    {
+      text: 'Encrypting sensitive data stored on attached EBS volumes',
+      why: 'AWS provides the encryption capability and manages the keys if you ask it to, but choosing to enable encryption is yours.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="Which of these responsibilities transfer to AWS when a company migrates a self-managed MySQL database from EC2 to Amazon RDS? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'Patching the underlying operating system',
+      correct: true,
+      why: 'RDS is a managed service — you no longer have OS-level access, so AWS handles OS patching.',
+    },
+    {
+      text: 'Installing database engine updates',
+      correct: true,
+      why: 'AWS produces and applies engine patches during your chosen maintenance window. You still decide when to take major version upgrades.',
+    },
+    {
+      text: 'Creating and managing database user accounts',
+      why: 'Database-level users are inside your data. AWS never manages them.',
+    },
+    {
+      text: 'Choosing whether the database is publicly accessible',
+      why: 'Network placement and exposure remain a customer decision on RDS, exactly as on EC2.',
+    },
+    {
+      text: 'Deciding the backup retention period',
+      why: 'RDS performs the backups, but how long you keep them — and whether that meets your compliance requirement — is yours.',
+    },
+  ]}
+  explain="The pattern to internalise: managed services take over <strong>operational work on the infrastructure</strong>. They never take over <strong>your data, your identities, or your exposure decisions</strong>."
+/>
+
+<Takeaways
+  items={[
+    'AWS = security <strong>of</strong> the cloud (hardware, buildings, hypervisor, managed service software). You = security <strong>in</strong> the cloud.',
+    'Yours on every service, no exceptions: <strong>D</strong>ata, <strong>I</strong>dentity, <strong>A</strong>pplications, <strong>N</strong>etwork config, <strong>E</strong>ncryption choices.',
+    'The line moves with the service model: <strong>EC2 → you patch the OS. RDS → AWS does. Lambda → there is no OS for you to see.</strong>',
+    'Managed services never take over your data or your access controls.',
+    '<strong>AWS Artifact</strong> is where you download AWS\'s side of the compliance evidence.',
+  ]}
+/>

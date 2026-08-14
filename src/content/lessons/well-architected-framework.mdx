@@ -1,0 +1,256 @@
+---
+title: The Well-Architected Framework
+summary: Six pillars, six questions to ask about any design. Plus the recovery vocabulary — RTO, RPO and the four disaster-recovery strategies — that scenario questions are built on.
+exams: [CCP, SAA]
+track: architecture
+order: 20
+domains:
+  CCP: 'Domain 1 — Cloud Concepts'
+  SAA: 'Domain 2 — Design Resilient Architectures'
+minutes: 11
+hook: Six questions. If a design has a good answer to all six, it is well architected. If a question stresses one of them, that pillar names the answer.
+updated: 2026-08-09
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+The **AWS Well-Architected Framework** is AWS's written-down answer to "what does good look
+like?". It is a set of six pillars, each of which is really a question you ask about a design.
+
+It matters for two reasons. On the exam, a scenario that stresses one pillar is usually telling
+you which family of services to reach for. In real work, it is a checklist that catches the
+thing everybody forgot — which is nearly always operations or cost.
+
+<Diagram
+  title="The six pillars"
+  viewBox="0 90 1000 370"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Operational Excellence — can we run it?',
+      body: 'Can we deploy without drama, see what is happening, and improve the process over time? This is <strong>infrastructure as code</strong>, small reversible changes, and learning from failure. Think CloudFormation, CloudWatch, Systems Manager.',
+    },
+    {
+      title: 'Security — can we protect it?',
+      body: 'Least privilege, identity at every layer, encryption at rest and in transit, and traceability so you can reconstruct what happened. Think IAM, KMS, CloudTrail, GuardDuty.',
+    },
+    {
+      title: 'Reliability — does it survive failure?',
+      body: 'Recover from failure automatically, test the recovery, scale horizontally, and stop guessing capacity. Think Multi-AZ, Auto Scaling, health checks, backups you have actually restored.',
+    },
+    {
+      title: 'Performance Efficiency — is it the right tool?',
+      body: 'Use the resource that fits, and keep re-evaluating as AWS releases better ones. Think choosing the right instance family, the right database, caching, and serverless where it fits.',
+    },
+    {
+      title: 'Cost Optimisation — are we paying for value?',
+      body: 'Pay only for what you use, measure it, and attribute it to someone. Think right-sizing, Savings Plans, S3 lifecycle rules, and turning off what nobody is using.',
+    },
+    {
+      title: 'Sustainability — what does it cost the planet?',
+      body: 'The newest pillar. Maximise utilisation, choose efficient instance types, and reduce the downstream impact of your workload. Fewer idle servers is both cheaper and greener, which makes this pillar rhyme with cost.',
+    },
+  ]}
+  caption="No design maximises all six. The framework's real value is making the trade-offs explicit rather than accidental."
+>
+  <Node x={500} y={140} w={920} h={56} label="AWS Well-Architected Framework" tone="orange" />
+
+  <Node x={90} y={280} w={150} h={150} label="Operational" sub="run it well" icon="gear" tone="blue" step={1} />
+  <Node x={250} y={280} w={150} h={150} label="Security" sub="protect it" icon="shield" tone="red" step={2} />
+  <Node x={410} y={280} w={150} h={150} label="Reliability" sub="survive failure" icon="zone" tone="teal" step={3} />
+  <Node x={570} y={280} w={150} h={150} label="Performance" sub="right tool for it" icon="chart" tone="purple" step={4} />
+  <Node x={730} y={280} w={150} h={150} label="Cost" sub="pay for value" icon="money" tone="green" step={5} />
+  <Node x={890} y={280} w={150} h={150} label="Sustainability" sub="reduce impact" icon="globe" tone="navy" step={6} />
+
+  <Node x={500} y={400} w={900} h={60} label="A workload that survives contact with reality" tone="muted" step={6} />
+</Diagram>
+
+<Mnemonic
+  title="The six pillars, in AWS's order"
+  phrase="Our Servers Run Pretty Cheaply, Sustainably"
+  tone="orange"
+  items={[
+    { key: 'O', term: 'Operational Excellence', note: 'run and monitor systems, and keep improving how you do it' },
+    { key: 'S', term: 'Security', note: 'protect data, systems and assets; least privilege everywhere' },
+    { key: 'R', term: 'Reliability', note: 'recover from failure automatically and meet demand' },
+    { key: 'P', term: 'Performance Efficiency', note: 'use computing resources efficiently as demand and technology change' },
+    { key: 'C', term: 'Cost Optimisation', note: 'deliver business value at the lowest price point' },
+    { key: 'S', term: 'Sustainability', note: 'minimise the environmental impact of running the workload' },
+  ]}
+/>
+
+## The design principles worth remembering
+
+Across the pillars, a handful of principles come up again and again, and they are quoted almost
+verbatim in exam answers:
+
+- **Stop guessing capacity.** Scale automatically instead of predicting.
+- **Test systems at production scale**, then throw the environment away — something you can only
+  afford in the cloud.
+- **Automate to make architectural experimentation easier.** Infrastructure as code means an
+  experiment costs an afternoon, not a quarter.
+- **Allow for evolutionary architectures.** The design should be able to change, because it will.
+- **Drive architectures using data.** Measure, do not argue.
+- **Improve through game days.** Deliberately break things in a controlled way and learn what
+  happens.
+- **Design for failure.** Assume every component will fail, because at scale everything does.
+
+<Callout type="exam">
+The <strong>AWS Well-Architected Tool</strong> is a free service in the console that walks you
+through these questions for a workload and produces a list of risks. If a question asks how to
+<em>review</em> an existing architecture against best practices, that is the answer — not
+Trusted Advisor, which checks live resources rather than design decisions.
+</Callout>
+
+## Reliability, in numbers: RTO and RPO
+
+Reliability questions get precise, and they get precise with two acronyms. Both are measured in
+time, and confusing them is a standard trap.
+
+- **RTO — Recovery Time Objective.** *How long can we be down?* You are measuring forward from
+  the failure to the moment service resumes.
+- **RPO — Recovery Point Objective.** *How much data can we afford to lose?* You are measuring
+  backward from the failure to the last usable copy of the data.
+
+A nightly backup gives you an RPO of up to 24 hours — everything since last night's backup is
+gone. If restoring that backup takes three hours, your RTO is three hours. They are independent:
+you can have an excellent RPO and a dreadful RTO, and often do.
+
+<Callout type="analogy">
+<strong>RPO</strong> is “when did I last save my document?” — it decides how much work you lose.
+<strong>RTO</strong> is “how long until I am typing again?” — it decides how long you are stuck.
+Saving constantly does not help if the laptop takes a day to replace.
+</Callout>
+
+## The four disaster-recovery strategies
+
+Ordered from cheapest and slowest to most expensive and fastest. The exam expects you to match
+a described RTO/RPO to the right one.
+
+| Strategy | What is running in the second Region | RTO | Cost |
+| --- | --- | --- | --- |
+| **Backup & Restore** | Nothing. Just backups and snapshots | Hours to days | Lowest |
+| **Pilot Light** | The critical core only — typically a replicating database, servers switched off | Tens of minutes | Low |
+| **Warm Standby** | A complete but **scaled-down** copy, running and serving nothing | Minutes | Medium |
+| **Multi-Site Active/Active** | A full copy, taking real traffic | Near zero | Highest |
+
+<Mnemonic
+  title="Disaster recovery, cheapest to fastest"
+  phrase="Big Problems Wake Managers"
+  tone="purple"
+  items={[
+    { key: 'B', term: 'Backup & Restore', note: 'nothing running — restore it when the day comes. Hours' },
+    { key: 'P', term: 'Pilot Light', note: 'the data replicating, the servers off. Start them and scale up. Tens of minutes' },
+    { key: 'W', term: 'Warm Standby', note: 'a small, live copy of everything. Scale it up. Minutes' },
+    { key: 'M', term: 'Multi-Site Active/Active', note: 'both Regions serving users. Near-zero RTO, near-double cost' },
+  ]}
+/>
+
+<Callout type="gotcha">
+The distinction that gets missed: <strong>Pilot Light has the servers switched off</strong>,
+with only the data replicating. <strong>Warm Standby is running</strong>, just small. If a
+question says “a scaled-down version of the environment is always running”, that is Warm
+Standby, not Pilot Light.
+</Callout>
+
+<Scenario
+  who="A payroll bureau that pays 40,000 people on the last Thursday of each month"
+  problem="Their disaster-recovery plan is a nightly backup copied to another Region. Nobody has restored one in two years. A tabletop exercise revealed that restoring would take about eleven hours, and losing a day of input during payroll week would mean re-keying thousands of timesheets. The business had assumed 'we have backups' meant they were covered."
+  solution="They wrote down what the business could actually tolerate: an RTO of one hour and an RPO of five minutes during payroll week. That ruled out backup-and-restore immediately. They moved to a warm standby — Aurora Global Database replicating continuously to a second Region, a scaled-down application tier running there permanently, and Route 53 health checks to fail over. Restores are now tested quarterly as a game day."
+  outcome="Measured failover takes 6 minutes and loses under a minute of data. Cost rose by roughly 30%, which the board approved in one meeting once the eleven-hour figure was on the slide."
+>
+The lesson is the order of operations. They chose a strategy <strong>after</strong> writing down
+RTO and RPO, not before — and that is exactly how the exam frames these questions. The numbers
+in the scenario are what select the answer.
+</Scenario>
+
+<Quiz
+  question="A company must be able to recover its application in another Region within 10 minutes, losing no more than 1 minute of data. Cost is a concern but availability matters more. Which disaster recovery strategy is most appropriate?"
+  choose={1}
+  options={[
+    {
+      text: 'Warm standby — a scaled-down but fully functional copy running in the second Region',
+      correct: true,
+      why: 'A 10-minute RTO rules out backup-and-restore and is tight for pilot light. Warm standby is already running and only needs scaling up, and continuous replication supports a 1-minute RPO.',
+    },
+    {
+      text: 'Backup and restore from cross-Region snapshots',
+      why: 'Restoring infrastructure and data from snapshots takes hours, not minutes, and snapshot frequency would put the RPO far beyond one minute.',
+    },
+    {
+      text: 'Pilot light with the application servers stopped',
+      why: 'Pilot light can meet the 1-minute RPO through database replication, but starting and scaling the application tier from cold typically takes longer than 10 minutes. It is the closest wrong answer.',
+    },
+    {
+      text: 'Multi-site active/active across both Regions',
+      why: 'This would exceed the requirement comfortably — near-zero RTO — but it roughly doubles infrastructure cost, and the question states cost is a concern.',
+    },
+  ]}
+  explain="Match the numbers to the tier: <strong>hours → backup & restore · tens of minutes → pilot light · minutes → warm standby · near zero → active/active.</strong> Then let the cost sentence break any tie."
+/>
+
+<Quiz
+  question="Which Well-Architected pillar is most directly addressed by implementing infrastructure as code, automating deployments, and running regular game days?"
+  choose={1}
+  options={[
+    {
+      text: 'Operational Excellence',
+      correct: true,
+      why: 'This pillar covers running and monitoring systems and continually improving processes and procedures. Infrastructure as code, automated deployment and game days are its headline practices.',
+    },
+    {
+      text: 'Reliability',
+      why: 'A reasonable second choice — game days test recovery, which is a reliability concern. But the grouping of code-managed infrastructure, deployment automation and process improvement is Operational Excellence.',
+    },
+    {
+      text: 'Performance Efficiency',
+      why: 'That pillar is about selecting and continually re-evaluating the right resource types for the workload, not about how you deploy and operate them.',
+    },
+    {
+      text: 'Security',
+      why: 'Automation certainly helps security, but nothing in the question mentions identity, encryption, permissions or traceability.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="A company takes a database backup every 24 hours. A failure occurs 20 hours after the last backup, and restoring it takes 2 hours. What are the RPO and RTO for this event?"
+  choose={1}
+  options={[
+    {
+      text: 'RPO is 20 hours of lost data; RTO is 2 hours of downtime',
+      correct: true,
+      why: 'RPO measures backwards from the failure to the last usable copy — 20 hours of transactions are gone. RTO measures forwards to service being restored — 2 hours.',
+    },
+    {
+      text: 'RPO is 2 hours; RTO is 20 hours',
+      why: 'These are the correct numbers with the definitions swapped, which is the exact confusion the question is testing.',
+    },
+    {
+      text: 'RPO is 24 hours; RTO is 24 hours',
+      why: '24 hours is the backup <em>interval</em> — the worst-case RPO. This particular failure happened 20 hours in, and the interval says nothing about restore time.',
+    },
+    {
+      text: 'RPO is 22 hours; RTO is 22 hours',
+      why: 'RPO and RTO measure in opposite directions from the failure and are not added together.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Six pillars: <strong>O</strong>perational Excellence, <strong>S</strong>ecurity, <strong>R</strong>eliability, <strong>P</strong>erformance Efficiency, <strong>C</strong>ost Optimisation, <strong>S</strong>ustainability.',
+    'The <strong>Well-Architected Tool</strong> reviews a design against the pillars. <strong>Trusted Advisor</strong> checks live resources — different jobs.',
+    '<strong>RPO = data you lose</strong> (measured backwards) · <strong>RTO = time you are down</strong> (measured forwards). They are independent.',
+    'DR ladder: <strong>Backup &amp; Restore</strong> (hours) → <strong>Pilot Light</strong> (servers off) → <strong>Warm Standby</strong> (running but small) → <strong>Active/Active</strong> (near zero, near double cost).',
+    'Pilot light is <strong>off</strong>; warm standby is <strong>on but scaled down</strong>. That single word decides many questions.',
+    'Recurring principles: stop guessing capacity, automate everything, test at production scale, and <strong>design for failure</strong>.',
+  ]}
+/>

@@ -1,0 +1,382 @@
+---
+title: Encryption and Key Management
+summary: At rest, in transit, and who holds the key. KMS, CloudHSM, Certificate Manager and Secrets Manager — and the one question that tells you which of them a scenario wants.
+exams: [CCP, SAA]
+track: security
+order: 30
+domains:
+  CCP: 'Domain 2 — Security and Compliance'
+  SAA: 'Domain 1 — Design Secure Architectures'
+minutes: 11
+hook: Encryption is not the hard part — AWS gives it away. Deciding who is allowed to hold the key is the whole subject.
+updated: 2026-08-11
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import DecisionTree from '../../components/DecisionTree.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+Encrypting data on AWS is close to free and usually a checkbox. That is precisely why the exam
+does not ask *whether* to encrypt — it asks **who holds the key**, and what happens when
+somebody who should not have it asks for your data.
+
+There are only two states data can be in, and each has its own answer.
+
+<Diagram
+  title="Two states, two protections, one key hierarchy"
+  viewBox="0 40 1040 520"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'In transit — protect the wire',
+      body: 'Data moving between a browser and your load balancer, or between services. The answer is <strong>TLS</strong>, and the certificate comes free from <strong>AWS Certificate Manager</strong> — which also renews it for you, so nobody gets paged about an expiry at 2am.',
+      flow: 'w-user-alb',
+    },
+    {
+      title: 'At rest — protect the disk',
+      body: 'Data sitting in S3, on an EBS volume, in RDS or DynamoDB. Every one of these can encrypt itself with a tick box, and the encryption is done with a key from <strong>AWS KMS</strong>.',
+      flow: ['w-alb-s3', 'w-alb-rds'],
+      duration: 1400,
+    },
+    {
+      title: 'KMS holds the key, not the data',
+      body: 'A <strong>KMS key</strong> never leaves the service. S3 does not receive your key — it asks KMS to unwrap a <em>data key</em>, uses that in memory, and throws it away. The master key is never on a disk you control.',
+      flow: ['w-s3-kms', 'w-rds-kms'],
+      duration: 1400,
+    },
+    {
+      title: 'And IAM decides who may ask',
+      body: 'This is the part that matters. Encryption is only as strong as the <strong>key policy</strong>: revoke a principal’s permission to use the key and their access to the data ends immediately, even though the ciphertext is untouched.',
+      flow: 'w-iam-kms',
+    },
+    {
+      title: 'CloudHSM — when "AWS manages it" is not allowed',
+      body: 'A dedicated, single-tenant <strong>hardware security module</strong> that you alone control. AWS cannot access your keys and cannot recover them if you lose them. You take that trade only when a regulator demands it.',
+    },
+  ]}
+  caption="The lesson of step 4: on AWS, deleting someone's access to a key is faster and more complete than deleting the data."
+>
+  <Node x={90} y={130} w={140} h={70} label="Browser" icon="user" tone="muted" step={1} />
+  <Node x={330} y={130} w={190} h={70} label="Load balancer" sub="TLS terminates" icon="balancer" tone="blue" step={1} />
+  <Node x={330} y={250} w={190} h={64} label="ACM" sub="free, auto-renewing" icon="allow" tone="green" step={1} />
+
+  <Node x={640} y={90} w={190} h={70} label="Amazon S3" icon="bucket" tone="green" step={2} />
+  <Node x={640} y={200} w={190} h={70} label="Amazon RDS" icon="database" tone="teal" step={2} />
+
+  <Boundary x={840} y={50} w={190} h={250} label="AWS KMS" icon="key" tone="purple" step={3} />
+  <Node x={935} y={150} w={150} h={80} label="KMS key" sub="never leaves" icon="key" tone="purple" step={3} />
+
+  <Node x={640} y={400} w={200} h={76} label="IAM key policy" sub="who may decrypt" icon="lock" tone="orange" step={4} />
+
+  <Node x={200} y={420} w={260} h={90} label="AWS CloudHSM" sub="single-tenant, yours alone" icon="shield" tone="red" step={5} />
+
+  <Wire id="w-user-alb" from={[160, 130]} to={[233, 130]} tone="blue" step={1} label="HTTPS" labelDy={-10} />
+  <Wire id="w-acm" from={[330, 218]} to={[330, 167]} tone="green" step={1} />
+  <Wire id="w-alb-s3" from={[425, 110]} to={[543, 90]} tone="green" step={2} />
+  <Wire id="w-alb-rds" from={[425, 150]} to={[543, 200]} tone="teal" step={2} />
+  <Wire id="w-s3-kms" from={[735, 90]} to={[858, 130]} tone="purple" step={3} />
+  <Wire id="w-rds-kms" from={[735, 200]} to={[858, 170]} tone="purple" step={3} />
+  <Wire id="w-iam-kms" from={[740, 400]} to={[935, 320]} shape="elbow-h" mid={880} tone="orange" step={4} />
+</Diagram>
+
+## In transit — TLS, and the certificate service
+
+Anything crossing a network should be encrypted in transit, which in practice means **TLS**
+(the protocol people still call SSL). You need a certificate to do it, and **AWS Certificate
+Manager (ACM)** issues them:
+
+- **Free** for use with AWS services — load balancers, CloudFront, API Gateway.
+- **Renewed automatically**, which quietly eliminates one of the most common causes of
+  self-inflicted outages.
+- Certificates are **Regional**, and a certificate used by CloudFront must live in
+  **us-east-1** regardless of where the rest of your stack is.
+
+<Callout type="gotcha">
+ACM certificates cannot be exported for use on your own servers outside AWS. If a question
+mentions installing a certificate on an on-premises appliance, ACM is wrong — you need a
+certificate from elsewhere, or ACM Private CA.
+</Callout>
+
+## At rest — AWS KMS
+
+**AWS Key Management Service** creates and controls the keys that encrypt your data. The
+important mechanic is that the **KMS key itself never leaves KMS**. When S3 encrypts an object
+it asks KMS for a *data key*, uses it in memory, and discards it — a pattern called **envelope
+encryption**.
+
+The consequence is the thing worth remembering: **access to encrypted data is an IAM question,
+not a cryptography question.** Remove a principal from the key policy and their access ends
+immediately, without touching a single byte of stored data.
+
+Three kinds of key, and the exam distinguishes them:
+
+| Key type | Who creates it | Who can rotate it | Cost |
+| --- | --- | --- | --- |
+| **AWS owned** | AWS, shared across accounts | AWS | Free, invisible to you |
+| **AWS managed** (`aws/s3`) | AWS, one per service per account | AWS, annually | Free |
+| **Customer managed** | You | You — automatic yearly rotation, or on demand | Monthly charge per key, plus API calls |
+
+You want a **customer managed key** whenever a question mentions *controlling* the key: custom
+rotation schedules, a key policy naming specific principals, cross-account grants, or the
+ability to disable a key and lock everyone out at once.
+
+<Callout type="exam">
+"Encryption keys must be rotated on a schedule the company controls", "the security team must
+be able to revoke access to encrypted data", or "keys must be shared with another AWS account"
+→ <strong>customer managed KMS key</strong>. If the requirement is only "the data must be
+encrypted at rest", an AWS managed key is enough and cheaper.
+</Callout>
+
+## CloudHSM — when you must be the only one with the key
+
+**AWS CloudHSM** gives you a dedicated, single-tenant hardware security module. It is
+FIPS 140-3 Level 3 validated, and **AWS has no access to your keys at all** — which is exactly
+the point, and also the risk: lose them and nobody, including AWS, can recover your data.
+
+Choose it only when a regulator or contract requires single-tenant hardware or the ability to
+prove AWS cannot access the keys. KMS is multi-tenant and right for nearly everyone else.
+
+<Mnemonic
+  title="Which key service?"
+  phrase="KMS Manages, CloudHSM is Custody, ACM is Certificates"
+  tone="purple"
+  items={[
+    { key: 'K', term: 'AWS KMS', note: 'managed, multi-tenant, integrated with every service. The default' },
+    { key: 'C', term: 'AWS CloudHSM', note: 'single-tenant hardware, you alone hold the keys. For regulators' },
+    { key: 'A', term: 'AWS Certificate Manager', note: 'free TLS certificates for AWS services, renewed automatically' },
+    { key: 'S', term: 'AWS Secrets Manager', note: 'passwords and API keys, rotated automatically' },
+  ]}
+/>
+
+## Secrets Manager, and the thing it is confused with
+
+A **secret** is not a key — it is a database password, a third-party API token, an OAuth
+credential. **AWS Secrets Manager** stores them encrypted with KMS, hands them to applications
+over an API, and — the feature that justifies its price — **rotates them automatically**,
+including natively rotating RDS credentials.
+
+It is routinely confused with **Systems Manager Parameter Store**, which also stores
+configuration values and can encrypt them:
+
+| | **Secrets Manager** | **Parameter Store** |
+| --- | --- | --- |
+| Built for | Secrets | Configuration, and secrets if you like |
+| Automatic rotation | **Yes**, built in | No, you build it yourself |
+| Cross-account sharing | Yes | No |
+| Cost | Per secret per month | Standard tier is **free** |
+
+<Callout type="cost">
+If a question stresses <strong>automatic rotation</strong> of a database credential, the answer
+is <strong>Secrets Manager</strong>. If it stresses storing configuration or secrets
+<strong>at no additional cost</strong>, it is <strong>Parameter Store</strong>. That single
+word — rotation or cost — decides it almost every time.
+</Callout>
+
+## Encryption you get without asking
+
+Worth knowing because questions sometimes offer "enable encryption" as a distractor when it is
+already on:
+
+- **S3** encrypts every new object by default with SSE-S3. You can upgrade to SSE-KMS for key
+  control, or SSE-C if you insist on supplying keys yourself.
+- **EBS** volumes can be encrypted by default account-wide, and snapshots of an encrypted
+  volume are encrypted too.
+- **RDS** encryption must be chosen **when the instance is created** — you cannot encrypt an
+  existing unencrypted RDS instance in place. You restore a snapshot into a new encrypted one.
+- **DynamoDB** encrypts all tables at rest, always, with no option to turn it off.
+
+<Callout type="gotcha">
+The RDS detail is a favourite. "An existing unencrypted RDS database must be encrypted" is not
+a settings change — you take a snapshot, copy the snapshot with encryption enabled, and restore
+it into a new instance. Any answer that just enables encryption on the running database is wrong.
+</Callout>
+
+<DecisionTree
+  title="Which service protects this?"
+  intro="Start from what you are protecting, not from the service names."
+  tree={{
+    q: 'What are you actually protecting?',
+    options: [
+      {
+        label: 'Data moving across a network',
+        note: 'browser to site, service to service',
+        next: {
+          result: 'TLS, with a certificate from AWS Certificate Manager',
+          detail: 'Free for AWS services and renewed automatically. Remember CloudFront needs its certificate in us-east-1, and ACM certificates cannot be exported for use off AWS.',
+          tone: 'good',
+        },
+      },
+      {
+        label: 'Data sitting on a disk',
+        note: 'S3 objects, EBS volumes, RDS, DynamoDB',
+        next: {
+          q: 'Does anyone need to control the key itself — rotation schedule, revocation, cross-account?',
+          options: [
+            {
+              label: 'No, it just has to be encrypted',
+              next: {
+                result: 'The AWS managed key for that service',
+                detail: 'Free, automatic, and enabled with a tick box. Sufficient for the great majority of "must be encrypted at rest" requirements.',
+                tone: 'good',
+              },
+            },
+            {
+              label: 'Yes, we must control the key',
+              next: {
+                q: 'Does a regulator require single-tenant hardware, or that AWS cannot access the key?',
+                options: [
+                  {
+                    label: 'No, but we need our own key policy',
+                    next: {
+                      result: 'A customer managed KMS key',
+                      detail: 'You set the key policy, the rotation schedule, and who may decrypt. Disabling the key revokes access to the data instantly.',
+                      tone: 'good',
+                    },
+                  },
+                  {
+                    label: 'Yes, single-tenant hardware is mandated',
+                    next: {
+                      result: 'AWS CloudHSM',
+                      detail: 'Dedicated FIPS 140-3 Level 3 hardware that only you can access. AWS cannot recover your keys — losing them means losing the data.',
+                      tone: 'warn',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+      {
+        label: 'A password, token or API key',
+        note: 'something an application needs to log in with',
+        next: {
+          q: 'Does it need to be rotated automatically?',
+          options: [
+            {
+              label: 'Yes — especially a database credential',
+              next: {
+                result: 'AWS Secrets Manager',
+                detail: 'Encrypted with KMS, delivered over an API, and rotated on a schedule — natively for RDS. The rotation is what you are paying for.',
+                tone: 'good',
+              },
+            },
+            {
+              label: 'No, and we want it free',
+              next: {
+                result: 'Systems Manager Parameter Store (SecureString)',
+                detail: 'Encrypts with KMS and costs nothing in the standard tier. You would have to build rotation yourself.',
+                tone: 'good',
+              },
+            },
+          ],
+        },
+      },
+    ],
+  }}
+/>
+
+<Scenario
+  who="A fintech that has to prove a departing contractor can no longer read customer data"
+  problem="A contractor with broad access left under a cloud. The data sits in S3 and RDS, encrypted with the default AWS managed keys. Legal asked the team to demonstrate that the contractor's access had been revoked — and the honest answer was that nobody could prove it, because access was scattered across a dozen IAM policies and the encryption was invisible to them either way."
+  solution="They re-encrypted the sensitive buckets and databases under a customer managed KMS key whose key policy names exactly three roles. Database credentials moved to Secrets Manager with 30-day rotation, which invalidated every password the contractor could have seen. CloudTrail now logs every Decrypt call against that key."
+  outcome="Revoking access is now a single change to one key policy, and the CloudTrail log of Decrypt calls is the evidence legal asked for."
+>
+The insight worth carrying into the exam: with a customer managed key, the <strong>key policy
+becomes a single, auditable chokepoint</strong> for access to the data. That is why questions
+about revoking or proving access point at KMS rather than at bucket policies.
+</Scenario>
+
+<Quiz
+  question="A company must encrypt data at rest in Amazon S3, and their security team requires the ability to control the key rotation schedule and to revoke access to the data immediately if needed. What should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'A customer managed key in AWS KMS',
+      correct: true,
+      why: 'Only a customer managed key lets you define the key policy, set the rotation schedule, and disable the key — which revokes access to everything encrypted under it at once.',
+    },
+    {
+      text: 'The AWS managed key for S3 (aws/s3)',
+      why: 'AWS managed keys encrypt the data perfectly well, but AWS controls rotation and you cannot edit their key policy or disable them. Neither stated requirement is met.',
+    },
+    {
+      text: 'AWS Secrets Manager',
+      why: 'Secrets Manager stores and rotates credentials such as passwords and API tokens. It is not the mechanism for encrypting objects at rest.',
+    },
+    {
+      text: 'AWS Certificate Manager',
+      why: 'ACM issues TLS certificates, which protect data in transit. It plays no part in encrypting stored objects.',
+    },
+  ]}
+  explain="Sort the four by what they protect: <strong>ACM = in transit · KMS = data at rest · CloudHSM = keys under single-tenant custody · Secrets Manager = credentials.</strong>"
+/>
+
+<Quiz
+  question="An application stores its Amazon RDS database password in a configuration file. Security requires that the password be rotated every 30 days without any application downtime or code changes. What should be implemented?"
+  choose={1}
+  options={[
+    {
+      text: 'Store the credential in AWS Secrets Manager and enable automatic rotation',
+      correct: true,
+      why: 'Secrets Manager rotates RDS credentials natively — it updates the password in the database and in the secret together, and the application retrieves the current value at runtime.',
+    },
+    {
+      text: 'Store the password in Systems Manager Parameter Store as a SecureString',
+      why: 'Parameter Store encrypts the value, but it has no built-in rotation. You would have to write and operate the rotation yourself, which the question is trying to avoid.',
+    },
+    {
+      text: 'Encrypt the configuration file with a KMS key',
+      why: 'This protects the file’s contents but does nothing about rotation. The same password would sit there, encrypted, for years.',
+    },
+    {
+      text: 'Store the password in an environment variable on the instance',
+      why: 'This changes where the long-lived credential lives without rotating it, and environment variables are readable by anyone who can inspect the instance.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="Which statements about encryption on AWS are correct? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'A KMS key never leaves AWS KMS; services request a data key to perform encryption',
+      correct: true,
+      why: 'This is envelope encryption. The master key stays inside KMS, and the short-lived data key is used in memory and discarded.',
+    },
+    {
+      text: 'An existing unencrypted RDS instance cannot be encrypted in place',
+      correct: true,
+      why: 'Encryption is chosen at creation. To encrypt existing data you snapshot the instance, copy the snapshot with encryption enabled, and restore into a new instance.',
+    },
+    {
+      text: 'AWS can recover keys stored in AWS CloudHSM if you lose them',
+      why: 'It cannot, and that is the entire point of single-tenant custody. Losing CloudHSM keys means losing the data encrypted under them.',
+    },
+    {
+      text: 'ACM certificates can be exported and installed on on-premises servers',
+      why: 'ACM public certificates cannot be exported for use outside AWS services. A question mentioning on-premises installation is pointing somewhere else.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Two states, two answers: <strong>in transit → TLS with an ACM certificate</strong> · <strong>at rest → KMS</strong>.',
+    '<strong>ACM certificates are free and auto-renewing</strong>, are Regional, must be in <strong>us-east-1</strong> for CloudFront, and cannot be exported.',
+    'KMS uses <strong>envelope encryption</strong> — the key never leaves KMS. Access to encrypted data is therefore an <strong>IAM/key-policy</strong> question.',
+    'Use a <strong>customer managed key</strong> when the question mentions controlling rotation, revoking access, or sharing across accounts. Otherwise the AWS managed key is free and enough.',
+    '<strong>CloudHSM</strong> = single-tenant hardware, AWS cannot access <em>or recover</em> your keys. Chosen for regulators, never for convenience.',
+    '<strong>Secrets Manager rotates</strong> (and costs); <strong>Parameter Store is free</strong> (and does not rotate).',
+    'S3 and DynamoDB encrypt by default. <strong>RDS cannot be encrypted in place</strong> — snapshot, copy with encryption, restore.',
+  ]}
+/>

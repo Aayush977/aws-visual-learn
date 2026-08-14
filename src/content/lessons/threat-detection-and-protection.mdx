@@ -1,0 +1,276 @@
+---
+title: Detecting and Blocking Threats
+summary: GuardDuty, Inspector, Macie, Security Hub, Shield and WAF all sound alike. Each one watches a different thing — and knowing which is which answers the question outright.
+exams: [CCP, SAA]
+track: security
+order: 40
+domains:
+  CCP: 'Domain 2 — Security and Compliance'
+  SAA: 'Domain 1 — Design Secure Architectures'
+minutes: 11
+hook: Six services, six different questions. Who is behaving oddly? What is unpatched? Where is the personal data? Everything else follows.
+updated: 2026-08-11
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+This is the group of services beginners find most interchangeable, because the names all sound
+like security and the marketing all sounds the same. They are not interchangeable at all. Each
+one answers exactly one question, and exam items are built by asking that question in plain
+English and seeing whether you recognise it.
+
+Split them by **where they sit**: some stand at the edge blocking traffic before it arrives,
+and the rest sit inside watching what is already happening.
+
+<Diagram
+  title="Blocking at the edge, watching on the inside"
+  viewBox="0 40 1060 560"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Shield — absorbs the flood',
+      body: '<strong>AWS Shield Standard</strong> is on for every account, free, and absorbs common network-layer <strong>DDoS</strong> attacks. <strong>Shield Advanced</strong> adds cost protection and a response team, for a substantial monthly fee.',
+      flow: 'w-att-shield',
+    },
+    {
+      title: 'WAF — inspects the request itself',
+      body: '<strong>AWS WAF</strong> reads the HTTP request and blocks by rule: SQL injection, cross-site scripting, a bad IP range, or simply too many requests per minute. It attaches to CloudFront, an ALB or API Gateway.',
+      flow: 'w-shield-waf',
+    },
+    {
+      title: 'GuardDuty — watches behaviour',
+      body: 'Continuous threat detection reading <strong>CloudTrail, VPC Flow Logs and DNS logs</strong>. It spots the <em>odd</em>: an instance talking to a known mining pool, credentials suddenly used from another continent, reconnaissance scans. Nothing to install.',
+      flow: 'w-logs-gd',
+      duration: 1400,
+    },
+    {
+      title: 'Inspector — watches software',
+      body: 'Scans <strong>EC2 instances, container images in ECR and Lambda functions</strong> for known vulnerabilities (CVEs) and unintended network exposure. Behaviour is fine; the question is whether the software is out of date.',
+      flow: 'w-ec2-insp',
+    },
+    {
+      title: 'Macie — watches data',
+      body: 'Uses machine learning to find <strong>sensitive data in S3</strong> — card numbers, national insurance numbers, credentials — and tells you which buckets hold it and whether they are public.',
+      flow: 'w-s3-macie',
+    },
+    {
+      title: 'Security Hub — collects all of it',
+      body: 'One dashboard aggregating findings from GuardDuty, Inspector, Macie and more, scored against standards such as CIS and AWS Foundational Security Best Practices. It <em>finds nothing itself</em> — it is the single pane of glass.',
+      flow: ['w-gd-hub', 'w-insp-hub', 'w-macie-hub'],
+      duration: 1500,
+    },
+  ]}
+  caption="The tell is the noun in the question: traffic → Shield/WAF · behaviour → GuardDuty · software versions → Inspector · data → Macie · all of it in one place → Security Hub."
+>
+  <Node x={85} y={210} w={140} h={78} label="Attacker" icon="deny" tone="red" step={1} />
+
+  <Boundary x={215} y={95} w={330} h={230} label="At the edge — block it arriving" tone="orange" step={1} />
+  <Node x={300} y={200} w={140} h={80} label="Shield" sub="DDoS" icon="shield" tone="orange" step={1} />
+  <Node x={465} y={200} w={140} h={80} label="WAF" sub="HTTP rules" icon="firewall" tone="orange" step={2} />
+
+  <Node x={690} y={200} w={170} h={80} label="Your app" icon="server" tone="blue" step={2} />
+
+  <Boundary x={215} y={370} w={640} h={210} label="On the inside — watch what happens" tone="purple" step={3} />
+  <Node x={310} y={470} w={170} h={86} label="GuardDuty" sub="odd behaviour" icon="eye" tone="purple" step={3} />
+  <Node x={530} y={470} w={170} h={86} label="Inspector" sub="unpatched software" icon="gear" tone="teal" step={4} />
+  <Node x={750} y={470} w={170} h={86} label="Macie" sub="sensitive data in S3" icon="file" tone="green" step={5} />
+
+  <Node x={960} y={200} w={170} h={86} label="Security Hub" sub="one dashboard" icon="chart" tone="navy" step={6} />
+
+  <Wire id="w-att-shield" from={[155, 210]} to={[228, 205]} tone="red" step={1} />
+  <Wire id="w-shield-waf" from={[370, 200]} to={[393, 200]} tone="orange" step={2} />
+  <Wire id="w-waf-app" from={[535, 200]} to={[603, 200]} tone="blue" step={2} />
+  <Wire id="w-logs-gd" from={[650, 240]} to={[310, 425]} shape="elbow-v" mid={350} tone="purple" step={3} label="CloudTrail · Flow Logs · DNS" labelDy={-8} />
+  <Wire id="w-ec2-insp" from={[700, 240]} to={[530, 425]} shape="elbow-v" mid={350} tone="teal" step={4} />
+  <Wire id="w-s3-macie" from={[750, 240]} to={[750, 425]} tone="green" step={5} />
+  <Wire id="w-gd-hub" from={[395, 470]} to={[940, 245]} shape="elbow-h" mid={900} tone="navy" step={6} />
+  <Wire id="w-insp-hub" from={[615, 470]} to={[940, 250]} shape="elbow-h" mid={905} tone="navy" step={6} />
+  <Wire id="w-macie-hub" from={[835, 470]} to={[940, 255]} shape="elbow-h" mid={910} tone="navy" step={6} />
+</Diagram>
+
+## The edge: Shield and WAF
+
+**AWS Shield Standard** protects every AWS account automatically, at no cost, against the
+common volumetric and network-layer DDoS attacks. You do not enable it and you cannot turn it
+off. **Shield Advanced** costs about $3,000 a month and adds 24/7 access to the Shield Response
+Team, detailed attack diagnostics, and — the reason people actually buy it — **cost protection**,
+refunding the scaling charges an attack causes.
+
+**AWS WAF** works one layer up, reading the HTTP request. You write rules, or subscribe to AWS
+managed rule groups, to block:
+
+- SQL injection and cross-site scripting patterns
+- Requests from particular countries or IP ranges
+- Too many requests from one source (**rate-based rules**)
+- Anything matching a string, regex or size constraint you specify
+
+It attaches to **CloudFront, an Application Load Balancer, API Gateway or AppSync** — never
+directly to an EC2 instance.
+
+<Callout type="exam">
+The distinction is the layer. <strong>Shield = volume</strong>, an attack that tries to exhaust
+your bandwidth or connections. <strong>WAF = content</strong>, a request that is individually
+malicious. "Protect against SQL injection" is always WAF. "Absorb a large-scale DDoS attack" is
+always Shield.
+</Callout>
+
+## The inside: GuardDuty, Inspector, Macie
+
+These three all "detect" and are constantly swapped in wrong answers. Separate them by
+**what they look at**:
+
+| Service | Looks at | Finds |
+| --- | --- | --- |
+| **GuardDuty** | Logs — CloudTrail, VPC Flow Logs, DNS, EKS audit | *Behaviour* that is out of character: crypto-mining, compromised credentials, reconnaissance |
+| **Inspector** | EC2, ECR images, Lambda | *Software* with known CVEs, and unintended network paths |
+| **Macie** | S3 objects | *Data* that is sensitive: PII, financial identifiers, credentials |
+
+All three are agentless or near-agentless, enabled with a click, and priced by volume analysed.
+
+<Mnemonic
+  title="Which detector?"
+  phrase="Guards watch People, Inspectors check Parts, Macie reads Papers"
+  tone="purple"
+  items={[
+    { key: 'G', term: 'GuardDuty → behaviour', note: 'reads logs. "Unusual activity", "compromised credentials", "crypto-mining"' },
+    { key: 'I', term: 'Inspector → vulnerabilities', note: 'scans workloads. "Unpatched", "CVE", "software vulnerabilities"' },
+    { key: 'M', term: 'Macie → sensitive data', note: 'scans S3. "PII", "credit card numbers", "where is our personal data"' },
+    { key: 'S', term: 'Security Hub → aggregation', note: 'collects the other three. "Single pane of glass", "CIS benchmark"' },
+  ]}
+/>
+
+<Callout type="gotcha">
+<strong>Security Hub detects nothing on its own.</strong> It aggregates and scores findings from
+other services against standards such as CIS Foundations and AWS Foundational Security Best
+Practices. If a question asks what actually <em>found</em> the problem, the answer is GuardDuty,
+Inspector or Macie — Security Hub is where you then see it.
+</Callout>
+
+## The rest of the toolkit
+
+Enough to recognise by name:
+
+- **AWS Network Firewall** — stateful filtering for a whole VPC, including intrusion prevention.
+  Beyond what security groups and NACLs can express.
+- **AWS Firewall Manager** — centrally applies WAF rules, Shield Advanced protections and
+  security group policies across **every account in an Organization**. The answer whenever a
+  question says "consistently across all accounts".
+- **Amazon Detective** — takes a GuardDuty finding and builds the investigation graph so you can
+  work out how far an intrusion spread. Detection versus *investigation*.
+- **AWS Security Hub** — as above, the aggregator.
+- **Amazon Cognito** — user sign-up and sign-in for your *applications'* end users, with social
+  and enterprise identity federation. Not for AWS console access; that is IAM Identity Center.
+- **AWS Directory Service** — managed Microsoft Active Directory, for joining EC2 Windows
+  instances to a domain or federating existing corporate identities.
+
+<Callout type="exam">
+Two identity services that get swapped: <strong>Cognito is for your application's users</strong>
+(the customers of your mobile app), and <strong>IAM Identity Center is for your employees</strong>
+(console and CLI access to AWS accounts). If the people in the question are customers, it is
+Cognito.
+</Callout>
+
+<Scenario
+  who="A retailer that failed a penetration test three ways at once"
+  problem="The report listed three unrelated findings: a public S3 bucket containing exported order data with customer card details, two EC2 instances running a web framework with a critical published vulnerability, and an IAM access key that had been used from an IP address in a country the company does not operate in. Nobody had noticed any of them, and there was no single place where such things would have shown up."
+  solution="Macie was enabled to classify the S3 estate, which found the card data and two other buckets nobody remembered. Inspector was enabled against EC2 and the ECR images, producing a ranked CVE list. GuardDuty had in fact already generated a finding for the anomalous credential use — it simply was not being read. All three now feed Security Hub, with findings routed to the on-call channel through EventBridge."
+  outcome="Each of the three findings maps to exactly one service, and all three now surface in one dashboard within minutes rather than in an annual penetration test."
+>
+This is the shape of the exam question, and of reality: <strong>three different problems needing
+three different detectors</strong>, plus one aggregator so a human actually sees them. Nothing
+in the toolkit overlaps as much as the names suggest.
+</Scenario>
+
+<Quiz
+  question="A company wants to be alerted when an Amazon EC2 instance in their account begins communicating with a known cryptocurrency mining domain, or when IAM credentials are used from an unusual geographic location. Which service should they enable?"
+  choose={1}
+  options={[
+    {
+      text: 'Amazon GuardDuty',
+      correct: true,
+      why: 'GuardDuty continuously analyses CloudTrail, VPC Flow Logs and DNS logs to detect behaviour that is out of character — mining traffic and anomalous credential use are two of its headline finding types.',
+    },
+    {
+      text: 'Amazon Inspector',
+      why: 'Inspector scans workloads for known software vulnerabilities and unintended network exposure. It examines what is installed, not how the instance is behaving.',
+    },
+    {
+      text: 'Amazon Macie',
+      why: 'Macie discovers and classifies sensitive data in S3. It has no visibility of network behaviour or credential use.',
+    },
+    {
+      text: 'AWS Security Hub',
+      why: 'Security Hub would be where you see the finding, but it does not generate it. Something has to detect it first, and for behaviour that is GuardDuty.',
+    },
+  ]}
+  explain="Match the noun: <strong>behaviour → GuardDuty · software versions → Inspector · sensitive data → Macie · all findings in one view → Security Hub.</strong>"
+/>
+
+<Quiz
+  question="A web application behind an Application Load Balancer is receiving SQL injection attempts. Which AWS service should be used to block these requests?"
+  choose={1}
+  options={[
+    {
+      text: 'AWS WAF',
+      correct: true,
+      why: 'WAF inspects the content of HTTP requests and can block SQL injection and cross-site scripting patterns, including through AWS managed rule groups. It attaches directly to an ALB.',
+    },
+    {
+      text: 'AWS Shield Standard',
+      why: 'Shield defends against volumetric DDoS attacks that try to exhaust capacity. It does not inspect the content of individual requests.',
+    },
+    {
+      text: 'A network ACL denying the attacker’s traffic',
+      why: 'NACLs filter by IP address and port, with no visibility of the HTTP payload. They cannot distinguish a SQL injection attempt from a legitimate request on port 443.',
+    },
+    {
+      text: 'Amazon GuardDuty',
+      why: 'GuardDuty is a detection service — it can tell you something suspicious happened, but it does not sit inline and block requests.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="Which statements are correct? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'AWS Shield Standard is enabled automatically for all AWS customers at no additional cost',
+      correct: true,
+      why: 'Every account gets Shield Standard against common network and transport layer DDoS attacks. Shield Advanced is the paid tier that adds the response team and cost protection.',
+    },
+    {
+      text: 'AWS Security Hub aggregates findings from other services rather than generating its own',
+      correct: true,
+      why: 'It is a single pane of glass over GuardDuty, Inspector, Macie and partner findings, scored against standards such as CIS. The detection happens elsewhere.',
+    },
+    {
+      text: 'Amazon Cognito is the recommended way to give employees access to the AWS Management Console',
+      why: 'That is IAM Identity Center. Cognito handles sign-up and sign-in for the end users of your own applications.',
+    },
+    {
+      text: 'AWS WAF can be attached directly to an EC2 instance',
+      why: 'WAF attaches to CloudFront, Application Load Balancers, API Gateway and AppSync — never to an instance directly.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Split them by position: <strong>Shield and WAF block at the edge</strong>; GuardDuty, Inspector and Macie <strong>watch from the inside</strong>.',
+    '<strong>Shield = volume</strong> (DDoS, Standard is free and always on) · <strong>WAF = content</strong> (SQL injection, XSS, rate limits).',
+    '<strong>GuardDuty = behaviour</strong> from logs · <strong>Inspector = software vulnerabilities</strong> · <strong>Macie = sensitive data in S3</strong>.',
+    '<strong>Security Hub aggregates and scores; it detects nothing.</strong> <strong>Detective</strong> investigates a finding once you have one.',
+    '<strong>Firewall Manager</strong> applies protections consistently across every account in an Organization.',
+    '<strong>Cognito = your application’s users.</strong> <strong>IAM Identity Center = your employees.</strong>',
+  ]}
+/>

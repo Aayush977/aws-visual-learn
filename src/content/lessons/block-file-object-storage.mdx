@@ -1,0 +1,314 @@
+---
+title: Block, File or Object Storage?
+summary: EBS, EFS and S3 are not three brands of the same thing. They differ in how many machines can reach the data at once — and that single question answers almost every storage exam item.
+exams: [CCP, SAA]
+track: storage
+order: 10
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 3 — Design High-Performing Architectures'
+minutes: 11
+hook: A hard drive, a shared network folder, and a warehouse you address by name. Everything else follows from that.
+updated: 2026-08-08
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import DecisionTree from '../../components/DecisionTree.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+Beginners usually meet AWS storage as a list of acronyms and try to memorise which is
+"faster" or "cheaper". That is the wrong axis, and it produces wrong answers.
+
+The real question is **how many machines need to reach this data at the same time, and do
+they need it to look like a filesystem?** Answer that and the service picks itself.
+
+<Diagram
+  title="What can reach your data, and from where"
+  viewBox="0 30 1030 440"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'EBS — a disk bolted to one instance',
+      body: '<strong>Elastic Block Store</strong> is a virtual hard drive. You attach it to an EC2 instance, format it, and the operating system sees a disk. Fast, and it behaves exactly like the drive in a laptop.',
+      flow: ['w-ebs-a', 'w-ebs-b'],
+    },
+    {
+      title: '…and only that one instance, in only that one AZ',
+      body: 'A volume lives in a <strong>single Availability Zone</strong> and normally attaches to a <strong>single instance</strong>. The instance in the other zone cannot mount it. This constraint is the reason the other two services exist.',
+      duration: 1200,
+    },
+    {
+      title: 'EFS — one filesystem, mounted by many',
+      body: '<strong>Elastic File System</strong> is a shared network drive. Hundreds of instances across <strong>several Availability Zones</strong> mount the same filesystem at once and all see the same files. It grows and shrinks automatically — no size to choose.',
+      flow: ['w-efs-a', 'w-efs-b'],
+      duration: 1400,
+    },
+    {
+      title: 'S3 — no instance required at all',
+      body: '<strong>Simple Storage Service</strong> is not a disk and not a filesystem. It is a store you address over HTTPS: <code>PUT</code> an object with a key, <code>GET</code> it back. Any instance, any Lambda, any browser on earth, no mounting involved.',
+      flow: ['w-s3', 'w-browser'],
+      duration: 1400,
+    },
+    {
+      title: 'So the question is never "which is fastest"',
+      body: 'It is <strong>one machine → EBS</strong>, <strong>many machines needing a filesystem → EFS</strong>, <strong>anything at all, over the web → S3</strong>. Nearly every storage question is that sentence in disguise.',
+    },
+  ]}
+  caption="Notice S3 sits outside both zones and needs no instance to be reachable. That is why static websites, backups and data lakes all end up there."
+>
+  <Boundary x={60} y={60} w={310} h={235} label="Availability Zone 2a" icon="zone" tone="teal" step={1} />
+  <Boundary x={390} y={60} w={310} h={235} label="Availability Zone 2b" icon="zone" tone="teal" step={1} />
+
+  <Node x={200} y={130} w={150} h={70} label="EC2" icon="server" tone="orange" step={1} />
+  <Node x={200} y={214} w={130} h={64} label="EBS" sub="20 GB, gp3" icon="disk" tone="blue" step={1} />
+  <Wire id="w-ebs-a" from={[200, 165]} to={[200, 180]} tone="blue" step={1} />
+
+  <Node x={530} y={130} w={150} h={70} label="EC2" icon="server" tone="orange" step={1} />
+  <Node x={530} y={214} w={130} h={64} label="EBS" sub="20 GB, gp3" icon="disk" tone="blue" step={1} />
+  <Wire id="w-ebs-b" from={[530, 165]} to={[530, 180]} tone="blue" step={1} />
+
+  {/* The whole point of step 2: this link does not exist. */}
+  <Wire
+    id="w-nope"
+    from={[268, 258]}
+    to={[462, 258]}
+    tone="red"
+    dashed
+    step={2}
+    label="one volume · one instance · one AZ"
+    labelDy={18}
+  />
+
+  <Node x={380} y={380} w={300} h={80} label="EFS" sub="shared filesystem, all AZs" icon="folder" tone="teal" step={3} />
+  <Wire id="w-efs-a" from={[125, 130]} to={[300, 340]} shape="elbow-v" mid={300} tone="teal" step={3} />
+  <Wire id="w-efs-b" from={[455, 130]} to={[460, 340]} shape="elbow-v" mid={300} tone="teal" step={3} />
+
+  <Node x={890} y={130} w={220} h={90} label="Amazon S3" sub="objects over HTTPS" icon="bucket" tone="green" step={4} />
+  <Wire id="w-s3" from={[605, 130]} to={[778, 130]} tone="green" step={4} label="PUT / GET" labelDy={-12} />
+  <Node x={890} y={300} w={180} h={70} label="Any browser" icon="user" tone="muted" step={4} />
+  <Wire id="w-browser" from={[890, 265]} to={[890, 178]} tone="green" step={4} />
+</Diagram>
+
+## Block storage — Amazon EBS
+
+An **EBS volume** is a virtual disk. The instance sees `/dev/xvdf`, you put a filesystem on
+it, and from then on it is indistinguishable from a physical drive. This is what you want
+whenever software expects a disk: a database's data directory, an operating system's boot
+volume, anything doing lots of small random reads and writes.
+
+The properties that get tested:
+
+- **It lives in one Availability Zone.** If that AZ fails, so does the volume.
+- **It attaches to one instance** at a time. (There is a Multi-Attach mode for `io1`/`io2`
+  volumes and a handful of cluster-aware filesystems, but treat one-to-one as the rule and
+  Multi-Attach as the footnote.)
+- **It persists independently of the instance.** Terminate the instance and the volume can
+  survive — though the root volume is set to delete on termination by default, which has
+  surprised a great many people.
+- **Snapshots go to S3** and are incremental. A snapshot can be restored into a *different*
+  Availability Zone, which is how you move a volume across zones.
+
+Volume types worth recognising:
+
+| Type | Shape of workload | Note |
+| --- | --- | --- |
+| **gp3** | General purpose SSD | The sensible default. Throughput and IOPS are configured independently of size |
+| **io2 Block Express** | Highest, most consistent IOPS | Large transactional databases. Expensive |
+| **st1** | Throughput-optimised HDD | Big sequential reads — log processing, data warehouses. Cannot be a boot volume |
+| **sc1** | Cold HDD | Cheapest, rarely touched. Cannot be a boot volume |
+
+<Callout type="gotcha">
+"Increase the IOPS" and "increase the size" used to be the same action. With **gp3** they are
+not — you buy IOPS and throughput as separate dials. A question describing a volume that is
+big enough but too slow is pointing at gp3 (or io2), not at a bigger disk.
+</Callout>
+
+## File storage — Amazon EFS (and FSx)
+
+**EFS** is a filesystem on the network. Many instances mount it at the same path and every one
+of them sees the same files, with ordinary POSIX permissions and file locking. It spreads
+across Availability Zones by default, grows to petabytes without being resized, and you pay
+for what you actually store.
+
+This is the answer whenever a **fleet** of machines needs shared files: a content management
+system where any web server might serve any upload, a shared home directory, a build farm
+reading the same dependency cache.
+
+The cost trap is that EFS is several times the price per gigabyte of EBS, and roughly ten
+times that of S3 Standard. It is bought for the sharing, not for the storage.
+
+Its siblings exist for cases where "a filesystem" means something more specific:
+
+- **Amazon FSx for Windows File Server** — a genuine SMB share with Active Directory
+  integration. The answer whenever a question mentions **Windows file shares**.
+- **Amazon FSx for Lustre** — extremely high-throughput parallel filesystem for HPC and
+  machine-learning training, able to present an S3 bucket as a filesystem.
+- **Amazon FSx for NetApp ONTAP / OpenZFS** — for teams migrating an existing NetApp or ZFS
+  estate and wanting the same features.
+
+<Callout type="exam">
+EFS is <strong>Linux/NFS</strong>. FSx for Windows File Server is <strong>Windows/SMB</strong>.
+If the scenario says "Windows-based application requiring an SMB file share", EFS is wrong no
+matter how well it fits everything else in the sentence.
+</Callout>
+
+## Object storage — Amazon S3
+
+S3 stores **objects** — a blob of bytes, a key that names it, and metadata — inside a
+**bucket**. You do not mount it. You call an API over HTTPS, and so can anything else with
+permission, from an EC2 instance to a mobile app to a browser.
+
+Giving up the filesystem buys a great deal:
+
+- **Effectively unlimited capacity.** No volume to resize, ever. Individual objects up to 5 TB.
+- **Eleven nines of durability** (99.999999999%), because every object is replicated across at
+  least three Availability Zones automatically.
+- **Reachable from anywhere**, with fine-grained permissions per object.
+- **Cheap** — a small fraction of EBS or EFS per gigabyte, with colder tiers cheaper still.
+- **It can serve a website directly**, and it is where CloudFront, Athena, and most analytics
+  tooling expect your data to be.
+
+What you gave up matters too. You cannot modify part of an object — every write replaces the
+whole thing. Latency per request is milliseconds rather than microseconds. And no operating
+system will boot from it or run a database on it.
+
+<Mnemonic
+  title="Which storage service?"
+  phrase="One machine Blocks, Every machine Files, Anything Objects"
+  tone="purple"
+  items={[
+    { key: 'B', term: 'Block — EBS', note: 'one instance, one AZ. Boot volumes and databases' },
+    { key: 'F', term: 'File — EFS / FSx', note: 'many instances share one filesystem across AZs' },
+    { key: 'O', term: 'Object — S3', note: 'no instance needed. Anything with HTTPS and permission' },
+  ]}
+/>
+
+<DecisionTree
+  title="Which storage service should I use?"
+  intro="Two questions is usually enough."
+  tree={{
+    q: 'Does the software need to see a filesystem — a mount point, file paths, file locking?',
+    hint: 'Databases, operating systems and most legacy applications say yes. Modern applications and anything web-facing often say no.',
+    options: [
+      {
+        label: 'No — the application can call an API',
+        next: {
+          result: 'Amazon S3',
+          detail: 'Cheapest by a wide margin, effectively unlimited, 11 nines of durability, reachable from anywhere. Uploads, backups, static websites, data lakes and archives all belong here.',
+          tone: 'good',
+        },
+      },
+      {
+        label: 'Yes, it needs a real filesystem',
+        next: {
+          q: 'How many machines need to read and write it at the same time?',
+          options: [
+            {
+              label: 'Just one',
+              next: {
+                result: 'Amazon EBS',
+                detail: 'A block volume attached to that instance. Use gp3 unless the workload demands the very highest IOPS, in which case io2. Remember it is tied to one Availability Zone.',
+                tone: 'good',
+              },
+            },
+            {
+              label: 'Several, and they are Linux',
+              next: {
+                result: 'Amazon EFS',
+                detail: 'One NFS filesystem mounted by every instance across multiple AZs. Grows automatically; costs several times EBS per GB, which is the price of sharing.',
+                tone: 'good',
+              },
+            },
+            {
+              label: 'Several, and they are Windows',
+              next: {
+                result: 'Amazon FSx for Windows File Server',
+                detail: 'A native SMB share with Active Directory support. EFS cannot serve SMB, so this is the only correct answer for Windows file sharing.',
+                tone: 'good',
+              },
+            },
+          ],
+        },
+      },
+    ],
+  }}
+/>
+
+<Scenario
+  who="A university department running a research image archive"
+  problem="Forty years of microscope images — 90 TB and growing — sit on a single server with a large attached disk. Researchers across three buildings need to read them, the disk is nearly full again, and the only backup is a second disk in the same room. Last month a power event took the building offline for two days and all research stopped."
+  solution="The archive itself moves to S3, with anything untouched for 90 days transitioned to Glacier Instant Retrieval by a lifecycle rule. The analysis cluster keeps a shared EFS filesystem for working data — the intermediate files that several nodes read at once during a run. Each node still boots from its own EBS volume."
+  outcome="No disk to run out again, durability rises from one room to eleven nines across three Availability Zones, and the archive costs less per month than the old server's maintenance contract."
+>
+All three services appear here, and none of them is a compromise — each is doing the job its
+shape suits. That is the normal outcome in real architectures, and it is why the exam asks
+you to *choose* rather than to rank.
+</Scenario>
+
+<Quiz
+  question="A company runs a content management system on a fleet of EC2 instances behind a load balancer. Users upload documents, and any instance must be able to serve any document immediately. The application requires a POSIX-compliant filesystem. What should a solutions architect recommend?"
+  choose={1}
+  options={[
+    {
+      text: 'Amazon EFS, mounted by every instance',
+      correct: true,
+      why: 'EFS is a POSIX-compliant filesystem that many instances can mount simultaneously across Availability Zones. The requirement for a filesystem rules out S3, and the requirement for shared access rules out EBS.',
+    },
+    {
+      text: 'An Amazon EBS volume attached to each instance',
+      why: 'Each instance would have its own separate volume, so a document uploaded through one instance would be invisible to the others. EBS cannot be shared this way.',
+    },
+    {
+      text: 'An Amazon S3 bucket',
+      why: 'S3 would handle the sharing and the durability beautifully, and is the better design in general — but the question states the application requires a POSIX-compliant filesystem, which S3 is not.',
+    },
+    {
+      text: 'An EBS volume with Multi-Attach enabled',
+      why: 'Multi-Attach works only with io1/io2 volumes, within a single Availability Zone, and requires a cluster-aware filesystem. It does not solve shared access for a load-balanced fleet across zones.',
+    },
+  ]}
+  explain="Read for two facts: <strong>how many readers</strong> and <strong>filesystem or API</strong>. Here it is “every instance” plus “POSIX”, which lands on EFS and nowhere else."
+/>
+
+<Quiz
+  question="An EC2 instance in Availability Zone eu-west-2a has an EBS volume containing important data. The instance must be replaced with a new one in eu-west-2b, keeping the data. What is the correct approach?"
+  choose={1}
+  options={[
+    {
+      text: 'Take a snapshot of the volume, then create a new volume from that snapshot in eu-west-2b',
+      correct: true,
+      why: 'Snapshots are stored in S3 and are not tied to an Availability Zone, so restoring one into a different AZ is the supported way to move a volume’s data across zones.',
+    },
+    {
+      text: 'Detach the volume and attach it to the new instance in eu-west-2b',
+      why: 'An EBS volume exists in exactly one Availability Zone and cannot be attached to an instance in another. Detaching does not change where the volume lives.',
+    },
+    {
+      text: 'Enable Multi-Attach on the volume and attach it in both zones',
+      why: 'Multi-Attach permits several instances to share a volume within one Availability Zone only. It is not a cross-AZ mechanism.',
+    },
+    {
+      text: 'Change the volume type to gp3, which is Region-scoped',
+      why: 'Volume type controls performance characteristics and price. No EBS volume type is Region-scoped — they are all confined to a single AZ.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Ask <strong>how many machines need it at once</strong>, not which service is faster. That question resolves nearly every storage scenario.',
+    '<strong>EBS = block.</strong> One instance, one AZ, behaves like a disk. Boot volumes and databases. Move it across AZs with a <strong>snapshot</strong>.',
+    '<strong>EFS = file.</strong> Many Linux instances mount one NFS filesystem across AZs. Bought for sharing, not for price.',
+    '<strong>FSx for Windows File Server</strong> for SMB and Active Directory — EFS cannot do Windows shares.',
+    '<strong>S3 = object.</strong> No mounting, no instance, HTTPS API, effectively unlimited, <strong>11 nines</strong> of durability across three AZs. The default for uploads, backups, static sites and analytics.',
+    'gp3 lets you buy <strong>IOPS and throughput separately from capacity</strong> — a slow volume no longer means a bigger one.',
+  ]}
+/>

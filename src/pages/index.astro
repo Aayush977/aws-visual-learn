@@ -1,0 +1,229 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LessonCard from '../components/LessonCard.astro';
+import { allLessons } from '../lib/lessons';
+import { url } from '../lib/paths';
+
+const lessons = await allLessons();
+const featured = lessons.slice(0, 6);
+
+const PILLARS = [
+  {
+    title: 'Watch it happen',
+    body: 'Every architecture diagram plays step by step. Press play and follow the packet from the browser all the way to the database — one hop at a time, with a caption for each.',
+    icon: 'M7 4l13 8-13 8z',
+  },
+  {
+    title: 'A hook for every list',
+    body: 'The exams are full of lists that all sound the same. Each one gets a mnemonic, so under time pressure you recall a silly sentence instead of nothing.',
+    icon: 'M9 21h6M10 18h4c0-3 4-4 4-8a6 6 0 1 0-12 0c0 4 4 5 4 8Z',
+  },
+  {
+    title: 'Decide, do not memorise',
+    body: 'Knowing what S3 Glacier is will not get you through a scenario question. Each family of services comes with a decision tree you click through until you land on the answer.',
+    icon: 'M6 3v12a3 3 0 0 0 3 3h9M18 3v6M6 3h12',
+  },
+  {
+    title: 'Practice in exam language',
+    body: 'Questions written the way the real ones are, with an explanation on every option — including the wrong ones, which is where the learning actually is.',
+    icon: 'M9 11l2 2 4-5M5 4h14v16l-7-3-7 3z',
+  },
+];
+---
+
+<BaseLayout
+  title="AWS Visual Learn"
+  description="Learn AWS for the Cloud Practitioner and Solutions Architect Associate exams through animated diagrams, mnemonics, decision trees and real-world scenarios."
+>
+  <section class="hero">
+    <div class="wrap hero__inner">
+      <p class="hero__eyebrow">Cloud Practitioner · Solutions Architect Associate</p>
+      <h1 class="hero__title">
+        AWS, explained in <em>pictures that move</em>.
+      </h1>
+      <p class="hero__lead">
+        Most AWS study material is a wall of bullet points. This is the opposite: every concept
+        gets a diagram you can play step by step, a mnemonic to hang it on, and a decision tree for
+        the moment the exam asks you to choose.
+      </p>
+      <div class="hero__cta">
+        <a class="btn btn--primary" href={url('/path/ccp')}>Start with Cloud Practitioner</a>
+        <a class="btn" href={url('/path/saa')}>Go to Solutions Architect</a>
+        <a class="btn" href={url('/quiz')}>Test yourself</a>
+      </div>
+      <p class="hero__note">Free, no sign-up, works without JavaScript.</p>
+    </div>
+  </section>
+
+  <section class="wrap band">
+    <ul class="pillars">
+      {
+        PILLARS.map((p) => (
+          <li class="pl">
+            <svg class="pl__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d={p.icon} />
+            </svg>
+            <h2 class="pl__title">{p.title}</h2>
+            <p class="pl__body">{p.body}</p>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="wrap band">
+    <div class="band__head">
+      <h2>Start here</h2>
+      <a href={url('/lessons')}>All {lessons.length} lessons →</a>
+    </div>
+    <ul class="grid">
+      {
+        featured.map((l, i) => (
+          <LessonCard
+            id={l.id}
+            title={l.data.title}
+            summary={l.data.summary}
+            exams={l.data.exams}
+            minutes={l.data.minutes}
+            n={i + 1}
+          />
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="wrap band">
+    <div class="who">
+      <h2>Who this is for</h2>
+      <p>
+        People who bounce off walls of text. If you have ever read “S3 Standard-IA has a 30-day
+        minimum storage duration” four times and still could not tell someone when to use it, the
+        problem was the format, not you.
+      </p>
+      <p>
+        These notes are written while studying for the same two exams, so they cover the things
+        that were confusing the first time round rather than the things that are easy to write.
+      </p>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    padding: var(--sp-8) 0 var(--sp-7);
+    background:
+      radial-gradient(
+        60rem 26rem at 15% -10%,
+        color-mix(in srgb, var(--aws-orange) 14%, transparent),
+        transparent
+      ),
+      radial-gradient(
+        50rem 24rem at 90% 0%,
+        color-mix(in srgb, var(--accent) 12%, transparent),
+        transparent
+      );
+    border-bottom: 1px solid var(--border);
+  }
+  .hero__inner {
+    max-width: 52rem;
+  }
+  .hero__eyebrow {
+    margin: 0 0 var(--sp-3);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .hero__title {
+    font-size: clamp(2.1rem, 1.4rem + 3.2vw, 3.8rem);
+    line-height: 1.05;
+    margin-bottom: var(--sp-4);
+  }
+  .hero__title em {
+    font-style: normal;
+    color: var(--aws-orange);
+  }
+  .hero__lead {
+    font-size: var(--step-1);
+    color: var(--text-muted);
+    max-width: 44ch;
+    line-height: 1.55;
+  }
+  .hero__cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    margin-top: var(--sp-5);
+  }
+  .hero__note {
+    margin: var(--sp-3) 0 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .band {
+    padding: var(--sp-7) 0;
+  }
+  .band__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-4);
+    padding-bottom: var(--sp-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .band__head h2 {
+    margin: 0;
+  }
+  .band__head a {
+    font-size: var(--step--1);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .pillars {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: var(--sp-5);
+  }
+  .pl__icon {
+    width: 26px;
+    height: 26px;
+    fill: none;
+    stroke: var(--aws-orange);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .pl__title {
+    margin: var(--sp-2) 0 var(--sp-2);
+    font-size: var(--step-0);
+  }
+  .pl__body {
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+    gap: var(--sp-3);
+    padding: 0;
+    margin: 0;
+  }
+
+  .who {
+    max-width: 46rem;
+  }
+  .who p {
+    color: var(--text-muted);
+  }
+</style>

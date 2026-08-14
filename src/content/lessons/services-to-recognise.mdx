@@ -1,0 +1,244 @@
+---
+title: The Rest of the Services You Must Recognise
+summary: Application integration, developer tools, end-user computing, IoT and customer engagement. One line each, organised by the sentence a question would use.
+exams: [CCP]
+track: services
+order: 20
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+minutes: 10
+hook: The last exam task statement is simply "identify services from other categories". It is worth about six marks and takes an afternoon.
+updated: 2026-08-11
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+The final task statement on the Cloud Practitioner blueprint is the vaguest — "identify services
+from other in-scope AWS service categories" — and it is the one most people leave to chance.
+It is worth several marks and requires no depth at all: one sentence per service, and the
+ability to tell apart three or four pairs that sound similar.
+
+<Diagram
+  title="Five categories, one job each"
+  viewBox="0 40 1060 520"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Application integration — connecting your own components',
+      body: '<strong>SQS</strong> queues work for later. <strong>SNS</strong> fans one message out to many. <strong>EventBridge</strong> routes events by rule. <strong>Step Functions</strong> orchestrates a multi-step workflow. <strong>API Gateway</strong> is the front door for APIs.',
+      flow: 'w-int',
+    },
+    {
+      title: 'Developer tools — getting code into production',
+      body: 'The <strong>Code*</strong> family: <strong>CodeCommit</strong> hosts Git, <strong>CodeBuild</strong> compiles and tests, <strong>CodeDeploy</strong> releases, <strong>CodePipeline</strong> chains the three into CI/CD. <strong>X-Ray</strong> traces a request through the services it touches.',
+      flow: 'w-dev',
+      duration: 1400,
+    },
+    {
+      title: 'End-user computing — desktops and apps for people',
+      body: '<strong>WorkSpaces</strong> is a managed virtual desktop. <strong>AppStream 2.0</strong> streams a single application rather than a whole desktop. Both answer "our staff need access from anywhere without company laptops".',
+      flow: 'w-euc',
+    },
+    {
+      title: 'Frontend and customer engagement',
+      body: '<strong>Amplify</strong> builds and hosts web and mobile front ends. <strong>AppSync</strong> is managed GraphQL. <strong>Connect</strong> is a cloud contact centre. <strong>SES</strong> sends bulk and transactional email.',
+      flow: 'w-front',
+      duration: 1400,
+    },
+    {
+      title: 'IoT — devices in the field',
+      body: '<strong>AWS IoT Core</strong> connects and manages devices — sensors, vehicles, machinery — and routes their messages into the rest of AWS.',
+      flow: 'w-iot',
+    },
+  ]}
+  caption="Nothing here needs depth. You need to recognise the sentence and produce the name."
+>
+  <Node x={140} y={120} w={210} h={72} label="Connect components" tone="muted" step={1} />
+  <Node x={140} y={215} w={210} h={72} label="Ship code" tone="muted" step={2} />
+  <Node x={140} y={310} w={210} h={72} label="Give people desktops" tone="muted" step={3} />
+  <Node x={140} y={405} w={210} h={72} label="Reach customers" tone="muted" step={4} />
+  <Node x={140} y={500} w={210} h={72} label="Connect devices" tone="muted" step={5} />
+
+  <Node x={620} y={120} w={330} h={72} label="SQS · SNS · EventBridge" sub="Step Functions · API Gateway" icon="queue" tone="orange" step={1} />
+  <Node x={620} y={215} w={330} h={72} label="CodeCommit · Build · Deploy" sub="CodePipeline · X-Ray" icon="code" tone="blue" step={2} />
+  <Node x={620} y={310} w={330} h={72} label="WorkSpaces · AppStream" sub="desktops and apps" icon="server" tone="teal" step={3} />
+  <Node x={620} y={405} w={330} h={72} label="Amplify · AppSync · Connect" sub="SES" icon="users" tone="purple" step={4} />
+  <Node x={620} y={500} w={330} h={72} label="AWS IoT Core" sub="devices in the field" icon="router" tone="green" step={5} />
+
+  <Wire id="w-int" from={[248, 120]} to={[452, 120]} tone="orange" step={1} />
+  <Wire id="w-dev" from={[248, 215]} to={[452, 215]} tone="blue" step={2} />
+  <Wire id="w-euc" from={[248, 310]} to={[452, 310]} tone="teal" step={3} />
+  <Wire id="w-front" from={[248, 405]} to={[452, 405]} tone="purple" step={4} />
+  <Wire id="w-iot" from={[248, 500]} to={[452, 500]} tone="green" step={5} />
+</Diagram>
+
+## Application integration
+
+You met SQS and SNS in the scaling lesson. Two more complete the set:
+
+- **AWS Step Functions** — coordinates a **multi-step workflow** as a state machine: do this, then
+  that, retry on failure, branch if the answer was no. The answer whenever a question describes
+  orchestrating several Lambda functions or services in order.
+- **Amazon API Gateway** — a managed front door for APIs. Handles throttling, authorisation,
+  caching and versioning, and is the usual way an HTTP request reaches a Lambda function.
+
+<Callout type="exam">
+<strong>SQS</strong> decouples one producer from one consumer group (each message consumed once).
+<strong>SNS</strong> fans one message out to many subscribers. <strong>EventBridge</strong> routes
+by rule, including events from AWS services and SaaS partners. <strong>Step Functions</strong>
+sequences steps in order. The verb in the question — queue, broadcast, route, orchestrate —
+picks the service.
+</Callout>
+
+## Developer tools
+
+The **Code\*** family is a CI/CD pipeline broken into pieces:
+
+| Service | Job |
+| --- | --- |
+| **CodeCommit** | Private Git repositories |
+| **CodeBuild** | Compiles source and runs tests |
+| **CodeDeploy** | Releases to EC2, Lambda or ECS, with rollback |
+| **CodePipeline** | Chains the above into an automated release pipeline |
+| **CodeArtifact** | Private package repository (npm, Maven, pip) |
+| **AWS X-Ray** | Distributed tracing — where the latency actually went |
+
+<Callout type="gotcha">
+<strong>CodePipeline</strong> is the orchestrator; the others are the stages. A question about
+"automating the entire release process from commit to production" wants CodePipeline, not
+CodeDeploy. And <strong>X-Ray</strong> is the answer for "which microservice is causing the
+latency", where CloudWatch only tells you that latency exists.
+</Callout>
+
+## End-user computing
+
+- **Amazon WorkSpaces** — a fully managed virtual **desktop** in the cloud, reachable from any
+  device. For remote staff, contractors, or regulated environments where data must not sit on a
+  laptop.
+- **Amazon AppStream 2.0** — streams a **single application** rather than a whole desktop. For
+  delivering one heavy program, such as a CAD package, without installing it anywhere.
+
+## Frontend, customer engagement and IoT
+
+- **AWS Amplify** — build, deploy and host web and mobile front ends, with authentication and
+  APIs wired in.
+- **AWS AppSync** — managed **GraphQL** APIs with real-time data synchronisation.
+- **Amazon Connect** — a cloud **contact centre**: phone numbers, call routing, agent interface,
+  pay per minute. Frequently paired with Lex for self-service and Transcribe for call analysis.
+- **Amazon Simple Email Service (SES)** — sending bulk and transactional email at low cost.
+- **AWS IoT Core** — connects devices to AWS, manages their identities and shadows their state,
+  and routes their messages onward.
+
+<Mnemonic
+  title="The confusable pairs"
+  tone="teal"
+  items={[
+    { key: '1', term: 'WorkSpaces vs AppStream', note: 'a whole desktop vs a single streamed application' },
+    { key: '2', term: 'CodeDeploy vs CodePipeline', note: 'one release step vs the whole pipeline' },
+    { key: '3', term: 'SNS vs SQS', note: 'broadcast to many vs queue for one consumer' },
+    { key: '4', term: 'CloudWatch vs X-Ray', note: 'is it slow? vs which part is slow?' },
+    { key: '5', term: 'SES vs SNS', note: 'email to customers vs notifications between systems' },
+  ]}
+/>
+
+<Scenario
+  who="An architecture firm whose staff could not work from home"
+  problem="Their CAD software needed a workstation costing several thousand pounds and would not run on a laptop. Project files were enormous and had to stay on the office server for insurance reasons. When the office was closed for three weeks by a burst pipe, nobody could work at all."
+  solution="AppStream 2.0 now streams the CAD application from AWS to whatever device an architect has, with the files staying on FSx rather than on any laptop. Non-technical staff use WorkSpaces for ordinary desktops. Amazon Connect replaced the office phone system so the switchboard follows the people."
+  outcome="Staff work from anywhere on ordinary hardware, no project file ever lands on a personal device, and the workstation refresh budget was cancelled."
+>
+The distinction the exam tests is right here: <strong>AppStream for one application, WorkSpaces
+for a whole desktop.</strong> The firm needed both, for two different groups of people.
+</Scenario>
+
+<Quiz
+  question="A company needs to coordinate a series of AWS Lambda functions that must run in a specific order, with retries on failure and different branches depending on each result. Which service should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'AWS Step Functions',
+      correct: true,
+      why: 'Step Functions is a managed state machine for orchestrating multi-step workflows, with built-in sequencing, branching, retries and error handling.',
+    },
+    {
+      text: 'Amazon SQS',
+      why: 'A queue decouples a producer from a consumer but has no concept of ordering steps, branching on results, or retry logic across a workflow.',
+    },
+    {
+      text: 'Amazon SNS',
+      why: 'SNS broadcasts one message to many subscribers simultaneously. It cannot sequence work or branch on a result.',
+    },
+    {
+      text: 'Amazon EventBridge',
+      why: 'EventBridge routes events to targets based on rules. It is excellent for reacting to events but is not a workflow orchestrator with ordered steps and retries.',
+    },
+  ]}
+  explain="The verb decides it: <strong>queue → SQS · broadcast → SNS · route → EventBridge · orchestrate in order → Step Functions.</strong>"
+/>
+
+<Quiz
+  question="A company wants to give remote employees access to a single, resource-intensive engineering application without providing them with high-specification laptops or installing anything locally. Which service is most appropriate?"
+  choose={1}
+  options={[
+    {
+      text: 'Amazon AppStream 2.0',
+      correct: true,
+      why: 'AppStream streams an individual application from AWS to any device. The heavy compute happens in AWS and nothing is installed locally, which is exactly the requirement.',
+    },
+    {
+      text: 'Amazon WorkSpaces',
+      why: 'WorkSpaces would work, but it provides an entire managed desktop. The question asks for a single application, which is the distinction between the two services.',
+    },
+    {
+      text: 'Amazon EC2 with Remote Desktop',
+      why: 'This could be built, but you would be managing instances, sessions, scaling and licensing yourself — the work the managed service removes.',
+    },
+    {
+      text: 'AWS Amplify',
+      why: 'Amplify builds and hosts web and mobile front ends. It has nothing to do with delivering desktop applications.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="Which service would a developer use to identify which microservice is responsible for latency in a request that passes through several services?"
+  choose={1}
+  options={[
+    {
+      text: 'AWS X-Ray',
+      correct: true,
+      why: 'X-Ray provides distributed tracing, following a single request across services and showing where the time was actually spent.',
+    },
+    {
+      text: 'Amazon CloudWatch',
+      why: 'CloudWatch reports metrics and logs per service, so it can tell you that latency is high. Attributing it to one hop across a distributed call path is what X-Ray adds.',
+    },
+    {
+      text: 'AWS CloudTrail',
+      why: 'CloudTrail records API calls for audit purposes — who did what, when. It carries no performance timing for application requests.',
+    },
+    {
+      text: 'AWS Config',
+      why: 'Config records resource configuration and compliance over time. It has no view of request performance.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Integration verbs: <strong>SQS queues · SNS broadcasts · EventBridge routes · Step Functions orchestrates · API Gateway fronts APIs</strong>.',
+    'CI/CD: <strong>CodeCommit → CodeBuild → CodeDeploy</strong>, chained by <strong>CodePipeline</strong>. <strong>X-Ray</strong> traces requests across services.',
+    '<strong>WorkSpaces = a whole desktop. AppStream 2.0 = one streamed application.</strong>',
+    '<strong>Amplify</strong> front ends · <strong>AppSync</strong> GraphQL · <strong>Connect</strong> contact centre · <strong>SES</strong> email · <strong>IoT Core</strong> devices.',
+    '<strong>CloudWatch says it is slow; X-Ray says which part.</strong> <strong>SES emails customers; SNS notifies systems.</strong>',
+  ]}
+/>

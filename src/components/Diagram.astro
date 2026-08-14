@@ -1,0 +1,398 @@
+---
+/**
+ * The animated diagram player.
+ *
+ * You supply the shapes (via <Node />, <Boundary />, <Wire /> or raw SVG) and a
+ * list of steps. Anything carrying `step={n}` stays dimmed until step n plays.
+ * A step with `flow: 'wire-id'` sends a travelling dot down that <Wire />.
+ *
+ *   <Diagram
+ *     title="How a request reaches your app"
+ *     viewBox="0 0 900 420"
+ *     steps={[
+ *       { title: 'Browser asks DNS', body: 'Route 53 answers…', flow: 'w1' },
+ *       { title: 'CloudFront edge', body: '…', flow: 'w2', duration: 1400 },
+ *     ]}
+ *   >
+ *     …shapes…
+ *   </Diagram>
+ *
+ * Playback is keyboard operable, announces each step to screen readers, and
+ * skips the motion entirely under `prefers-reduced-motion`.
+ */
+import '../styles/diagram.css';
+
+export interface DiagramStep {
+  title: string;
+  /** Supports inline HTML. */
+  body: string;
+  /** id (or ids) of <Wire /> paths to animate when this step plays. */
+  flow?: string | string[];
+  /** Travel time in ms for this step's packet. Default 1200. */
+  duration?: number;
+}
+
+interface Props {
+  title: string;
+  steps: DiagramStep[];
+  /** SVG coordinate space. Pick one and lay everything out inside it. */
+  viewBox?: string;
+  /** 'build' keeps earlier steps lit (default) · 'focus' lights only the current one. */
+  mode?: 'build' | 'focus';
+  caption?: string;
+  /** Start playing when the diagram scrolls into view. */
+  autoplay?: boolean;
+  /** Draw a faint background grid. Helps when you are still positioning things. */
+  grid?: boolean;
+}
+
+const {
+  title,
+  steps,
+  viewBox = '0 0 900 460',
+  mode = 'build',
+  caption,
+  autoplay = false,
+  grid = false,
+} = Astro.props;
+
+const TONES = ['orange', 'blue', 'teal', 'purple', 'green', 'red', 'navy', 'muted'];
+const uid = 'dg-' + Math.random().toString(36).slice(2, 9);
+---
+
+<figure class="dg bleed">
+  <aws-diagram
+    class="dg__root"
+    data-mode={mode}
+    data-total={steps.length}
+    data-autoplay={autoplay ? 'true' : 'false'}
+  >
+    <div class="dg__head">
+      <h4 class="dg__title" id={`${uid}-title`}>{title}</h4>
+      <div class="dg__controls" role="group" aria-label={`Playback for: ${title}`}>
+        <button type="button" class="dg__btn" data-act="prev" aria-label="Previous step">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"></path></svg>
+        </button>
+        <button type="button" class="dg__btn dg__btn--play" data-act="play">
+          <svg class="dg__ico-play" viewBox="0 0 24 24" aria-hidden="true"
+            ><path d="M7 4l13 8-13 8z"></path></svg
+          >
+          <svg class="dg__ico-pause" viewBox="0 0 24 24" aria-hidden="true"
+            ><path d="M7 4h4v16H7z"></path><path d="M13 4h4v16h-4z"></path></svg
+          >
+          <span class="dg__btnText">Play</span>
+        </button>
+        <button type="button" class="dg__btn" data-act="next" aria-label="Next step">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
+        </button>
+        <span class="dg__count" data-role="count" aria-hidden="true">0 / {steps.length}</span>
+        <button type="button" class="dg__btn dg__btn--ghost" data-act="reset">Reset</button>
+      </div>
+    </div>
+
+    <div class="dg__stage">
+      <svg
+        class="dg__svg"
+        viewBox={viewBox}
+        role="img"
+        aria-labelledby={`${uid}-title`}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        <defs>
+          <pattern id={`${uid}-grid`} width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M20 0H0v20" fill="none" stroke="var(--diagram-grid)" stroke-width="1"></path>
+          </pattern>
+          {
+            TONES.map((t) => (
+              <>
+                <marker
+                  id={`dg-arrow-${t}`}
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 10 5 0 10z" class={`dg-arrowhead dg-arrowhead--${t}`} />
+                </marker>
+                <marker
+                  id={`dg-arrow-back-${t}`}
+                  viewBox="0 0 10 10"
+                  refX="1"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto"
+                >
+                  <path d="M10 0 0 5 10 10z" class={`dg-arrowhead dg-arrowhead--${t}`} />
+                </marker>
+              </>
+            ))
+          }
+        </defs>
+        {grid && <rect width="100%" height="100%" fill={`url(#${uid}-grid)`} />}
+        <slot />
+      </svg>
+    </div>
+
+    <ol class="dg__steps">
+      {
+        steps.map((s, i) => (
+          <li class="dg__step" data-index={i + 1}>
+            <button
+              type="button"
+              class="dg__stepBtn"
+              data-flow={Array.isArray(s.flow) ? s.flow.join(' ') : s.flow}
+              data-duration={s.duration}
+            >
+              <span class="dg__num" aria-hidden="true">
+                {i + 1}
+              </span>
+              <span class="dg__stepText">
+                <strong class="dg__stepTitle">{s.title}</strong>
+                <span class="dg__stepBody" set:html={s.body} />
+              </span>
+            </button>
+          </li>
+        ))
+      }
+    </ol>
+
+    <p class="visually-hidden" data-role="live" aria-live="polite"></p>
+  </aws-diagram>
+  {caption && <figcaption class="dg__caption">{caption}</figcaption>}
+</figure>
+
+<script>
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const DEFAULT_DURATION = 1200;
+
+  class AwsDiagram extends HTMLElement {
+    #index = 0;
+    #total = 0;
+    #playing = false;
+    #timer = 0;
+    #token = 0;
+    #reduced = false;
+    #svg: SVGSVGElement | null = null;
+    #targets: SVGElement[] = [];
+    #stepItems: HTMLLIElement[] = [];
+    #live: HTMLElement | null = null;
+    #count: HTMLElement | null = null;
+    #playBtn: HTMLButtonElement | null = null;
+
+    connectedCallback() {
+      this.#svg = this.querySelector('svg.dg__svg');
+      if (!this.#svg) return;
+
+      this.#total = Number(this.dataset.total || 0);
+      this.#targets = Array.from(this.#svg.querySelectorAll<SVGElement>('[data-step]'));
+      this.#stepItems = Array.from(this.querySelectorAll<HTMLLIElement>('.dg__step'));
+      this.#live = this.querySelector('[data-role="live"]');
+      this.#count = this.querySelector('[data-role="count"]');
+      this.#playBtn = this.querySelector('[data-act="play"]');
+
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      this.#reduced = mq.matches;
+      mq.addEventListener('change', (e) => (this.#reduced = e.matches));
+
+      this.addEventListener('click', this.#onClick);
+      this.addEventListener('keydown', this.#onKeydown);
+
+      this.#render();
+
+      if (this.dataset.autoplay === 'true') {
+        const io = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting && this.#index === 0) {
+                this.#play();
+                io.disconnect();
+              }
+            }
+          },
+          { threshold: 0.4 },
+        );
+        io.observe(this);
+      }
+    }
+
+    disconnectedCallback() {
+      this.#stop();
+    }
+
+    #onClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      const stepBtn = target.closest<HTMLButtonElement>('.dg__stepBtn');
+      if (stepBtn) {
+        const li = stepBtn.closest<HTMLLIElement>('.dg__step');
+        this.#stop();
+        this.#goto(Number(li?.dataset.index || 1));
+        return;
+      }
+      const act = target.closest<HTMLButtonElement>('[data-act]')?.dataset.act;
+      if (act === 'play') this.#playing ? this.#stop() : this.#play();
+      if (act === 'next') {
+        this.#stop();
+        this.#goto(Math.min(this.#total, this.#index + 1));
+      }
+      if (act === 'prev') {
+        this.#stop();
+        this.#goto(Math.max(0, this.#index - 1));
+      }
+      if (act === 'reset') {
+        this.#stop();
+        this.#goto(0);
+      }
+    };
+
+    #onKeydown = (e: KeyboardEvent) => {
+      if (!(e.target as HTMLElement).closest('.dg__controls, .dg__stepBtn')) return;
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.#stop();
+        this.#goto(Math.min(this.#total, this.#index + 1));
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        this.#stop();
+        this.#goto(Math.max(0, this.#index - 1));
+      }
+    };
+
+    #goto(n: number) {
+      this.#index = n;
+      this.#token++;
+      this.#render();
+      if (n > 0) this.#runFlows(n);
+    }
+
+    #play() {
+      if (this.#index >= this.#total) this.#goto(0);
+      this.#playing = true;
+      this.#syncPlayButton();
+      const advance = () => {
+        if (!this.#playing) return;
+        if (this.#index >= this.#total) {
+          this.#stop();
+          return;
+        }
+        this.#goto(this.#index + 1);
+        const wait = this.#durationFor(this.#index) + 700;
+        this.#timer = window.setTimeout(advance, wait);
+      };
+      advance();
+    }
+
+    #stop() {
+      this.#playing = false;
+      window.clearTimeout(this.#timer);
+      this.#syncPlayButton();
+    }
+
+    #syncPlayButton() {
+      if (!this.#playBtn) return;
+      this.#playBtn.classList.toggle('is-playing', this.#playing);
+      const text = this.#playBtn.querySelector('.dg__btnText');
+      if (text) text.textContent = this.#playing ? 'Pause' : this.#index > 0 ? 'Resume' : 'Play';
+      this.#playBtn.setAttribute('aria-pressed', String(this.#playing));
+    }
+
+    #durationFor(n: number) {
+      const btn = this.#stepItems[n - 1]?.querySelector<HTMLButtonElement>('.dg__stepBtn');
+      return Number(btn?.dataset.duration) || DEFAULT_DURATION;
+    }
+
+    #render() {
+      const build = this.dataset.mode !== 'focus';
+      const n = this.#index;
+
+      for (const el of this.#targets) {
+        const s = Number(el.dataset.step);
+        const lit = n === 0 ? false : build ? s <= n : s === n;
+        el.classList.toggle('is-lit', lit);
+        el.classList.toggle('is-current', s === n);
+      }
+
+      for (const li of this.#stepItems) {
+        const s = Number(li.dataset.index);
+        li.classList.toggle('is-current', s === n);
+        li.classList.toggle('is-done', s < n);
+        li.querySelector('.dg__stepBtn')?.setAttribute('aria-current', s === n ? 'step' : 'false');
+      }
+
+      if (this.#count) this.#count.textContent = `${n} / ${this.#total}`;
+      if (this.#live && n > 0) {
+        const item = this.#stepItems[n - 1];
+        const t = item?.querySelector('.dg__stepTitle')?.textContent ?? '';
+        const b = item?.querySelector('.dg__stepBody')?.textContent ?? '';
+        this.#live.textContent = `Step ${n} of ${this.#total}. ${t}. ${b}`;
+      }
+      this.#syncPlayButton();
+    }
+
+    #runFlows(n: number) {
+      const btn = this.#stepItems[n - 1]?.querySelector<HTMLButtonElement>('.dg__stepBtn');
+      const ids = (btn?.dataset.flow || '').split(/\s+/).filter(Boolean);
+      const duration = this.#durationFor(n);
+      ids.forEach((id, i) => this.#flyPacket(id, duration, i * 160));
+    }
+
+    /** Send a dot down a <Wire /> path using getPointAtLength — no SMIL, fully cancellable. */
+    #flyPacket(pathId: string, duration: number, delay: number) {
+      const path = this.#svg?.querySelector<SVGPathElement>(`#${CSS.escape(pathId)}`);
+      if (!path || typeof path.getTotalLength !== 'function') return;
+
+      const token = this.#token;
+      const total = path.getTotalLength();
+      if (!total) return;
+
+      const dot = document.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('class', 'dg__packet');
+      dot.setAttribute('r', '7');
+      const start = path.getPointAtLength(0);
+      dot.setAttribute('cx', String(start.x));
+      dot.setAttribute('cy', String(start.y));
+      // Append next to the path so any parent transform applies to both.
+      path.parentNode?.appendChild(dot);
+
+      if (this.#reduced) {
+        const end = path.getPointAtLength(total);
+        dot.setAttribute('cx', String(end.x));
+        dot.setAttribute('cy', String(end.y));
+        window.setTimeout(() => dot.remove(), 600);
+        return;
+      }
+
+      const begin = performance.now() + delay;
+      const tick = (now: number) => {
+        if (token !== this.#token || !dot.isConnected) {
+          dot.remove();
+          return;
+        }
+        const elapsed = now - begin;
+        if (elapsed < 0) {
+          requestAnimationFrame(tick);
+          return;
+        }
+        const t = Math.min(1, elapsed / duration);
+        // easeInOutQuad, so the packet accelerates out and settles in.
+        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const p = path.getPointAtLength(eased * total);
+        dot.setAttribute('cx', String(p.x));
+        dot.setAttribute('cy', String(p.y));
+        if (t < 1) requestAnimationFrame(tick);
+        else {
+          dot.classList.add('is-landing');
+          window.setTimeout(() => dot.remove(), 260);
+        }
+      };
+      requestAnimationFrame(tick);
+    }
+  }
+
+  if (!customElements.get('aws-diagram')) {
+    customElements.define('aws-diagram', AwsDiagram);
+  }
+</script>

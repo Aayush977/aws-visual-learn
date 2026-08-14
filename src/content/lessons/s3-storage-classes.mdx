@@ -1,0 +1,329 @@
+---
+title: Choosing an S3 Storage Class
+summary: Seven classes, one axis — how fast you need the object back. Plus the minimum-duration and retrieval-fee traps that make the cheap tiers expensive.
+exams: [CCP, SAA]
+track: storage
+order: 20
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 4 — Design Cost-Optimized Architectures'
+minutes: 11
+hook: Every S3 class stores your object just as safely. What you are actually buying is how quickly you can have it back.
+updated: 2026-08-07
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Callout from '../../components/Callout.astro';
+import DecisionTree from '../../components/DecisionTree.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+S3 storage classes look like seven separate products. They are closer to one product
+with a dial on it, and the dial is labelled **how long are you willing to wait?**
+
+Turn it towards "instantly" and storage costs more. Turn it towards "some time
+tomorrow" and storage gets very cheap, but getting the object back starts costing money
+and time. Durability does not change: every class except One Zone-IA stores your object
+across at least three Availability Zones, and all of them are designed for the same
+99.999999999% (eleven nines) durability.
+
+<Diagram
+  title="One object, ageing through the classes"
+  viewBox="0 85 1000 225"
+  steps={[
+    {
+      title: 'Day 0 — S3 Standard',
+      body: 'A user uploads an invoice PDF. It is downloaded several times in the first fortnight. Highest storage price, no retrieval fee, milliseconds to read.',
+    },
+    {
+      title: 'Day 30 — Standard-IA',
+      body: 'Nobody has opened it in two weeks. A lifecycle rule moves it to Infrequent Access: roughly half the storage price, but now you pay a small fee per GB retrieved. Still milliseconds.',
+      flow: 'w1',
+    },
+    {
+      title: 'Day 90 — Glacier Instant Retrieval',
+      body: 'A quarter has passed. Cheaper again, still returned in milliseconds — but with a higher retrieval fee and a 90-day minimum storage duration.',
+      flow: 'w2',
+    },
+    {
+      title: 'Day 180 — Glacier Flexible Retrieval',
+      body: 'This is now archive material. Very cheap to store, but you no longer get it instantly: minutes to hours, depending on which retrieval speed you pay for.',
+      flow: 'w3',
+    },
+    {
+      title: 'Day 365 — Glacier Deep Archive',
+      body: 'Kept only because the regulator says seven years. The cheapest storage AWS sells, and retrieval takes 12 to 48 hours. Perfectly fine — nobody is going to ask for it.',
+      flow: 'w4',
+    },
+  ]}
+  caption="A lifecycle rule automates every one of these transitions. You write the policy once."
+>
+  <Node x={90} y={150} w={165} h={100} label="S3 Standard" sub="ms · no min" icon="bucket" tone="orange" step={1} />
+  <Node x={295} y={150} w={165} h={100} label="Standard-IA" sub="ms · 30-day min" icon="bucket" tone="blue" step={2} />
+  <Node x={500} y={150} w={165} h={100} label="Glacier Instant" sub="ms · 90-day min" icon="archive" tone="teal" step={3} />
+  <Node x={705} y={150} w={165} h={100} label="Glacier Flexible" sub="1 min – 12 h · 90-day min" icon="archive" tone="purple" step={4} />
+  <Node x={910} y={150} w={165} h={100} label="Deep Archive" sub="12 – 48 h · 180-day min" icon="archive" tone="navy" step={5} />
+
+  <Wire id="w1" from={[173, 150]} to={[212, 150]} tone="blue" step={2} />
+  <Wire id="w2" from={[378, 150]} to={[417, 150]} tone="teal" step={3} />
+  <Wire id="w3" from={[583, 150]} to={[622, 150]} tone="purple" step={4} />
+  <Wire id="w4" from={[788, 150]} to={[827, 150]} tone="navy" step={5} />
+
+  <text class="dg-text dg-text--mid" x="90" y="232" data-step={1}>day 0</text>
+  <text class="dg-text dg-text--mid" x="295" y="232" data-step={2}>day 30</text>
+  <text class="dg-text dg-text--mid" x="500" y="232" data-step={3}>day 90</text>
+  <text class="dg-text dg-text--mid" x="705" y="232" data-step={4}>day 180</text>
+  <text class="dg-text dg-text--mid" x="910" y="232" data-step={5}>day 365</text>
+
+  <line x1="30" y1="268" x2="970" y2="268" stroke="var(--diagram-boundary)" stroke-width="1.5" stroke-dasharray="5 5" />
+  <text class="dg-text dg-text--muted" x="30" y="292">cheaper to keep →</text>
+  <text class="dg-text dg-text--muted" x="970" y="292" text-anchor="end">← slower and dearer to get back</text>
+</Diagram>
+
+<Mnemonic
+  title="The classes, hottest to coldest"
+  phrase="Sensible Investors Should Own Gold, Gems & Diamonds"
+  tone="orange"
+  items={[
+    { key: 'S', term: 'S3 Standard', note: 'frequently accessed, no minimum, no retrieval fee' },
+    { key: 'I', term: 'Intelligent-Tiering', note: 'unknown or changing access patterns — S3 moves it for you' },
+    { key: 'S', term: 'Standard-IA', note: 'infrequent, but needed in milliseconds · 3+ AZs · 30-day min' },
+    { key: 'O', term: 'One Zone-IA', note: 'same, but stored in a single AZ · ~20% cheaper · recreatable data only' },
+    { key: 'G', term: 'Glacier Instant Retrieval', note: 'archive you still need instantly · 90-day min' },
+    { key: 'G', term: 'Glacier Flexible Retrieval', note: 'archive · minutes to hours · 90-day min' },
+    { key: 'D', term: 'Deep Archive', note: 'cheapest storage AWS sells · 12–48 hours · 180-day min' },
+  ]}
+/>
+
+## The table the exam is testing
+
+| Class | Retrieval time | AZs | Minimum duration | Best for |
+| --- | --- | --- | --- | --- |
+| **Standard** | milliseconds | ≥ 3 | none | Active data, websites, content distribution |
+| **Intelligent-Tiering** | milliseconds | ≥ 3 | none | Data whose access pattern you cannot predict |
+| **Standard-IA** | milliseconds | ≥ 3 | 30 days | Backups and older data you occasionally need at once |
+| **One Zone-IA** | milliseconds | **1** | 30 days | Data you could regenerate — thumbnails, secondary copies |
+| **Glacier Instant Retrieval** | milliseconds | ≥ 3 | 90 days | Archives read a few times a year but needed immediately |
+| **Glacier Flexible Retrieval** | 1 min – 12 h | ≥ 3 | 90 days | Backups and archives where waiting is acceptable |
+| **Glacier Deep Archive** | 12 – 48 h | ≥ 3 | 180 days | Seven-year compliance retention nobody expects to read |
+
+<Callout type="cost">
+The **minimum storage duration** is the trap. Put a file in Standard-IA and delete it
+after a week, and you are still billed for thirty days. Put it in Deep Archive and
+delete it after a month, and you are billed for six. Cold storage is only cheap for
+data that is genuinely going to sit still.
+</Callout>
+
+<Callout type="gotcha">
+**One Zone-IA** stores data in a single Availability Zone. Its durability figure is the
+same eleven nines *within* that zone, but if the zone is destroyed, the data is gone.
+Use it only for data you can recreate from somewhere else. If a question says "must
+survive the loss of an Availability Zone", One Zone-IA is a wrong answer.
+</Callout>
+
+## Intelligent-Tiering deserves its own paragraph
+
+Most classes ask you to predict the future. **S3 Intelligent-Tiering** does not: it
+monitors access per object and moves each one between a frequent tier, an infrequent
+tier and (optionally) archive tiers automatically. There is a small per-object
+monitoring charge, and no retrieval fee for the automatic tiers.
+
+The practical rule: if you *know* the access pattern, pick the specific class and pay
+less. If you genuinely do not know, or it changes, Intelligent-Tiering costs less than
+guessing wrong.
+
+<Callout type="exam">
+Any question containing "unknown", "unpredictable" or "changing access patterns"
+alongside "without operational overhead" or "without application changes" is an
+Intelligent-Tiering question.
+</Callout>
+
+## Work it out for yourself
+
+<DecisionTree
+  title="Which S3 storage class?"
+  intro="Answer for one kind of object at a time — a bucket can hold several classes at once."
+  tree={{
+    q: 'Do you know how often this data will be read?',
+    options: [
+      {
+        label: 'No — it varies, or nobody can say',
+        next: {
+          result: 'S3 Intelligent-Tiering',
+          detail:
+            'S3 monitors each object and moves it between tiers for you. A small monitoring fee per object, no retrieval fees on the automatic tiers, and no application changes. Cheaper than guessing wrong.',
+        },
+      },
+      {
+        label: 'Yes — several times a month or more',
+        next: {
+          result: 'S3 Standard',
+          detail:
+            'No minimum duration, no retrieval fee, milliseconds to first byte. For genuinely active data the higher storage price is more than repaid by the absence of retrieval charges.',
+        },
+      },
+      {
+        label: 'Yes — rarely, but I need it in milliseconds when I do',
+        next: {
+          q: 'Roughly how rarely?',
+          hint: 'The line is around "monthly" versus "a few times a year".',
+          options: [
+            {
+              label: 'Around once a month',
+              next: {
+                q: 'Could you recreate this data if an Availability Zone was lost?',
+                hint: 'Thumbnails and transcoded copies: yes. The only copy of a customer contract: no.',
+                options: [
+                  {
+                    label: 'No — it is irreplaceable',
+                    next: {
+                      result: 'S3 Standard-IA',
+                      detail:
+                        'Stored across three or more AZs. Roughly half the storage price of Standard, with a per-GB retrieval fee and a 30-day minimum duration.',
+                    },
+                  },
+                  {
+                    label: 'Yes — I could regenerate it',
+                    next: {
+                      result: 'S3 One Zone-IA',
+                      tone: 'warn',
+                      detail:
+                        'About 20% cheaper than Standard-IA because it lives in one AZ only. Fine for derived data. Never for the only copy of anything.',
+                    },
+                  },
+                ],
+              },
+            },
+            {
+              label: 'A few times a year at most',
+              next: {
+                result: 'S3 Glacier Instant Retrieval',
+                detail:
+                  'Archive pricing with millisecond access — the cheapest way to keep data you still need immediately. 90-day minimum duration and a higher retrieval fee than Standard-IA.',
+              },
+            },
+          ],
+        },
+      },
+      {
+        label: 'Yes — rarely, and I can wait to get it back',
+        next: {
+          q: 'How long can you wait?',
+          options: [
+            {
+              label: 'Minutes to a few hours',
+              next: {
+                result: 'S3 Glacier Flexible Retrieval',
+                detail:
+                  'Three retrieval speeds: Expedited (1–5 minutes), Standard (3–5 hours) and Bulk (5–12 hours, free). 90-day minimum duration. The default choice for backups and archives.',
+              },
+            },
+            {
+              label: 'Up to a day or two, and I am keeping it for years',
+              next: {
+                result: 'S3 Glacier Deep Archive',
+                detail:
+                  'The lowest storage price AWS offers, aimed at 7–10 year compliance retention. Standard retrieval is 12 hours, Bulk is 48. 180-day minimum duration.',
+              },
+            },
+          ],
+        },
+      },
+    ],
+  }}
+/>
+
+<Scenario
+  who="A hospital trust keeping diagnostic images"
+  problem="Scans are reviewed constantly for about a month, then almost never — but regulation says keep them for eight years, and a clinician must be able to pull one up in minutes if a case is reopened. Storing everything in S3 Standard is costing five figures a month."
+  solution="A lifecycle rule: S3 Standard for 30 days, then Standard-IA to day 90, then Glacier Instant Retrieval for the rest of the eight years. Object Lock in compliance mode stops anything being deleted early."
+  outcome="Storage cost falls by roughly 70%, and a reopened case still returns an image in milliseconds."
+>
+Deep Archive would be cheaper still, but it fails the requirement: 12 hours is not
+"in minutes". This is the shape of a good scenario question — the cheapest option is
+deliberately wrong, and the constraint that rules it out is one clause in the middle of
+the paragraph.
+</Scenario>
+
+## Lifecycle rules do the moving
+
+You do not migrate objects by hand. A **lifecycle configuration** on the bucket says
+things like "transition to Standard-IA after 30 days, to Glacier Flexible Retrieval
+after 90, expire after 2555 days", and S3 applies it to every object that matches a
+prefix or tag.
+
+Two rules worth remembering:
+
+- Transitions only move **downwards** in the diagram above — towards colder, cheaper
+  storage. Moving an object back to a warmer class means restoring or copying it.
+- An object must spend **at least 30 days** in Standard before a lifecycle rule can
+  transition it to Standard-IA or One Zone-IA.
+
+<Quiz
+  question="A company stores 200 TB of log files in S3 Standard. The logs are analysed daily for the first week, then kept for seven years to satisfy an audit requirement. Auditors have never requested a file, but if they did, a two-day wait would be acceptable. What is the most cost-effective design?"
+  choose={1}
+  options={[
+    {
+      text: 'A lifecycle rule that transitions objects to S3 Glacier Deep Archive after 30 days',
+      correct: true,
+      why: 'Deep Archive is the cheapest class, its 12–48 hour retrieval comfortably fits a two-day tolerance, and the seven-year retention is far beyond the 180-day minimum duration.',
+    },
+    {
+      text: 'A lifecycle rule that transitions objects to S3 Standard-IA after 30 days',
+      why: 'Standard-IA is far more expensive than Deep Archive and buys millisecond retrieval the requirement explicitly does not need.',
+    },
+    {
+      text: 'Move everything to S3 Intelligent-Tiering',
+      why: 'Intelligent-Tiering is for unpredictable access. Here the pattern is precisely known, so paying a monitoring fee to discover it is waste.',
+    },
+    {
+      text: 'Compress the files and leave them in S3 Standard',
+      why: 'Compression helps a little, but leaving seven years of audit logs in the most expensive class ignores the entire point of the storage classes.',
+    },
+  ]}
+  explain="Work these backwards from the <em>tolerance</em>, not the data. “A two-day wait would be acceptable” is the sentence that picks the class."
+/>
+
+<Quiz
+  question="Which statements about S3 storage classes are correct? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'S3 One Zone-IA stores data in a single Availability Zone',
+      correct: true,
+      why: 'That is what makes it cheaper, and what makes it unsuitable for data that cannot be recreated.',
+    },
+    {
+      text: 'S3 Standard-IA has a minimum billable storage duration of 30 days',
+      correct: true,
+      why: 'Delete an object sooner and you are still charged for the full 30 days. Both Glacier Instant and Flexible are 90 days; Deep Archive is 180.',
+    },
+    {
+      text: 'S3 Glacier Deep Archive returns objects in a few minutes',
+      why: 'Standard retrieval is around 12 hours, Bulk up to 48. Glacier Flexible Retrieval offers Expedited retrieval in 1–5 minutes.',
+    },
+    {
+      text: 'Objects in Standard-IA are less durable than objects in Standard',
+      why: 'All classes are designed for the same eleven nines of durability. What differs is availability, retrieval time and price — not durability.',
+    },
+    {
+      text: 'A bucket can only use one storage class at a time',
+      why: 'Storage class is a property of each object, not of the bucket. One bucket routinely holds objects in several classes at once.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'All classes share the same <strong>eleven nines of durability</strong>. You are buying retrieval speed, not safety.',
+    'Order: <strong>S</strong>tandard · <strong>I</strong>ntelligent-Tiering · <strong>S</strong>tandard-IA · <strong>O</strong>ne Zone-IA · <strong>G</strong>lacier Instant · <strong>G</strong>lacier Flexible · <strong>D</strong>eep Archive.',
+    'Minimum durations: <strong>IA 30 days, Glacier Instant and Flexible 90, Deep Archive 180.</strong> Deleting early does not save money.',
+    '<strong>One Zone-IA lives in one AZ.</strong> Never for data you cannot recreate.',
+    '“Unknown or changing access patterns” → <strong>Intelligent-Tiering</strong>. Known pattern → pick the class yourself and pay less.',
+    'Storage class is per <strong>object</strong>, and <strong>lifecycle rules</strong> move objects between classes automatically.',
+  ]}
+/>

@@ -1,0 +1,85 @@
+---
+import '../styles/global.css';
+import SiteHeader from '../components/SiteHeader.astro';
+import { url } from '../lib/paths';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Drop the reading-width wrapper (used by the wide index pages). */
+  wide?: boolean;
+}
+
+const { title, description } = Astro.props;
+const fullTitle = title === 'AWS Visual Learn' ? title : `${title} · AWS Visual Learn`;
+const canonical = new URL(Astro.url.pathname, Astro.site ?? 'http://localhost:4321');
+---
+
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical.href} />
+    <link rel="icon" href={url('/favicon.svg')} type="image/svg+xml" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="generator" content={Astro.generator} />
+
+    {/* Set the theme before first paint so there is no light-mode flash. */}
+    <script is:inline>
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.dataset.theme = stored || (prefersDark ? 'dark' : 'light');
+        } catch (e) {
+          /* no storage access — fall back to the light default */
+        }
+      })();
+    </script>
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <SiteHeader />
+    <main id="main">
+      <slot />
+    </main>
+    <footer class="ft">
+      <div class="wrap ft__inner">
+        <p>
+          <strong>AWS Visual Learn</strong> — study notes for the AWS Cloud Practitioner and
+          Solutions Architect Associate exams, written while learning them.
+        </p>
+        <p class="ft__small">
+          Not affiliated with, endorsed by, or sponsored by Amazon Web Services. Always check the
+          <a href="https://aws.amazon.com/certification/" rel="noopener">official exam guides</a> and
+          AWS documentation — service limits and pricing change.
+        </p>
+      </div>
+    </footer>
+
+    <style>
+      .ft {
+        margin-top: var(--sp-8);
+        border-top: 1px solid var(--border);
+        background: var(--bg-sunken);
+        padding: var(--sp-6) 0;
+      }
+      .ft__inner p {
+        margin: 0 0 var(--sp-2);
+        font-size: var(--step--1);
+        color: var(--text-muted);
+        max-width: 60ch;
+      }
+      .ft__small {
+        font-size: 0.78rem;
+      }
+    </style>
+  </body>
+</html>

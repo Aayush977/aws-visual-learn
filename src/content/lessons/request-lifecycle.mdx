@@ -1,0 +1,288 @@
+---
+title: How a Request Reaches Your Application
+summary: Follow one browser request from the address bar to the database and back — Route 53, CloudFront, the load balancer, EC2 in two Availability Zones, and RDS.
+exams: [CCP, SAA]
+track: networking
+order: 10
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 2 — Design Resilient Architectures'
+minutes: 12
+hook: If you can draw this one diagram from memory, a surprising number of exam questions answer themselves.
+updated: 2026-08-07
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+Individual AWS services make much more sense once you have seen where they sit in the
+path of a single request. This is the reference architecture that turns up, in some
+form, in most Solutions Architect scenario questions.
+
+Play it all the way through, then read the section for each hop.
+
+<Diagram
+  title="One request, end to end"
+  viewBox="0 0 1000 700"
+  autoplay
+  steps={[
+    {
+      title: 'The browser needs an IP address',
+      body: 'You type <code>shop.example.com</code>. Before anything else can happen, that name has to become a number. The browser asks DNS, and <strong>Amazon Route 53</strong> is holding the answer.',
+      flow: 'w-user-r53',
+    },
+    {
+      title: 'Route 53 points at the nearest edge',
+      body: 'Rather than the address of a server in London, it returns a <strong>CloudFront</strong> edge location close to the user. Route 53 itself is answered from edge locations worldwide, so even the lookup is fast.',
+      flow: 'w-r53-cf',
+    },
+    {
+      title: 'CloudFront checks its cache',
+      body: 'Images, CSS, JavaScript and cached pages are returned straight from the edge — the request stops here and never enters your Region. Only a <em>cache miss</em> continues to the origin.',
+      flow: 'w-cf-alb',
+      duration: 1500,
+    },
+    {
+      title: 'The load balancer spreads the traffic',
+      body: 'An <strong>Application Load Balancer</strong> sits in public subnets across two Availability Zones. It health-checks every target and only sends traffic to the ones answering.',
+      flow: ['w-alb-a', 'w-alb-b'],
+      duration: 1400,
+    },
+    {
+      title: 'An EC2 instance runs your code',
+      body: 'The instances live in <strong>private</strong> subnets — no public IP, unreachable from the internet directly. The only way in is through the load balancer.',
+    },
+    {
+      title: 'The application queries the database',
+      body: 'Both instances talk to the same <strong>RDS Multi-AZ</strong> database. The standby in the second AZ receives synchronous writes and takes over automatically if the primary fails.',
+      flow: ['w-a-rds', 'w-b-rds'],
+      duration: 1400,
+    },
+    {
+      title: 'The response travels back',
+      body: 'Back through the load balancer to CloudFront, which stores a copy at the edge before returning it. The next user in the same city gets it without any of the hops below.',
+      flow: 'w-return',
+      duration: 1800,
+    },
+  ]}
+  caption="Public subnets hold the load balancer; private subnets hold the instances and the database. That separation is the exam's favourite detail."
+>
+  <Node x={80} y={110} w={130} label="Browser" icon="user" tone="muted" step={1} />
+  <Node x={280} y={110} w={150} label="Route 53" sub="DNS" icon="dns" tone="purple" step={1} />
+  <Node x={510} y={110} w={170} label="CloudFront" sub="edge cache" icon="cdn" tone="orange" step={2} />
+
+  <Wire id="w-user-r53" from={[145, 110]} to={[201, 110]} tone="purple" step={1} />
+  <Wire id="w-r53-cf" from={[355, 110]} to={[421, 110]} tone="orange" step={2} />
+  <Wire id="w-return" from={[510, 70]} to={[80, 70]} shape="arc" bow={55} tone="green" dashed step={7} label="response, cached at the edge" labelDy={-46} />
+
+  <Boundary x={140} y={230} w={820} h={440} label="Region — eu-west-2 (London)" icon="region" tone="blue" step={3} />
+
+  <Node x={400} y={320} w={200} label="Application Load Balancer" sub="public subnets" icon="balancer" tone="blue" step={3} />
+  <Wire id="w-cf-alb" from={[510, 150]} to={[400, 278]} shape="elbow-v" tone="orange" step={3} label="cache miss → origin" labelDx={110} labelDy={-6} />
+
+  <Boundary x={200} y={400} w={300} h={170} label="AZ 2a · private subnet" icon="zone" tone="teal" step={4} />
+  <Boundary x={560} y={400} w={300} h={170} label="AZ 2b · private subnet" icon="zone" tone="teal" step={4} />
+
+  <Node x={350} y={485} w={190} h={85} label="EC2" sub="your application" icon="server" tone="teal" step={5} />
+  <Node x={710} y={485} w={190} h={85} label="EC2" sub="your application" icon="server" tone="teal" step={5} />
+
+  {/* mid=384 turns the corner above the AZ boxes so the run does not cross their labels. */}
+  <Wire id="w-alb-a" from={[400, 362]} to={[350, 440]} shape="elbow-v" mid={384} tone="blue" step={4} />
+  <Wire id="w-alb-b" from={[400, 362]} to={[710, 440]} shape="elbow-v" mid={384} tone="blue" step={4} />
+
+  <Node x={530} y={622} w={210} h={80} label="RDS" sub="Multi-AZ, private" icon="database" tone="green" step={6} />
+  {/* Turn at the database's centreline so each wire enters from the side. */}
+  <Wire id="w-a-rds" from={[350, 530]} to={[425, 622]} shape="elbow-v" mid={622} tone="green" step={6} />
+  <Wire id="w-b-rds" from={[710, 530]} to={[635, 622]} shape="elbow-v" mid={622} tone="green" step={6} />
+</Diagram>
+
+## Hop 1 — Route 53 turns a name into an address
+
+Every request starts with DNS. **Amazon Route 53** is AWS's DNS service, and the "53"
+is the port DNS runs on. It is a global service answered from edge locations, so a
+lookup from Sydney is not served out of Virginia.
+
+The two features worth knowing:
+
+- **Routing policies** decide *which* address to return. Simple, weighted (send 10% of
+  traffic to a new version), latency-based (send users to the fastest Region for them),
+  failover (return the backup only when the primary fails a health check), and
+  geolocation (return different answers per country).
+- **Health checks** let Route 53 stop returning an address that is not responding —
+  this is how DNS-level failover between Regions works.
+
+<Callout type="exam">
+When a question involves failing over **between Regions**, the answer usually involves
+Route 53. When it involves distributing traffic **inside** a Region, the answer is a
+load balancer. Route 53 is the only one of the two that can move traffic across Regions.
+</Callout>
+
+## Hop 2 — CloudFront serves what it can from the edge
+
+**CloudFront** is the CDN. It keeps copies of your content at hundreds of edge locations
+and serves them from whichever one is closest to the user.
+
+Two consequences that matter more than they first appear:
+
+1. **Latency drops** because the physical distance drops. Nothing you configure in your
+   application beats not crossing an ocean.
+2. **Load on your origin drops**, often dramatically, because cached requests never
+   reach it. A CDN in front of a small server can absorb a traffic spike that would
+   otherwise flatten it.
+
+CloudFront is also where **AWS WAF** and **AWS Shield** attach, which is why "protect a
+web application from a DDoS attack" points at CloudFront rather than at anything in
+your VPC.
+
+<Callout type="gotcha">
+CloudFront is not only for static files. It can sit in front of a dynamic application
+and still help — it terminates TLS at the edge and carries the request to your origin
+over AWS's own optimised network, which is faster than the public internet even when
+nothing is cached.
+</Callout>
+
+## Hop 3 — The load balancer picks a healthy target
+
+An **Application Load Balancer (ALB)** receives the request and forwards it to one of
+your instances. Three things it does that are easy to undervalue:
+
+- **Health checks.** It polls each target and quietly stops sending traffic to any that
+  fails. A broken instance produces no errors for users.
+- **Cross-AZ distribution.** It has a presence in each AZ you enable and spreads traffic
+  across all of them. This is the mechanism that makes multi-AZ actually work.
+- **It is the only public thing.** The ALB sits in public subnets; everything behind it
+  does not need a public IP at all.
+
+Which load balancer to use is a standard exam question:
+
+| Load balancer | Operates at | Reach for it when |
+| --- | --- | --- |
+| **Application (ALB)** | Layer 7 — HTTP/HTTPS | You need routing by path or hostname, or you are running containers |
+| **Network (NLB)** | Layer 4 — TCP/UDP/TLS | You need extreme throughput, ultra-low latency, or a static IP |
+| **Gateway (GWLB)** | Layer 3 | You are inserting third-party virtual firewalls or inspection appliances |
+
+<Mnemonic
+  title="Choosing a load balancer"
+  phrase="Apps use HTTP, Networks use TCP, Gateways guard"
+  tone="teal"
+  items={[
+    { key: 'A', term: 'ALB → HTTP/HTTPS', note: 'layer 7, routes on paths and hostnames' },
+    { key: 'N', term: 'NLB → TCP/UDP', note: 'layer 4, millions of requests/sec, static IP' },
+    { key: 'G', term: 'GWLB → appliances', note: 'layer 3, for firewalls and inspection' },
+  ]}
+/>
+
+## Hop 4 — The instances sit in private subnets
+
+The EC2 instances have **no public IP address**. They cannot be reached from the
+internet, and a port scan of your public address range will not find them. The load
+balancer forwards traffic to them over the VPC's private network.
+
+If those instances need to make *outbound* calls — to fetch OS updates, or to call a
+third-party API — they go through a **NAT Gateway** in a public subnet. Outbound works;
+inbound does not. That asymmetry is the entire point.
+
+<Callout type="exam">
+"Instances must be able to download patches from the internet but must not be reachable
+from it" is a NAT Gateway question, every time. And a NAT Gateway lives in **one AZ** —
+for a highly available design you need one per AZ, or an AZ failure takes the other
+zone's outbound traffic with it.
+</Callout>
+
+## Hop 5 — The database, in one place, replicated
+
+Both instances talk to the same **RDS** database. With **Multi-AZ** enabled, RDS keeps a
+standby copy in a second Availability Zone, replicates to it synchronously, and fails
+over automatically — the endpoint name stays the same and DNS is repointed for you.
+
+Two things Multi-AZ is *not*:
+
+- It is **not** a way to scale reads. The standby serves no traffic. If you need to
+  scale reads, that is a **read replica**, which is a different feature (asynchronous,
+  and it *can* serve reads).
+- It is **not** a backup. It replicates your mistakes faithfully. Deleting a table on
+  the primary deletes it on the standby moments later. Backups and point-in-time
+  recovery are what protect you from that.
+
+<Callout type="gotcha">
+**Multi-AZ = availability. Read replica = performance. Backup = recovery.** Three
+different features solving three different problems, and swapping them is one of the
+most common wrong answers on the SAA exam.
+</Callout>
+
+<Scenario
+  who="A ticketing site that sells out shows in ninety seconds"
+  problem="On sale days the single server melts. Between sales it sits idle and still costs the same. The database is also the single server, so when it falls over, everything is gone until someone restores a backup by hand."
+  solution="Put CloudFront in front to absorb the static load. Move the app onto EC2 in an Auto Scaling group across two AZs, behind an ALB. Move the database to RDS Multi-AZ, with a read replica serving the seating-chart queries."
+  outcome="Spikes are absorbed at the edge and by scaling out; a failed instance or AZ is invisible to buyers; a database failure recovers in a minute or two without anyone being paged."
+>
+Notice that no single service solved this. The scale problem, the availability problem
+and the recovery problem each needed a different piece — which is exactly how SAA
+scenario questions are constructed.
+</Scenario>
+
+<Quiz
+  question="A company runs a web application on EC2 instances in private subnets behind an Application Load Balancer. The instances must download operating system patches from the internet, but must not be reachable from the internet. What should a solutions architect configure?"
+  choose={1}
+  options={[
+    {
+      text: 'A NAT Gateway in a public subnet, with a route from the private subnets to it',
+      correct: true,
+      why: 'A NAT Gateway allows outbound connections to be initiated from private subnets while blocking any inbound connection that the instance did not start. This is exactly the asymmetry the requirement describes.',
+    },
+    {
+      text: 'An internet gateway attached to the private subnets',
+      why: 'Attaching an internet gateway route makes a subnet public by definition, which would make the instances reachable — the opposite of the requirement.',
+    },
+    {
+      text: 'Elastic IP addresses on each instance',
+      why: 'An Elastic IP is a public address. It would give the instances outbound access and also make them directly reachable.',
+    },
+    {
+      text: 'A second Application Load Balancer configured for outbound traffic',
+      why: 'Load balancers distribute inbound traffic to targets. They have no role in outbound connections initiated by an instance.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="An application's read traffic has grown until the RDS primary instance is CPU-bound. Writes are unaffected. The team already runs RDS in Multi-AZ. What is the most appropriate next step?"
+  choose={1}
+  options={[
+    {
+      text: 'Add one or more read replicas and send read queries to them',
+      correct: true,
+      why: 'Read replicas exist precisely for this: they take read load off the primary and can be added in the same Region or another one.',
+    },
+    {
+      text: 'Rely on the Multi-AZ standby to serve the read traffic',
+      why: 'The Multi-AZ standby serves no traffic at all. It exists only to take over during a failover. This is the single most common misunderstanding about Multi-AZ.',
+    },
+    {
+      text: 'Enable automated backups more frequently',
+      why: 'Backups protect against data loss. They do nothing for CPU load, and taking them more often adds load rather than removing it.',
+    },
+    {
+      text: 'Move the database to a second Region',
+      why: 'It does not reduce load, and it adds cross-Region latency to every query. Distance is not the problem here — CPU is.',
+    },
+  ]}
+  explain="Say it out loud until it sticks: <strong>Multi-AZ is for availability, read replicas are for performance, backups are for recovery.</strong>"
+/>
+
+<Takeaways
+  items={[
+    'The path is <strong>Route 53 → CloudFront → load balancer → compute → database</strong>. Most scenario questions are asking you to change exactly one hop.',
+    'Route 53 moves traffic <strong>between Regions</strong>; a load balancer moves it <strong>within</strong> one.',
+    'CloudFront cuts latency <em>and</em> origin load, and is where WAF and Shield attach.',
+    'Load balancer in <strong>public</strong> subnets, instances and database in <strong>private</strong> ones. Outbound-only internet access = <strong>NAT Gateway</strong> (one per AZ for HA).',
+    '<strong>Multi-AZ = availability. Read replica = performance. Backup = recovery.</strong>',
+  ]}
+/>

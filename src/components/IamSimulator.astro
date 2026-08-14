@@ -1,0 +1,559 @@
+---
+/**
+ * "Would this request be allowed?" — flip the policies, watch the answer change.
+ *
+ * The request walks left to right through the three gates AWS actually applies,
+ * in order, and stops at the first one that refuses it. Every verdict comes from
+ * evaluate() in lib/iam.ts, so the animation cannot drift away from the rule.
+ *
+ * Without JavaScript the default scenario renders fully decided and readable.
+ */
+import { GATES, evaluate, type IamRequest } from '../lib/iam.ts';
+
+interface Props {
+  title?: string;
+  intro?: string;
+}
+
+const {
+  title = 'Would this request be allowed?',
+  intro = 'Alice asks to delete one object. Flip the policies below and watch where the request gets stopped.',
+} = Astro.props;
+
+const SWITCHES: { key: keyof IamRequest; label: string; note: string }[] = [
+  {
+    key: 'identityAllow',
+    label: 'Identity policy allows it',
+    note: 'Allow s3:DeleteObject on company-reports/2026/*',
+  },
+  {
+    key: 'scpAllowsRegion',
+    label: 'SCP permits eu-west-1',
+    note: 'The organisation’s ceiling for this account',
+  },
+  {
+    key: 'bucketDenyWithoutMfa',
+    label: 'Bucket policy denies without MFA',
+    note: 'An explicit Deny with a Condition on MFA',
+  },
+  { key: 'mfa', label: 'Alice signed in with MFA', note: 'Satisfies the Condition above' },
+];
+
+/** The happy path: everything passes, so the learner starts by breaking it. */
+const initial: IamRequest = {
+  identityAllow: true,
+  scpAllowsRegion: true,
+  bucketDenyWithoutMfa: false,
+  mfa: false,
+};
+const decision = evaluate(initial);
+const stopIndex = decision.stoppedAt ? GATES.findIndex((g) => g.id === decision.stoppedAt) : -1;
+const stateOf = (i: number) => (stopIndex === -1 || i < stopIndex ? 'pass' : i === stopIndex ? 'stop' : 'idle');
+
+const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
+---
+
+<section class="sim" aria-labelledby={`${uid}-h`}>
+  <header class="sim__head">
+    <p class="sim__eyebrow">Simulate</p>
+    <h4 class="sim__title" id={`${uid}-h`}>{title}</h4>
+    <p class="sim__intro">{intro}</p>
+  </header>
+
+  <p class="sim__req">
+    <span class="sim__prompt" aria-hidden="true">$</span>
+    <code>aws s3 rm s3://company-reports/2026/q3.pdf --region eu-west-1</code>
+  </p>
+
+  <div class="sim__switches" role="group" aria-label="Policies in effect">
+    {
+      SWITCHES.map((s) => (
+        <label class="sw">
+          <input type="checkbox" class="sw__input" data-key={s.key} checked={initial[s.key]} />
+          <span class="sw__track" aria-hidden="true" />
+          <span class="sw__text">
+            <span class="sw__label">{s.label}</span>
+            <span class="sw__note">{s.note}</span>
+          </span>
+        </label>
+      ))
+    }
+  </div>
+
+  <div class="sim__stage" data-stage>
+    <div class="sim__lane" aria-hidden="true"><span class="sim__dot" data-dot /></div>
+    <ol class="sim__cards">
+      <li class="sim__card sim__card--start" data-card="start">
+        <span class="sim__cardLabel">Request</span>
+        <span class="sim__cardQ">who · what · which</span>
+      </li>
+      {
+        GATES.map((g, i) => (
+          <li class="sim__card" data-card={g.id} data-state={stateOf(i)}>
+            <span class="sim__cardLabel">{g.label}</span>
+            <span class="sim__cardQ">{g.question}</span>
+            <span class="sim__chip" data-chip>
+              {stateOf(i) === 'pass' ? 'passed' : stateOf(i) === 'stop' ? 'stopped here' : ''}
+            </span>
+          </li>
+        ))
+      }
+      <li
+        class="sim__card sim__card--end"
+        data-card="end"
+        data-verdict={decision.verdict}
+        data-state={decision.verdict === 'allowed' ? 'pass' : 'stop'}
+      >
+        <span class="sim__cardLabel" data-endlabel>{decision.verdict === 'allowed' ? 'ALLOWED' : 'DENIED'}</span>
+        <span class="sim__cardQ">what AWS does</span>
+      </li>
+    </ol>
+  </div>
+
+  <div class={`sim__out sim__out--${decision.verdict}`} data-out>
+    <p class="sim__outHead" data-outhead>{decision.headline}</p>
+    <p class="sim__outWhy" data-outwhy>{decision.reason}</p>
+    <p class="sim__cliLabel">What the CLI prints</p>
+    <pre class="sim__cli" data-cli>{decision.cli}</pre>
+  </div>
+
+  <div class="sim__foot">
+    <button type="button" class="sim__btn" data-act="replay">Replay</button>
+    <button type="button" class="sim__btn" data-act="reset">Reset switches</button>
+  </div>
+
+  <p class="visually-hidden" aria-live="polite" data-live></p>
+</section>
+
+<script>
+  import { GATES, evaluate, type IamRequest } from '../lib/iam.ts';
+
+  const TRAVEL = 460; // ms per hop
+  const HOLD = 240; // ms paused at each gate
+
+  document.querySelectorAll<HTMLElement>('.sim').forEach((root) => {
+    const stage = root.querySelector<HTMLElement>('[data-stage]')!;
+    const dot = root.querySelector<HTMLElement>('[data-dot]')!;
+    const out = root.querySelector<HTMLElement>('[data-out]')!;
+    const outHead = root.querySelector<HTMLElement>('[data-outhead]')!;
+    const outWhy = root.querySelector<HTMLElement>('[data-outwhy]')!;
+    const outCli = root.querySelector<HTMLElement>('[data-cli]')!;
+    const endLabel = root.querySelector<HTMLElement>('[data-endlabel]')!;
+    const live = root.querySelector<HTMLElement>('[data-live]')!;
+    const inputs = Array.from(root.querySelectorAll<HTMLInputElement>('.sw__input'));
+    const cards = new Map<string, HTMLElement>();
+    root.querySelectorAll<HTMLElement>('[data-card]').forEach((c) => cards.set(c.dataset.card!, c));
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let token = 0;
+    let timers: number[] = [];
+
+    const readState = (): IamRequest =>
+      Object.fromEntries(inputs.map((i) => [i.dataset.key, i.checked])) as unknown as IamRequest;
+
+    const lane = dot.parentElement!;
+
+    function park(card: HTMLElement) {
+      // Measured, not offsetLeft: the dot and the cards have different offsetParents.
+      const x =
+        card.getBoundingClientRect().left - lane.getBoundingClientRect().left + card.offsetWidth / 2;
+      dot.style.transform = `translateX(${x}px)`;
+      stage.scrollTo({ left: x - stage.clientWidth / 2, behavior: reduced.matches ? 'auto' : 'smooth' });
+    }
+
+    function run() {
+      const mine = ++token;
+      timers.forEach(clearTimeout);
+      timers = [];
+
+      const decision = evaluate(readState());
+      const stopIndex = decision.stoppedAt ? GATES.findIndex((g) => g.id === decision.stoppedAt) : -1;
+
+      for (const c of cards.values()) c.dataset.state = 'idle';
+      cards.forEach((c) => {
+        const chip = c.querySelector('[data-chip]');
+        if (chip) chip.textContent = '';
+      });
+      dot.dataset.verdict = '';
+      dot.style.transitionDuration = reduced.matches ? '0ms' : `${TRAVEL}ms`;
+      park(cards.get('start')!);
+
+      // One hop per gate, stopping at the first refusal.
+      const last = stopIndex === -1 ? GATES.length : stopIndex;
+      const hops = GATES.slice(0, last + 1);
+
+      hops.forEach((g, i) => {
+        timers.push(
+          window.setTimeout(
+            () => {
+              if (mine !== token) return;
+              const card = cards.get(g.id)!;
+              const stopped = i === stopIndex;
+              card.dataset.state = stopped ? 'stop' : 'pass';
+              const chip = card.querySelector('[data-chip]');
+              if (chip) chip.textContent = stopped ? 'stopped here' : 'passed';
+              park(card);
+              if (stopped) settle(mine, decision, card);
+            },
+            (i + 1) * (TRAVEL + HOLD),
+          ),
+        );
+      });
+
+      if (stopIndex === -1) {
+        timers.push(
+          window.setTimeout(
+            () => {
+              if (mine !== token) return;
+              const end = cards.get('end')!;
+              end.dataset.state = 'pass';
+              park(end);
+              settle(mine, decision, end);
+            },
+            (GATES.length + 1) * (TRAVEL + HOLD),
+          ),
+        );
+      }
+    }
+
+    function settle(mine: number, decision: ReturnType<typeof evaluate>, at: HTMLElement) {
+      if (mine !== token) return;
+      dot.dataset.verdict = decision.verdict;
+      const end = cards.get('end')!;
+      end.dataset.verdict = decision.verdict;
+      endLabel.textContent = decision.verdict === 'allowed' ? 'ALLOWED' : 'DENIED';
+      if (at !== end) end.dataset.state = decision.verdict === 'allowed' ? 'pass' : 'stop';
+      out.className = `sim__out sim__out--${decision.verdict}`;
+      outHead.textContent = decision.headline;
+      outWhy.textContent = decision.reason;
+      outCli.textContent = decision.cli;
+      live.textContent = `${decision.headline}. ${decision.reason}`;
+    }
+
+    root.addEventListener('change', (e) => {
+      if ((e.target as HTMLElement).classList.contains('sw__input')) run();
+    });
+    root.addEventListener('click', (e) => {
+      const act = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-act]')?.dataset.act;
+      if (act === 'reset') {
+        inputs.forEach((i) => (i.checked = i.dataset.key !== 'bucketDenyWithoutMfa' && i.dataset.key !== 'mfa'));
+      }
+      if (act) run();
+    });
+    window.addEventListener('resize', () => {
+      // Re-park without replaying, so a rotation does not strand the dot.
+      const at = root.querySelector<HTMLElement>('[data-card][data-state="stop"], [data-card="end"][data-state="pass"]');
+      if (at) {
+        dot.style.transitionDuration = '0ms';
+        park(at);
+      }
+    });
+
+    run();
+  });
+</script>
+
+<style>
+  .sim {
+    margin: var(--sp-6) 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .sim__head {
+    padding: var(--sp-4);
+    background: var(--bg-sunken);
+    border-bottom: 1px solid var(--border);
+  }
+  .sim__eyebrow {
+    margin: 0 0 var(--sp-1);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--aws-purple);
+  }
+  .sim__title {
+    margin: 0;
+    font-size: var(--step-1);
+  }
+  .sim__intro {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .sim__req {
+    margin: 0;
+    padding: var(--sp-3) var(--sp-4);
+    border-bottom: 1px solid var(--border);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .sim__req code {
+    color: var(--text);
+    font-family: var(--font-mono);
+  }
+  .sim__prompt {
+    margin-right: var(--sp-2);
+    color: var(--aws-green);
+    font-family: var(--font-mono);
+    font-weight: 700;
+  }
+
+  .sim__switches {
+    display: grid;
+    gap: var(--sp-2);
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    padding: var(--sp-4);
+  }
+
+  .sw {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    cursor: pointer;
+  }
+  .sw:hover {
+    border-color: var(--accent);
+  }
+  .sw__input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .sw__track {
+    flex: none;
+    margin-top: 2px;
+    width: 34px;
+    height: 20px;
+    border-radius: 999px;
+    background: var(--border-strong);
+    position: relative;
+    transition: background 0.15s;
+  }
+  .sw__track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s;
+  }
+  .sw__input:checked + .sw__track {
+    background: var(--accent);
+  }
+  .sw__input:checked + .sw__track::after {
+    transform: translateX(14px);
+  }
+  .sw__input:focus-visible + .sw__track {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .sw__text {
+    display: grid;
+    gap: 2px;
+  }
+  .sw__label {
+    font-weight: 600;
+    font-size: var(--step--1);
+  }
+  .sw__note {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .sim__stage {
+    padding: var(--sp-2) var(--sp-4) var(--sp-4);
+    overflow-x: auto;
+    background: var(--diagram-bg);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .sim__lane {
+    position: relative;
+    height: 22px;
+    min-width: 44rem;
+  }
+  .sim__lane::before {
+    content: '';
+    position: absolute;
+    inset: 50% 0 auto;
+    height: 2px;
+    background: var(--border);
+  }
+  .sim__dot {
+    position: absolute;
+    top: 4px;
+    left: -7px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+    transition: transform 460ms cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  .sim__dot[data-verdict='allowed'] {
+    background: var(--aws-green);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--aws-green) 25%, transparent);
+  }
+  .sim__dot[data-verdict='denied'] {
+    background: var(--aws-red);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--aws-red) 25%, transparent);
+  }
+
+  .sim__cards {
+    display: flex;
+    gap: var(--sp-3);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    min-width: 44rem;
+  }
+  .sim__card {
+    flex: 1;
+    display: grid;
+    gap: 2px;
+    align-content: start;
+    padding: var(--sp-3);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    opacity: 0.5;
+    transition:
+      opacity 0.25s,
+      border-color 0.25s;
+  }
+  .sim__card--start,
+  .sim__card[data-state='pass'],
+  .sim__card[data-state='stop'] {
+    opacity: 1;
+  }
+  .sim__card[data-state='pass'] {
+    border-top-color: var(--aws-green);
+  }
+  .sim__card[data-state='stop'] {
+    border-top-color: var(--aws-red);
+  }
+  .sim__cardLabel {
+    font-weight: 650;
+    font-size: var(--step--1);
+  }
+  .sim__cardQ {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .sim__chip:not(:empty) {
+    justify-self: start;
+    margin-top: var(--sp-2);
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: var(--bg-sunken);
+    color: var(--text-muted);
+  }
+  .sim__card[data-state='pass'] .sim__chip:not(:empty) {
+    background: color-mix(in srgb, var(--aws-green) 16%, var(--bg));
+    color: var(--aws-green);
+  }
+  .sim__card[data-state='stop'] .sim__chip:not(:empty) {
+    background: color-mix(in srgb, var(--aws-red) 16%, var(--bg));
+    color: var(--aws-red);
+  }
+  .sim__card--end[data-verdict='allowed'] .sim__cardLabel {
+    color: var(--aws-green);
+  }
+  .sim__card--end[data-verdict='denied'] .sim__cardLabel {
+    color: var(--aws-red);
+  }
+
+  .sim__out {
+    --o-tone: var(--aws-green);
+    margin: var(--sp-4);
+    padding: var(--sp-4);
+    border: 1px solid color-mix(in srgb, var(--o-tone) 40%, var(--border));
+    border-left: 4px solid var(--o-tone);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--o-tone) 8%, var(--bg));
+  }
+  .sim__out--denied {
+    --o-tone: var(--aws-red);
+  }
+  .sim__outHead {
+    margin: 0 0 var(--sp-2);
+    font-size: var(--step-1);
+    font-weight: 700;
+  }
+  .sim__outWhy {
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .sim__cliLabel {
+    margin: var(--sp-4) 0 var(--sp-2);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .sim__cli {
+    margin: 0;
+    padding: var(--sp-3);
+    border-radius: var(--radius);
+    background: var(--aws-squid);
+    color: #e6edf3;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .sim__foot {
+    display: flex;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4);
+    border-top: 1px solid var(--border);
+    background: var(--bg-sunken);
+  }
+  .sim__btn {
+    font: inherit;
+    font-size: var(--step--1);
+    font-weight: 600;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .sim__btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sim__dot,
+    .sim__card,
+    .sw__track,
+    .sw__track::after {
+      transition: none;
+    }
+  }
+</style>

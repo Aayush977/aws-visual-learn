@@ -1,0 +1,89 @@
+---
+/**
+ * Coloured aside. Pick the `type` by what the reader should DO with it.
+ *
+ *   <Callout type="exam">On the exam, "highly available" almost always
+ *   means "spread across Availability Zones".</Callout>
+ */
+interface Props {
+  /**
+   * exam    — a fact the exam actually tests
+   * gotcha  — the thing everyone gets wrong
+   * analogy — the plain-English mental model
+   * cost    — the money angle
+   * note    — everything else
+   */
+  type?: 'exam' | 'gotcha' | 'analogy' | 'cost' | 'note';
+  title?: string;
+}
+
+const { type = 'note', title } = Astro.props;
+
+const PRESET = {
+  exam: { label: 'On the exam', icon: 'M9 11l2 2 4-5M5 4h14v16l-7-3-7 3z' },
+  gotcha: { label: 'Easy to get wrong', icon: 'M12 3 2 20h20L12 3ZM12 9v5M12 17h.01' },
+  analogy: { label: 'Think of it like', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM9.5 9a2.5 2.5 0 1 1 3.4 2.3c-.6.3-.9.8-.9 1.4v.3M12 17h.01' },
+  cost: { label: 'What it costs', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 6v12M15 9.5C15 8.1 13.7 7 12 7S9 8.1 9 9.5s1.3 2 3 2.5 3 1.1 3 2.5-1.3 2.5-3 2.5-3-1.1-3-2.5' },
+  note: { label: 'Note', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 8h.01M11 12h1v5h1' },
+} as const;
+
+const preset = PRESET[type];
+---
+
+<aside class={`co co--${type}`}>
+  <p class="co__head">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d={preset.icon}></path></svg>
+    <span>{title ?? preset.label}</span>
+  </p>
+  <div class="co__body"><slot /></div>
+</aside>
+
+<style>
+  .co {
+    --co-tone: var(--text-muted);
+    margin: var(--sp-5) 0;
+    padding: var(--sp-4);
+    border: 1px solid color-mix(in srgb, var(--co-tone) 35%, var(--border));
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--co-tone) 7%, var(--bg-raised));
+    font-size: var(--step--1);
+  }
+  .co--exam {
+    --co-tone: var(--accent);
+  }
+  .co--gotcha {
+    --co-tone: var(--aws-red);
+  }
+  .co--analogy {
+    --co-tone: var(--aws-purple);
+  }
+  .co--cost {
+    --co-tone: var(--aws-green);
+  }
+
+  .co__head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-2);
+    font-weight: 700;
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--co-tone) 78%, var(--text));
+  }
+  .co__head svg {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .co__body :global(> :last-child) {
+    margin-bottom: 0;
+  }
+</style>

@@ -1,0 +1,876 @@
+---
+/**
+ * A scored, multi-question practice test.
+ *
+ * Unlike <Quiz />, which drops a single question into the middle of a lesson,
+ * this runs a whole set: one question at a time, immediate feedback, and a
+ * scored result at the end broken down by track, with links back to the lesson
+ * behind every question the reader got wrong.
+ *
+ *   <QuizRunner
+ *     questions={questionsForExam('CCP')}
+ *     label="Cloud Practitioner"
+ *     passMark={70}
+ *   />
+ *
+ * Without JavaScript it degrades to a plain numbered list of questions, each
+ * with a <details> disclosure holding the answer and the explanation — still
+ * usable, still printable.
+ */
+import type { Question } from '../lib/questions';
+import { CCP_DOMAINS } from '../lib/questions';
+import { TRACK_META } from '../content.config';
+import { lessonUrl } from '../lib/paths';
+
+interface Props {
+  questions: Question[];
+  /** Shown in the intro panel, e.g. "Cloud Practitioner" or "Storage". */
+  label: string;
+  /** Percentage needed to pass. Purely for encouragement. */
+  passMark?: number;
+  /**
+   * How to group the results breakdown. 'ccpDomain' reports in the same four
+   * domains the CLF-C02 exam guide uses, which is what a candidate wants after
+   * a full practice test; 'track' reports by site topic.
+   */
+  groupBy?: 'track' | 'ccpDomain';
+}
+
+const { questions, label, passMark = 70, groupBy = 'track' } = Astro.props;
+
+/** Resolved server-side so the runner only ever deals in display strings. */
+function groupLabel(q: Question): string {
+  if (groupBy === 'ccpDomain' && q.ccpDomain) {
+    return `Domain ${q.ccpDomain} — ${CCP_DOMAINS[q.ccpDomain].label}`;
+  }
+  return TRACK_META[q.track].label;
+}
+
+const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+const uid = 'qr-' + Math.random().toString(36).slice(2, 9);
+
+---
+
+<section class="qr" aria-labelledby={`${uid}-h`}>
+  <quiz-runner
+    class="qr__root"
+    data-total={questions.length}
+    data-pass={passMark}
+  >
+    <div class="qr__intro" data-role="intro">
+      <p class="qr__eyebrow">Practice test</p>
+      <h2 class="qr__title" id={`${uid}-h`}>{label}</h2>
+      <p class="qr__lead">
+        {questions.length} questions, written in the style the real exam uses. You get the answer
+        and an explanation straight after each one — including why the wrong options are wrong,
+        which is where most of the learning is.
+      </p>
+      <div class="qr__introActions">
+        <button type="button" class="btn btn--primary" data-act="start">
+          Start the test
+        </button>
+        <button type="button" class="btn" data-act="browse">Just show me all the answers</button>
+      </div>
+      <p class="qr__note">Questions are shuffled. Nothing is recorded or sent anywhere.</p>
+    </div>
+
+    <div class="qr__progress" data-role="progress" hidden>
+      <div class="qr__bar"><span class="qr__barFill" data-role="bar"></span></div>
+      <p class="qr__count">
+        <span data-role="count">1</span> of {questions.length}
+        <span class="qr__score" data-role="runningScore"></span>
+      </p>
+    </div>
+
+    <ol class="qr__list" data-role="list">
+      {
+        questions.map((q, i) => {
+          const choose = q.choose ?? 1;
+          const correctLetters = q.options
+            .map((o, oi) => (o.correct ? LETTERS[oi] : null))
+            .filter(Boolean)
+            .join(' and ');
+          return (
+            <li
+              class="qr__item"
+              data-index={i}
+              data-id={q.id}
+              data-group={groupLabel(q)}
+              data-choose={choose}
+              data-lesson={q.lesson}
+            >
+              <p class="qr__qnum">
+                Question {i + 1}
+                {choose > 1 && <span class="qr__multi"> · choose {choose}</span>}
+              </p>
+              <p class="qr__question">{q.prompt}</p>
+
+              <ul class="qr__options">
+                {q.options.map((o, oi) => (
+                  <li>
+                    <button
+                      type="button"
+                      class="qr__option"
+                      data-correct={o.correct ? 'true' : 'false'}
+                      aria-pressed="false"
+                    >
+                      <span class="qr__letter" aria-hidden="true">
+                        {LETTERS[oi]}
+                      </span>
+                      <span class="qr__optionBody">
+                        <span class="qr__text">{o.text}</span>
+                        <span class="qr__why">{o.why}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              <div class="qr__check" data-role="check" hidden>
+                <button type="button" class="btn btn--primary" data-act="check" disabled>
+                  Check answer
+                </button>
+                <span class="qr__checkHint" data-role="checkHint" />
+              </div>
+
+              <details class="qr__reveal">
+                <summary>Show the answer</summary>
+                <div class="qr__revealBody">
+                  <p class="qr__answer">
+                    Correct answer: <strong>{correctLetters}</strong>
+                  </p>
+                  {q.explain && <p class="qr__explain" set:html={q.explain} />}
+                  {q.lesson && (
+                    <p class="qr__lessonLink">
+                      <a href={lessonUrl(q.lesson)}>Read the lesson behind this question →</a>
+                    </p>
+                  )}
+                </div>
+              </details>
+
+              <div class="qr__nav" data-role="nav" hidden>
+                <button type="button" class="btn btn--primary" data-act="next">
+                  {i === questions.length - 1 ? 'See my results' : 'Next question'}
+                </button>
+              </div>
+            </li>
+          );
+        })
+      }
+    </ol>
+
+    <div class="qr__result" data-role="result" hidden>
+      <p class="qr__eyebrow">Result</p>
+      <p class="qr__scoreBig">
+        <strong data-role="finalScore">0</strong><span> / {questions.length}</span>
+      </p>
+      <p class="qr__verdict" data-role="verdict"></p>
+
+      <h3 class="qr__subhead">Where the marks went</h3>
+      <ul class="qr__breakdown" data-role="breakdown"></ul>
+
+      <div data-role="missedWrap" hidden>
+        <h3 class="qr__subhead">Worth another look</h3>
+        <ul class="qr__missed" data-role="missed"></ul>
+      </div>
+
+      <div class="qr__resultActions">
+        <button type="button" class="btn btn--primary" data-act="again">Take it again</button>
+        <button type="button" class="btn" data-act="retryMissed" hidden>
+          Retry just the ones I missed
+        </button>
+      </div>
+    </div>
+
+    <p class="visually-hidden" data-role="live" aria-live="polite"></p>
+  </quiz-runner>
+</section>
+
+<script>
+  class QuizRunner extends HTMLElement {
+    #items: HTMLLIElement[] = [];
+    #order: number[] = [];
+    #cursor = 0;
+    #correct = new Set<number>();
+    #answered = new Set<number>();
+    #total = 0;
+
+    connectedCallback() {
+      this.#items = Array.from(this.querySelectorAll<HTMLLIElement>('.qr__item'));
+      this.#total = this.#items.length;
+      // Only take over once we know scripting works, so the no-JS list stays.
+      this.classList.add('is-interactive');
+      this.addEventListener('click', this.#onClick);
+    }
+
+    #onClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+
+      const option = target.closest<HTMLButtonElement>('.qr__option');
+      if (option) {
+        this.#onOption(option);
+        return;
+      }
+
+      const act = target.closest<HTMLButtonElement>('[data-act]')?.dataset.act;
+      if (act === 'start') this.#start(this.#items.map((_, i) => i), true);
+      if (act === 'browse') this.#browse();
+      if (act === 'check') this.#grade(this.#currentItem());
+      if (act === 'next') this.#next();
+      if (act === 'again') this.#start(this.#items.map((_, i) => i), true);
+      if (act === 'retryMissed') {
+        const missed = this.#order.filter((i) => this.#answered.has(i) && !this.#correct.has(i));
+        this.#start(missed, true);
+      }
+    };
+
+    #shuffle<T>(a: T[]): T[] {
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    /**
+     * Reorder a question's options and re-letter them.
+     *
+     * The bank is authored with the correct option first, which would make the
+     * whole test guessable if the DOM order stood. Shuffling here also means a
+     * second attempt does not look identical to the first. The rendered
+     * "Correct answer: A" line is rebuilt from whichever options are now where.
+     */
+    #shuffleOptions(item: HTMLLIElement) {
+      const list = item.querySelector<HTMLUListElement>('.qr__options');
+      if (!list) return;
+
+      const rows = this.#shuffle(Array.from(list.children) as HTMLLIElement[]);
+      for (const row of rows) list.appendChild(row); // appendChild moves, not copies
+
+      const letters = 'ABCDEF';
+      const correct: string[] = [];
+      rows.forEach((row, i) => {
+        const letter = row.querySelector('.qr__letter');
+        if (letter) letter.textContent = letters[i];
+        if (row.querySelector('.qr__option')?.getAttribute('data-correct') === 'true') {
+          correct.push(letters[i]);
+        }
+      });
+
+      const answer = item.querySelector('.qr__answer');
+      if (answer) {
+        answer.textContent = 'Correct answer: ';
+        const strong = document.createElement('strong');
+        strong.textContent = correct.join(' and ');
+        answer.appendChild(strong);
+      }
+    }
+
+    #start(indices: number[], shuffle: boolean) {
+      this.#order = shuffle ? this.#shuffle([...indices]) : [...indices];
+      this.#cursor = 0;
+      this.#correct.clear();
+      this.#answered.clear();
+
+      for (const item of this.#items) {
+        item.classList.remove('is-current', 'is-graded');
+        this.#shuffleOptions(item);
+        item.querySelectorAll<HTMLButtonElement>('.qr__option').forEach((b) => {
+          b.setAttribute('aria-pressed', 'false');
+          b.classList.remove('is-picked', 'is-right', 'is-wrong', 'is-missed');
+          b.disabled = false;
+        });
+        const details = item.querySelector<HTMLDetailsElement>('.qr__reveal');
+        if (details) details.open = false;
+        this.#hide(item, '[data-role="nav"]');
+        this.#hide(item, '[data-role="check"]');
+      }
+
+      this.#toggle('[data-role="intro"]', false);
+      this.#toggle('[data-role="result"]', false);
+      this.#toggle('[data-role="progress"]', true);
+      this.#showCurrent();
+    }
+
+    #browse() {
+      this.classList.remove('is-interactive');
+      this.#toggle('[data-role="intro"]', false);
+      for (const item of this.#items) {
+        const details = item.querySelector<HTMLDetailsElement>('.qr__reveal');
+        if (details) details.open = true;
+      }
+    }
+
+    #currentItem() {
+      return this.#items[this.#order[this.#cursor]];
+    }
+
+    #showCurrent() {
+      for (const item of this.#items) item.classList.remove('is-current');
+      const item = this.#currentItem();
+      if (!item) return;
+      item.classList.add('is-current');
+
+      const choose = Number(item.dataset.choose || 1);
+      if (choose > 1 && !item.classList.contains('is-graded')) {
+        this.#show(item, '[data-role="check"]');
+        this.#syncCheck(item);
+      }
+
+      const count = this.querySelector('[data-role="count"]');
+      if (count) count.textContent = String(this.#cursor + 1);
+      const bar = this.querySelector<HTMLElement>('[data-role="bar"]');
+      if (bar) bar.style.width = `${(this.#cursor / this.#order.length) * 100}%`;
+      this.#syncRunningScore();
+
+      const q = item.querySelector('.qr__question')?.textContent ?? '';
+      this.#announce(`Question ${this.#cursor + 1} of ${this.#order.length}. ${q}`);
+      item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    #onOption(btn: HTMLButtonElement) {
+      const item = btn.closest<HTMLLIElement>('.qr__item');
+      if (!item || item.classList.contains('is-graded')) return;
+      if (!this.classList.contains('is-interactive')) return;
+
+      const choose = Number(item.dataset.choose || 1);
+      if (choose === 1) {
+        btn.setAttribute('aria-pressed', 'true');
+        btn.classList.add('is-picked');
+        this.#grade(item);
+        return;
+      }
+
+      const picked = btn.getAttribute('aria-pressed') === 'true';
+      const current = item.querySelectorAll('.qr__option[aria-pressed="true"]').length;
+      if (!picked && current >= choose) return; // do not let them exceed the limit
+      btn.setAttribute('aria-pressed', picked ? 'false' : 'true');
+      btn.classList.toggle('is-picked', !picked);
+      this.#syncCheck(item);
+    }
+
+    #syncCheck(item: HTMLLIElement) {
+      const choose = Number(item.dataset.choose || 1);
+      const picked = item.querySelectorAll('.qr__option[aria-pressed="true"]').length;
+      const btn = item.querySelector<HTMLButtonElement>('[data-act="check"]');
+      const hint = item.querySelector('[data-role="checkHint"]');
+      if (btn) btn.disabled = picked !== choose;
+      if (hint) {
+        hint.textContent =
+          picked === choose ? '' : `Select ${choose - picked} more`;
+      }
+    }
+
+    #grade(item: HTMLLIElement | undefined) {
+      if (!item || item.classList.contains('is-graded')) return;
+      item.classList.add('is-graded');
+      this.#hide(item, '[data-role="check"]');
+
+      let right = true;
+      item.querySelectorAll<HTMLButtonElement>('.qr__option').forEach((b) => {
+        const isCorrect = b.dataset.correct === 'true';
+        const isPicked = b.getAttribute('aria-pressed') === 'true';
+        if (isPicked && isCorrect) b.classList.add('is-right');
+        if (isPicked && !isCorrect) {
+          b.classList.add('is-wrong');
+          right = false;
+        }
+        if (!isPicked && isCorrect) {
+          b.classList.add('is-missed');
+          right = false;
+        }
+        b.disabled = true;
+      });
+
+      const index = Number(item.dataset.index);
+      this.#answered.add(index);
+      if (right) this.#correct.add(index);
+
+      const details = item.querySelector<HTMLDetailsElement>('.qr__reveal');
+      if (details) details.open = true;
+      this.#show(item, '[data-role="nav"]');
+      this.#syncRunningScore();
+      this.#announce(right ? 'Correct.' : 'Not quite. The explanation is now shown.');
+
+      const next = item.querySelector<HTMLButtonElement>('[data-act="next"]');
+      next?.focus({ preventScroll: true });
+    }
+
+    #next() {
+      if (this.#cursor >= this.#order.length - 1) {
+        this.#finish();
+        return;
+      }
+      this.#cursor += 1;
+      this.#showCurrent();
+    }
+
+    #syncRunningScore() {
+      const el = this.querySelector('[data-role="runningScore"]');
+      if (el) {
+        el.textContent = this.#answered.size
+          ? `· ${this.#correct.size} right so far`
+          : '';
+      }
+    }
+
+    #finish() {
+      for (const item of this.#items) item.classList.remove('is-current');
+      this.#toggle('[data-role="progress"]', false);
+      this.#toggle('[data-role="result"]', true);
+
+      const total = this.#order.length;
+      const score = this.#correct.size;
+      const pct = total ? Math.round((score / total) * 100) : 0;
+      const pass = Number(this.dataset.pass || 70);
+
+      const finalScore = this.querySelector('[data-role="finalScore"]');
+      if (finalScore) finalScore.textContent = String(score);
+
+      const verdict = this.querySelector('[data-role="verdict"]');
+      if (verdict) {
+        verdict.textContent =
+          pct >= pass
+            ? `${pct}% — comfortably above the ${pass}% mark. Keep going.`
+            : `${pct}% — below the ${pass}% mark. The topics below are where the marks went.`;
+        verdict.classList.toggle('is-pass', pct >= pass);
+      }
+
+      // Per-track breakdown, in the order the tracks appear in the set.
+      const byTrack = new Map<string, { right: number; total: number }>();
+      for (const i of this.#order) {
+        const group = this.#items[i].dataset.group || 'Other';
+        const row = byTrack.get(group) ?? { right: 0, total: 0 };
+        row.total += 1;
+        if (this.#correct.has(i)) row.right += 1;
+        byTrack.set(group, row);
+      }
+
+      const breakdown = this.querySelector('[data-role="breakdown"]');
+      if (breakdown) {
+        breakdown.innerHTML = '';
+        for (const [group, row] of byTrack) {
+          const share = Math.round((row.right / row.total) * 100);
+          const li = document.createElement('li');
+          li.className = 'qr__bdRow';
+          li.innerHTML = `
+            <span class="qr__bdName"></span>
+            <span class="qr__bdBar"><span style="width:${share}%"></span></span>
+            <span class="qr__bdNum">${row.right}/${row.total}</span>`;
+          const name = li.querySelector('.qr__bdName');
+          if (name) name.textContent = group;
+          li.classList.toggle('is-weak', share < 70);
+          breakdown.appendChild(li);
+        }
+      }
+
+      // Everything they got wrong, with a route back to the lesson.
+      const missedIdx = this.#order.filter((i) => !this.#correct.has(i));
+      const missedWrap = this.querySelector<HTMLElement>('[data-role="missedWrap"]');
+      const missed = this.querySelector('[data-role="missed"]');
+      if (missed && missedWrap) {
+        missed.innerHTML = '';
+        missedWrap.hidden = missedIdx.length === 0;
+        for (const i of missedIdx) {
+          const item = this.#items[i];
+          const prompt = item.querySelector('.qr__question')?.textContent ?? '';
+          const link = item.querySelector<HTMLAnchorElement>('.qr__lessonLink a');
+          const li = document.createElement('li');
+          const p = document.createElement('p');
+          p.className = 'qr__missedQ';
+          p.textContent = prompt;
+          li.appendChild(p);
+          if (link) {
+            const a = document.createElement('a');
+            a.href = link.href;
+            a.textContent = 'Read the lesson →';
+            li.appendChild(a);
+          }
+          missed.appendChild(li);
+        }
+      }
+
+      const retry = this.querySelector<HTMLButtonElement>('[data-act="retryMissed"]');
+      if (retry) retry.hidden = missedIdx.length === 0;
+
+      this.#announce(`Finished. You scored ${score} out of ${total}, ${pct} percent.`);
+      this.querySelector('[data-role="result"]')?.scrollIntoView({
+        block: 'start',
+        behavior: 'smooth',
+      });
+    }
+
+    #announce(text: string) {
+      const live = this.querySelector('[data-role="live"]');
+      if (live) live.textContent = text;
+    }
+
+    #toggle(selector: string, show: boolean) {
+      const el = this.querySelector<HTMLElement>(selector);
+      if (el) el.hidden = !show;
+    }
+    #show(scope: HTMLElement, selector: string) {
+      const el = scope.querySelector<HTMLElement>(selector);
+      if (el) el.hidden = false;
+    }
+    #hide(scope: HTMLElement, selector: string) {
+      const el = scope.querySelector<HTMLElement>(selector);
+      if (el) el.hidden = true;
+    }
+  }
+
+  if (!customElements.get('quiz-runner')) {
+    customElements.define('quiz-runner', QuizRunner);
+  }
+</script>
+
+<style>
+  .qr {
+    margin: var(--sp-6) 0;
+  }
+
+  .qr__eyebrow {
+    margin: 0 0 var(--sp-2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .qr__intro {
+    padding: var(--sp-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+  }
+  .qr__title {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--step-2);
+  }
+  .qr__lead {
+    margin: 0 0 var(--sp-5);
+    color: var(--text-muted);
+    max-width: 42rem;
+  }
+  .qr__introActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+  }
+  .qr__note {
+    margin: var(--sp-4) 0 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  /* ── progress ─────────────────────────────────────────── */
+  .qr__progress {
+    margin-bottom: var(--sp-5);
+  }
+  .qr__bar {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .qr__barFill {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    transition: width 0.3s ease;
+  }
+  .qr__count {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .qr__score {
+    margin-left: var(--sp-2);
+  }
+
+  /* ── the question list ────────────────────────────────── */
+  .qr__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--sp-6);
+  }
+
+  .qr__item {
+    padding: var(--sp-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+  }
+
+  /* Once scripting takes over, show one question at a time. */
+  .is-interactive .qr__list {
+    gap: 0;
+  }
+  .is-interactive .qr__item {
+    display: none;
+  }
+  .is-interactive .qr__item.is-current {
+    display: block;
+  }
+
+  .qr__qnum {
+    margin: 0 0 var(--sp-2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .qr__multi {
+    color: var(--aws-orange);
+  }
+  .qr__question {
+    margin: 0 0 var(--sp-4);
+    font-size: var(--step-1);
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  .qr__options {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .qr__option {
+    display: flex;
+    gap: var(--sp-3);
+    width: 100%;
+    text-align: left;
+    padding: var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    transition:
+      border-color 0.15s ease,
+      background 0.15s ease;
+  }
+  .qr__option:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .qr__option:disabled {
+    cursor: default;
+  }
+  .qr__option:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .qr__letter {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    border: 1px solid var(--border-strong);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .qr__optionBody {
+    display: block;
+  }
+  .qr__text {
+    display: block;
+  }
+
+  .qr__why {
+    display: none;
+    margin-top: var(--sp-2);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .qr__item.is-graded .qr__why,
+  .qr__item:has(.qr__reveal[open]) .qr__why {
+    display: block;
+  }
+
+  .qr__option.is-picked {
+    border-color: var(--accent);
+  }
+  .qr__option.is-right {
+    border-color: var(--aws-green);
+    background: color-mix(in srgb, var(--aws-green) 10%, var(--bg));
+  }
+  .qr__option.is-right .qr__letter {
+    border-color: var(--aws-green);
+    background: var(--aws-green);
+    color: #fff;
+  }
+  .qr__option.is-wrong {
+    border-color: var(--aws-red);
+    background: color-mix(in srgb, var(--aws-red) 8%, var(--bg));
+  }
+  .qr__option.is-wrong .qr__letter {
+    border-color: var(--aws-red);
+    background: var(--aws-red);
+    color: #fff;
+  }
+  /* A correct option they did not pick — shown so the right answer is obvious. */
+  .qr__option.is-missed {
+    border-color: var(--aws-green);
+    border-style: dashed;
+  }
+
+  .qr__check {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-top: var(--sp-4);
+  }
+  .qr__checkHint {
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .qr__reveal {
+    margin-top: var(--sp-4);
+    font-size: var(--step--1);
+  }
+  .qr__reveal summary {
+    cursor: pointer;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .is-interactive .qr__reveal summary {
+    display: none;
+  }
+  .qr__revealBody {
+    margin-top: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border-left: 3px solid var(--accent);
+    background: var(--bg-sunken);
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .qr__answer,
+  .qr__explain,
+  .qr__lessonLink {
+    margin: 0 0 var(--sp-2);
+  }
+  .qr__lessonLink {
+    margin-bottom: 0;
+  }
+
+  .qr__nav {
+    margin-top: var(--sp-4);
+  }
+
+  /* ── results ──────────────────────────────────────────── */
+  .qr__result {
+    padding: var(--sp-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+  }
+  .qr__scoreBig {
+    margin: 0;
+    font-size: var(--step-3);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .qr__scoreBig span {
+    color: var(--text-muted);
+    font-size: var(--step-1);
+  }
+  .qr__verdict {
+    margin: var(--sp-2) 0 var(--sp-6);
+    color: var(--aws-red);
+    font-weight: 600;
+  }
+  .qr__verdict.is-pass {
+    color: var(--aws-green);
+  }
+
+  .qr__subhead {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--step-0);
+  }
+
+  .qr__breakdown {
+    list-style: none;
+    margin: 0 0 var(--sp-6);
+    padding: 0;
+    display: grid;
+    gap: var(--sp-2);
+  }
+  .qr__bdRow {
+    display: grid;
+    grid-template-columns: minmax(8rem, 14rem) 1fr auto;
+    align-items: center;
+    gap: var(--sp-3);
+    font-size: var(--step--1);
+  }
+  .qr__bdBar {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .qr__bdBar span {
+    display: block;
+    height: 100%;
+    background: var(--aws-green);
+  }
+  .qr__bdRow.is-weak .qr__bdBar span {
+    background: var(--aws-orange);
+  }
+  .qr__bdNum {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+
+  .qr__missed {
+    list-style: none;
+    margin: 0 0 var(--sp-6);
+    padding: 0;
+    display: grid;
+    gap: var(--sp-3);
+  }
+  .qr__missed li {
+    padding: var(--sp-3);
+    border-left: 3px solid var(--aws-orange);
+    background: var(--bg-sunken);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: var(--step--1);
+  }
+  .qr__missedQ {
+    margin: 0 0 var(--sp-2);
+  }
+
+  .qr__resultActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+  }
+
+  @media (max-width: 34rem) {
+    .qr__bdRow {
+      grid-template-columns: 1fr auto;
+    }
+    .qr__bdBar {
+      grid-column: 1 / -1;
+      order: 3;
+    }
+  }
+</style>

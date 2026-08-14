@@ -1,0 +1,47 @@
+---
+/**
+ * A dashed container that groups nodes: an AWS Region, a VPC, an Availability
+ * Zone, a subnet, "your responsibility" vs "AWS's responsibility", and so on.
+ *
+ * Unlike <Node />, coordinates here are the TOP-LEFT corner, because you
+ * usually draw a boundary by deciding what it needs to wrap.
+ *
+ *   <Boundary x={40} y={40} w={400} h={260} label="Region: us-east-1" icon="region" />
+ *
+ * Put the nodes it contains AFTER it in the SVG so they paint on top.
+ */
+import { GLYPHS, type GlyphName } from '../../lib/glyphs';
+
+interface Props {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label: string;
+  icon?: GlyphName;
+  tone?: 'orange' | 'blue' | 'teal' | 'purple' | 'green' | 'red' | 'navy' | 'muted';
+  step?: number;
+  /** Solid outline instead of dashed. Use for physical/ownership boundaries. */
+  solid?: boolean;
+  id?: string;
+}
+
+const { x, y, w, h, label, icon, tone = 'muted', step, solid = false, id } = Astro.props;
+
+const paths: readonly string[] = icon ? GLYPHS[icon] : [];
+const iconScale = 16 / 24;
+---
+
+<g class={`dg-bound dg-bound--${tone} ${solid ? 'is-solid' : ''}`} data-step={step} id={id}>
+  <rect class="dg-bound__box" x={x} y={y} width={w} height={h} rx="12"></rect>
+  {
+    paths.length > 0 && (
+      <g class="dg-bound__icon" transform={`translate(${x + 12} ${y + 10}) scale(${iconScale})`}>
+        {paths.map((d) => (
+          <path d={d} />
+        ))}
+      </g>
+    )
+  }
+  <text class="dg-bound__label" x={paths.length ? x + 34 : x + 14} y={y + 22}>{label}</text>
+</g>

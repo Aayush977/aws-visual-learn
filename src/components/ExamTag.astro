@@ -1,0 +1,38 @@
+---
+import { EXAM_META, type EXAMS } from '../content.config';
+
+interface Props {
+  exam: (typeof EXAMS)[number];
+  /** Show the full exam name instead of the short code. */
+  full?: boolean;
+}
+
+const { exam, full = false } = Astro.props;
+const meta = EXAM_META[exam];
+---
+
+<span class={`tag tag--${exam.toLowerCase()}`} title={meta.full}>
+  {full ? meta.full : meta.label}
+</span>
+
+<style>
+  .tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    padding: 0.12rem 0.45rem;
+    border-radius: 4px;
+    border: 1px solid currentColor;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .tag--ccp {
+    color: color-mix(in srgb, var(--aws-teal) 80%, var(--text));
+    background: color-mix(in srgb, var(--aws-teal) 12%, transparent);
+  }
+  .tag--saa {
+    color: color-mix(in srgb, var(--aws-purple) 80%, var(--text));
+    background: color-mix(in srgb, var(--aws-purple) 12%, transparent);
+  }
+</style>

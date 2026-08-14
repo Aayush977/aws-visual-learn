@@ -1,0 +1,249 @@
+---
+title: AI, Machine Learning and Analytics
+summary: A dozen services whose names tell you almost nothing. Sorted by the sentence a question would use — "convert speech to text", "find the insight in five years of logs" — they become easy marks.
+exams: [CCP]
+track: services
+order: 10
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+minutes: 12
+hook: You are not asked how any of these work. You are asked which one you would point at a problem — so learn them as a sentence each.
+updated: 2026-08-11
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+This is the part of the blueprint people skip, and it is close to free marks. The Cloud
+Practitioner exam never asks how a model is trained. It describes a task in one sentence —
+"automatically convert customer calls to text", "detect objects in uploaded images" — and asks
+which service does it.
+
+So learn them as sentences, not as technology.
+
+## The AI services — one job each
+
+Almost all of these are **pre-trained**: you call an API, you do not build a model.
+
+<Diagram
+  title="Match the sentence to the service"
+  viewBox="0 40 1060 560"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Anything with images or video',
+      body: '<strong>Amazon Rekognition</strong>. Object and scene detection, facial analysis and comparison, content moderation, text in images. If the input is a picture, this is the answer.',
+      flow: 'w-img',
+    },
+    {
+      title: 'Speech, in both directions',
+      body: '<strong>Transcribe</strong> turns speech into text (call recordings, subtitles). <strong>Polly</strong> turns text into lifelike speech. Remember them as a pair pointing opposite ways.',
+      flow: ['w-stt', 'w-tts'],
+      duration: 1400,
+    },
+    {
+      title: 'Text you want to understand',
+      body: '<strong>Comprehend</strong> finds sentiment, entities, key phrases and language in free text. <strong>Translate</strong> converts between languages. <strong>Textract</strong> pulls text, forms and tables out of <em>scanned documents</em> — not photographs.',
+      flow: ['w-nlp', 'w-doc'],
+      duration: 1400,
+    },
+    {
+      title: 'Conversation and search',
+      body: '<strong>Lex</strong> builds chatbots and voice interfaces — it is the engine behind Alexa. <strong>Kendra</strong> is intelligent enterprise search that answers a natural-language question from your own documents.',
+      flow: ['w-bot', 'w-search'],
+      duration: 1400,
+    },
+    {
+      title: 'Build your own model',
+      body: 'When no pre-trained service fits, <strong>Amazon SageMaker</strong> is the full platform for building, training and deploying your own. If a question mentions <em>custom</em> models or a data science team, it is SageMaker.',
+      flow: 'w-sm',
+    },
+    {
+      title: 'Generative AI',
+      body: '<strong>Amazon Q</strong> is the AI assistant for business and for building on AWS. Generative services are the newest additions to the blueprint — recognise the names and what they are for.',
+      flow: 'w-gen',
+    },
+  ]}
+  caption="The trap is Rekognition versus Textract. A photograph of a scene is Rekognition; a scanned form you want the fields out of is Textract."
+>
+  <Node x={120} y={110} w={180} h={76} label="Images / video" icon="eye" tone="muted" step={1} />
+  <Node x={120} y={215} w={180} h={76} label="Audio" icon="mail" tone="muted" step={2} />
+  <Node x={120} y={320} w={180} h={76} label="Free text" icon="file" tone="muted" step={3} />
+  <Node x={120} y={425} w={180} h={76} label="A question" icon="user" tone="muted" step={4} />
+  <Node x={120} y={530} w={180} h={76} label="Your own data" icon="database" tone="muted" step={5} />
+
+  <Node x={520} y={110} w={220} h={76} label="Rekognition" sub="see the picture" icon="eye" tone="orange" step={1} />
+  <Node x={520} y={200} w={220} h={70} label="Transcribe" sub="speech → text" icon="code" tone="blue" step={2} />
+  <Node x={520} y={280} w={220} h={70} label="Polly" sub="text → speech" icon="mail" tone="blue" step={2} />
+  <Node x={520} y={360} w={220} h={70} label="Comprehend" sub="sentiment, entities" icon="chart" tone="teal" step={3} />
+  <Node x={520} y={440} w={220} h={70} label="Textract" sub="scanned forms" icon="file" tone="teal" step={3} />
+  <Node x={520} y={520} w={220} h={70} label="Lex · Kendra" sub="chatbots · search" icon="users" tone="purple" step={4} />
+
+  <Node x={880} y={300} w={220} h={90} label="SageMaker" sub="build your own model" icon="gear" tone="green" step={5} />
+  <Node x={880} y={450} w={220} h={80} label="Amazon Q" sub="generative assistant" icon="lambda" tone="red" step={6} />
+
+  <Wire id="w-img" from={[215, 110]} to={[405, 110]} tone="orange" step={1} />
+  <Wire id="w-stt" from={[215, 215]} to={[405, 200]} tone="blue" step={2} />
+  <Wire id="w-tts" from={[215, 235]} to={[405, 280]} tone="blue" step={2} />
+  <Wire id="w-nlp" from={[215, 320]} to={[405, 360]} tone="teal" step={3} />
+  <Wire id="w-doc" from={[215, 340]} to={[405, 440]} tone="teal" step={3} />
+  <Wire id="w-bot" from={[215, 425]} to={[405, 515]} tone="purple" step={4} />
+  <Wire id="w-search" from={[215, 445]} to={[405, 530]} tone="purple" step={4} />
+  <Wire id="w-sm" from={[215, 530]} to={[765, 320]} shape="elbow-h" mid={340} tone="green" step={5} />
+  <Wire id="w-gen" from={[640, 555]} to={[765, 470]} tone="red" step={6} />
+</Diagram>
+
+<Mnemonic
+  title="The AI services, as one sentence each"
+  tone="orange"
+  items={[
+    { key: 'R', term: 'Rekognition', note: 'images and video — objects, faces, moderation' },
+    { key: 'T', term: 'Transcribe', note: 'speech → text' },
+    { key: 'P', term: 'Polly', note: 'text → speech' },
+    { key: 'C', term: 'Comprehend', note: 'natural language understanding — sentiment, entities' },
+    { key: 'T', term: 'Translate', note: 'one language → another' },
+    { key: 'T', term: 'Textract', note: 'scanned documents → text, forms and tables' },
+    { key: 'L', term: 'Lex', note: 'chatbots and voice interfaces' },
+    { key: 'K', term: 'Kendra', note: 'intelligent search across your own documents' },
+    { key: 'S', term: 'SageMaker', note: 'build, train and deploy your own custom models' },
+    { key: 'Q', term: 'Amazon Q', note: 'generative AI assistant for business and for building' },
+  ]}
+/>
+
+<Callout type="exam">
+Three pairs the exam deliberately confuses:
+<br />· <strong>Rekognition vs Textract</strong> — a photograph of the world vs a scanned document.
+<br />· <strong>Transcribe vs Polly</strong> — speech to text vs text to speech.
+<br />· <strong>Comprehend vs Kendra</strong> — analyse a piece of text vs search a whole corpus.
+</Callout>
+
+## The analytics services — moving from raw data to an answer
+
+Analytics questions describe a pipeline, and each stage has an obvious service.
+
+| Stage | Service | The sentence |
+| --- | --- | --- |
+| **Ingest streams** | **Amazon Kinesis** | "Real-time streaming data" — clickstreams, IoT telemetry, logs as they happen |
+| **Store** | **Amazon S3** | The data lake. Everything lands here |
+| **Catalogue & transform** | **AWS Glue** | Serverless **ETL**, plus the Data Catalog that records what your files contain |
+| **Query in place** | **Amazon Athena** | Serverless **SQL directly on S3**, billed per TB scanned |
+| **Warehouse** | **Amazon Redshift** | Petabyte-scale analytics when many analysts query all day |
+| **Big data frameworks** | **Amazon EMR** | Managed **Hadoop, Spark, Hive** for teams who already work that way |
+| **Search & log analytics** | **Amazon OpenSearch Service** | Full-text search, log analytics, operational dashboards |
+| **Visualise** | **Amazon QuickSight** | The BI dashboards that business users actually look at |
+
+<Callout type="cost">
+<strong>Athena vs Redshift</strong> is a frequency question, not a size question. Occasional
+queries over data already in S3 → <strong>Athena</strong>, because you pay only for the scans.
+Continuous querying by a team of analysts → <strong>Redshift</strong>, because dedicated compute
+stops being the expensive option.
+</Callout>
+
+<Callout type="gotcha">
+<strong>Kinesis is for data in motion; S3 and Redshift are for data at rest.</strong> If a
+question says "real time", "streaming" or "as events arrive", it is Kinesis — even when the data
+eventually lands in S3 anyway.
+</Callout>
+
+<Scenario
+  who="A call centre drowning in recordings nobody listens to"
+  problem="Twelve thousand support calls a month were recorded and archived, and the only quality process was a supervisor spot-checking about forty of them. Nobody could answer which products generated angry calls, and a Spanish-speaking segment was growing with no way to review those calls at all."
+  solution="Recordings land in S3. Amazon Transcribe converts each to text, Amazon Translate handles the Spanish, and Amazon Comprehend scores sentiment and pulls out product names as entities. Results go back to S3, are catalogued by AWS Glue, queried with Athena, and shown to managers in QuickSight."
+  outcome="All twelve thousand calls are now analysed instead of forty, and the biggest driver of negative sentiment turned out to be a delivery partner nobody had suspected."
+>
+Five services, one sentence each, no machine learning expertise involved. This chain —
+<strong>Transcribe → Translate → Comprehend → Athena → QuickSight</strong> — is close to a
+canonical exam scenario, so it is worth being able to reconstruct it.
+</Scenario>
+
+<Quiz
+  question="A company wants to automatically extract text, form fields and table data from scanned invoices and paper contracts. Which AWS service should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'Amazon Textract',
+      correct: true,
+      why: 'Textract is purpose-built for documents — it goes beyond simple OCR to preserve form field relationships and table structure, which is exactly what invoices and contracts need.',
+    },
+    {
+      text: 'Amazon Rekognition',
+      why: 'Rekognition analyses images and video for objects, scenes and faces. It can detect text in an image, but it does not understand form fields or table structure in documents.',
+    },
+    {
+      text: 'Amazon Comprehend',
+      why: 'Comprehend analyses text that you already have, finding sentiment and entities. It cannot read a scanned page in the first place — you would run Textract, then Comprehend.',
+    },
+    {
+      text: 'Amazon Transcribe',
+      why: 'Transcribe converts speech audio to text. There is no audio in this scenario.',
+    },
+  ]}
+  explain="<strong>Textract reads documents. Rekognition sees pictures.</strong> The two are swapped in wrong answers more than any other pair here."
+/>
+
+<Quiz
+  question="An analytics team needs to run occasional SQL queries directly against log files stored in Amazon S3, without provisioning or managing any infrastructure. Which service is most appropriate?"
+  choose={1}
+  options={[
+    {
+      text: 'Amazon Athena',
+      correct: true,
+      why: 'Athena is serverless SQL over data in S3, billed per terabyte scanned. Nothing is provisioned and nothing runs between queries.',
+    },
+    {
+      text: 'Amazon Redshift',
+      why: 'Redshift is a data warehouse requiring a provisioned cluster billed continuously — poor value for occasional queries, though the right answer once querying is constant.',
+    },
+    {
+      text: 'Amazon EMR',
+      why: 'EMR runs managed Hadoop and Spark clusters. It is powerful but requires cluster management, which the question rules out.',
+    },
+    {
+      text: 'Amazon QuickSight',
+      why: 'QuickSight is the visualisation layer that displays results. It is not the query engine reading the files.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="Which service would you use to build, train and deploy a custom machine learning model when no pre-trained AWS AI service fits the problem?"
+  choose={1}
+  options={[
+    {
+      text: 'Amazon SageMaker',
+      correct: true,
+      why: 'SageMaker is the end-to-end platform for building, training, tuning and deploying custom models. "Custom model" or "data science team" in a question points here.',
+    },
+    {
+      text: 'Amazon Comprehend',
+      why: 'Comprehend is a pre-trained natural language service. It offers limited customisation but is not a platform for building a model from scratch.',
+    },
+    {
+      text: 'Amazon Q',
+      why: 'Amazon Q is a generative AI assistant for business users and builders. It is not a model development platform.',
+    },
+    {
+      text: 'Amazon EMR',
+      why: 'EMR runs big data frameworks such as Spark and Hadoop. Spark can train models, but the managed ML platform AWS points you at is SageMaker.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Learn each AI service as <strong>one sentence</strong>. The exam describes the task and asks for the name.',
+    '<strong>Rekognition</strong> images · <strong>Transcribe</strong> speech→text · <strong>Polly</strong> text→speech · <strong>Comprehend</strong> understands text · <strong>Translate</strong> languages · <strong>Textract</strong> scanned documents.',
+    '<strong>Lex</strong> chatbots · <strong>Kendra</strong> enterprise search · <strong>SageMaker</strong> custom models · <strong>Amazon Q</strong> generative assistant.',
+    'The confusable pairs: <strong>Rekognition vs Textract</strong>, <strong>Transcribe vs Polly</strong>, <strong>Comprehend vs Kendra</strong>.',
+    'Analytics pipeline: <strong>Kinesis</strong> (streaming) → <strong>S3</strong> (lake) → <strong>Glue</strong> (ETL and catalog) → <strong>Athena</strong> or <strong>Redshift</strong> → <strong>QuickSight</strong>.',
+    '<strong>Athena</strong> for occasional queries over S3 · <strong>Redshift</strong> when analysts query all day · <strong>EMR</strong> for Hadoop and Spark · <strong>OpenSearch</strong> for search and logs.',
+  ]}
+/>

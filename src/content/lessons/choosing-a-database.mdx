@@ -1,0 +1,392 @@
+---
+title: Choosing the Right Database
+summary: Relational, key-value, in-memory, warehouse. AWS has one database per shape of question — and the exam is really asking which question your application is asking.
+exams: [CCP, SAA]
+track: database
+order: 10
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 3 — Design High-Performing Architectures'
+minutes: 13
+hook: Do not ask "which database is best". Ask "what question does my application keep asking?" — the answer names the service.
+updated: 2026-08-08
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import DecisionTree from '../../components/DecisionTree.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+For thirty years "the database" meant one thing: a relational database, and you bent your
+problem until it fitted. AWS takes the opposite position — **purpose-built databases** — and
+offers a different engine for each shape of question.
+
+That is genuinely better, and it is also why the exam can ask a database question that has
+four plausible-looking answers. The way through is to stop thinking about the data and start
+thinking about **the query you will run ten thousand times a second**.
+
+<Diagram
+  title="One application, five different questions"
+  viewBox="0 30 950 570"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: '"Which customers in Leeds ordered a tent last spring?"',
+      body: 'A question that <strong>joins</strong> tables and must be exactly right. That is a relational database — <strong>Amazon RDS</strong> or <strong>Aurora</strong>. Structured schema, SQL, ACID transactions.',
+      flow: 'w-rds',
+    },
+    {
+      title: '"Give me the profile for user 8842."',
+      body: 'One item, fetched by its key, a hundred thousand times a second, at any scale. No joins involved. That is <strong>DynamoDB</strong> — single-digit millisecond responses and no server to size.',
+      flow: 'w-dyn',
+    },
+    {
+      title: '"…and again. And again. And again."',
+      body: 'The same expensive answer requested repeatedly. Keep it in memory with <strong>ElastiCache</strong> and respond in <strong>microseconds</strong>, taking the load off the database behind it.',
+      flow: 'w-cache',
+    },
+    {
+      title: '"Revenue by region by month, for the last five years."',
+      body: 'One enormous query across billions of historical rows, run by an analyst, not by the website. That is a data warehouse — <strong>Amazon Redshift</strong>.',
+      flow: 'w-rs',
+      duration: 1400,
+    },
+    {
+      title: '"Who is connected to whom?" · "Find every document mentioning…"',
+      body: 'Shapes that relational tables handle badly. <strong>Neptune</strong> for graphs and relationships, <strong>OpenSearch</strong> for full-text search and log analytics.',
+      flow: 'w-sp',
+    },
+  ]}
+  caption="One application very often uses three of these at once. They are not competitors — they answer different questions."
+>
+  <Node x={140} y={310} w={180} h={90} label="Your application" icon="code" tone="muted" />
+
+  <Node x={740} y={90} w={300} h={86} label="ElastiCache" sub="in-memory · microseconds" icon="cache" tone="red" step={3} />
+  <Node x={740} y={200} w={300} h={86} label="DynamoDB" sub="key-value · any scale" icon="database" tone="purple" step={2} />
+  <Node x={740} y={310} w={300} h={86} label="RDS / Aurora" sub="relational · joins, transactions" icon="database" tone="blue" step={1} />
+  <Node x={740} y={420} w={300} h={86} label="Redshift" sub="warehouse · analytics" icon="warehouse" tone="teal" step={4} />
+  <Node x={740} y={530} w={300} h={86} label="Neptune · OpenSearch" sub="graphs · full-text search" icon="gear" tone="muted" step={5} />
+
+  <Wire id="w-cache" from={[230, 310]} to={[588, 90]} shape="elbow-h" mid={340} tone="red" step={3} label="cache it" labelDy={-8} />
+  <Wire id="w-dyn" from={[230, 310]} to={[588, 200]} shape="elbow-h" mid={390} tone="purple" step={2} label="by key" labelDy={-8} />
+  <Wire id="w-rds" from={[230, 310]} to={[588, 310]} shape="elbow-h" mid={440} tone="blue" step={1} label="SQL joins" labelDy={-8} />
+  <Wire id="w-rs" from={[230, 310]} to={[588, 420]} shape="elbow-h" mid={490} tone="teal" step={4} label="history" labelDy={-8} />
+  <Wire id="w-sp" from={[230, 310]} to={[588, 530]} shape="elbow-h" mid={540} tone="muted" step={5} label="odd shapes" labelDy={-8} />
+</Diagram>
+
+## Relational — Amazon RDS and Aurora
+
+**RDS** runs the databases you already know — PostgreSQL, MySQL, MariaDB, Oracle, SQL Server —
+and takes the operational work off you: patching, backups, failover, replication. You still
+tune queries and design the schema. You no longer install anything.
+
+Use it when the data has a **fixed shape** and questions **join across** it, and when a
+transaction must either fully happen or fully not happen. Orders and payments, bookings,
+anything where "roughly right" is not acceptable.
+
+Three RDS features that carry most of the exam weight, and are constantly confused:
+
+| Feature | What it is for | What it is **not** for |
+| --- | --- | --- |
+| **Multi-AZ** | Availability. A synchronous standby in another AZ, automatic failover, same endpoint | Not for scaling reads — the standby serves no traffic |
+| **Read replicas** | Performance. Asynchronous copies that serve read queries | Not automatic failover (though one can be promoted manually) |
+| **Automated backups & snapshots** | Recovery. Point-in-time restore, typically to any second in the last 35 days | Not availability — restoring takes minutes to hours |
+
+**Amazon Aurora** is AWS's own reimplementation of MySQL and PostgreSQL, wire-compatible with
+both. It stores data in a shared, self-healing layer replicated **six ways across three
+Availability Zones**, is markedly faster than standard RDS, supports up to 15 read replicas
+with very low replica lag, and grows storage automatically to 128 TB. **Aurora Serverless v2**
+scales capacity up and down with load, which suits spiky or unpredictable workloads.
+
+<Callout type="gotcha">
+Say it until it is automatic: <strong>Multi-AZ is availability. Read replicas are performance.
+Backups are recovery.</strong> Three separate features solving three separate problems. Swapping
+them is the single most common wrong answer in the database section of the SAA exam.
+</Callout>
+
+## Key-value — Amazon DynamoDB
+
+**DynamoDB** is a managed NoSQL key-value and document store. There is no server, no version
+to upgrade, and no capacity to plan if you choose on-demand mode. It returns single-digit
+millisecond responses at effectively any scale, and stays there whether the table holds a
+thousand items or a hundred billion.
+
+What you give up is the ability to ask arbitrary questions. You design a DynamoDB table around
+**the access patterns you already know** — get an item by key, or query a range within one
+partition. There is no efficient equivalent of "join these two tables and filter on a column I
+never indexed".
+
+Worth knowing by name:
+
+- **DynamoDB Accelerator (DAX)** — an in-memory cache built for DynamoDB, taking responses from
+  milliseconds to **microseconds**, with no application changes.
+- **Global Tables** — an active-active copy of your table in several Regions, so users on other
+  continents read and write locally.
+- **On-demand capacity mode** — pay per request, no capacity planning. The right default for
+  unpredictable traffic; provisioned mode is cheaper for steady, well-understood load.
+- **TTL** — set an expiry timestamp per item and DynamoDB deletes it for free. The tidy way to
+  hold sessions or short-lived data.
+
+<Callout type="exam">
+The words that point at DynamoDB: <strong>"millions of requests per second", "single-digit
+millisecond latency", "serverless", "flexible schema", "key-value", "no database management".</strong>
+The words that point away from it: <strong>"complex joins", "ad-hoc queries", "existing SQL
+application", "strong relational integrity".</strong>
+</Callout>
+
+## In-memory — Amazon ElastiCache
+
+**ElastiCache** keeps data in RAM, so reads come back in microseconds. It is not usually where
+the truth lives — it sits **in front of** a database and answers the questions that keep being
+asked, so the database never sees them.
+
+Two engines, and choosing between them is a standard question:
+
+- **Redis** — richer. Persistence, replication, Multi-AZ with automatic failover, sorted sets,
+  pub/sub, geospatial queries. Choose it when the cache must survive a restart, or when you
+  need leaderboards, session stores or queues.
+- **Memcached** — simpler. Pure in-memory cache, multi-threaded, easy to scale horizontally, no
+  persistence and no replication. Choose it when you only want a big, fast, disposable cache.
+
+<Mnemonic
+  title="Redis or Memcached?"
+  phrase="Redis Remembers, Memcached Merely caches"
+  tone="teal"
+  items={[
+    { key: 'R', term: 'Redis', note: 'persistence, replication, Multi-AZ failover, sorted sets, pub/sub' },
+    { key: 'M', term: 'Memcached', note: 'simple, multi-threaded, horizontally scalable, nothing survives a restart' },
+  ]}
+/>
+
+## Analytics — Amazon Redshift, and friends
+
+A production database is optimised to fetch a few rows very quickly. Asking it to scan five
+years of orders and total them by region will work once, and will bring the website down if
+an analyst does it at lunchtime.
+
+**Amazon Redshift** is a data warehouse: columnar storage, massively parallel processing,
+built for enormous aggregate queries over historical data. You load data into it from S3 and
+run SQL against it, and it is where business-intelligence tools point.
+
+Near it in most exam questions:
+
+- **Amazon Athena** — SQL directly against files sitting in S3, **serverless**, priced per
+  terabyte scanned. Ideal for occasional queries where standing up a warehouse is overkill.
+- **AWS Glue** — the managed ETL service that catalogues and transforms the data on the way in.
+- **Amazon QuickSight** — the dashboards people actually look at.
+
+<Callout type="cost">
+Athena versus Redshift is usually a question about <em>frequency</em>. Occasional queries over
+data already in S3 → <strong>Athena</strong>, because you pay only for the scans. Constant
+querying by many analysts all day → <strong>Redshift</strong>, because per-query pricing stops
+being a bargain and dedicated compute wins.
+</Callout>
+
+## The purpose-built ones
+
+You need to recognise these by their giveaway phrase, not to know them deeply:
+
+| Service | Reach for it when the question says |
+| --- | --- |
+| **Amazon Neptune** | Graph. "Relationships between entities", social networks, fraud rings, recommendations |
+| **Amazon OpenSearch Service** | "Full-text search", log analytics, operational dashboards |
+| **Amazon DocumentDB** | "MongoDB-compatible" document database |
+| **Amazon Keyspaces** | "Apache Cassandra-compatible" |
+| **Amazon Timestream** | Time-series — IoT sensor readings, metrics over time |
+| **Amazon QLDB** | An immutable, cryptographically verifiable ledger of every change |
+
+<DecisionTree
+  title="Which database should I use?"
+  intro="Answer for one access pattern. A real system usually walks this tree more than once."
+  tree={{
+    q: 'What is the application mainly doing with this data?',
+    options: [
+      {
+        label: 'Running the business, live',
+        note: 'orders, users, bookings — reads and writes from the app itself',
+        next: {
+          q: 'Do the queries join across tables, or need multi-row transactions?',
+          options: [
+            {
+              label: 'Yes — joins, transactions, existing SQL',
+              next: {
+                q: 'How demanding is it on performance and availability?',
+                options: [
+                  {
+                    label: 'Ordinary — a normal production database',
+                    next: {
+                      result: 'Amazon RDS, Multi-AZ',
+                      detail: 'Managed PostgreSQL, MySQL, MariaDB, Oracle or SQL Server. Multi-AZ for automatic failover; add read replicas if reads outgrow the primary.',
+                      tone: 'good',
+                    },
+                  },
+                  {
+                    label: 'Demanding, or spiky and unpredictable',
+                    next: {
+                      result: 'Amazon Aurora',
+                      detail: 'MySQL/PostgreSQL-compatible, several times faster, six copies across three AZs, up to 15 low-lag replicas. Use Serverless v2 when the load is unpredictable.',
+                      tone: 'good',
+                    },
+                  },
+                ],
+              },
+            },
+            {
+              label: 'No — fetch and update items by key',
+              next: {
+                result: 'Amazon DynamoDB',
+                detail: 'Serverless key-value at single-digit millisecond latency and any scale. Add DAX for microsecond reads, Global Tables for multi-Region, TTL to expire items automatically.',
+                tone: 'good',
+              },
+            },
+          ],
+        },
+      },
+      {
+        label: 'Answering the same expensive question repeatedly',
+        note: 'a hot product page, a session lookup, a leaderboard',
+        next: {
+          result: 'Amazon ElastiCache in front of the database',
+          detail: 'Redis if the cache needs persistence, replication or failover; Memcached if you want a simple, disposable cache. If the store behind it is DynamoDB, use DAX instead.',
+          tone: 'good',
+        },
+      },
+      {
+        label: 'Analysing history',
+        note: 'reports, dashboards, "how did last year compare"',
+        next: {
+          q: 'How often does anyone actually run these queries?',
+          options: [
+            {
+              label: 'Occasionally, over data already in S3',
+              next: {
+                result: 'Amazon Athena',
+                detail: 'Serverless SQL straight against S3, billed per terabyte scanned. Nothing to provision and nothing running between queries.',
+                tone: 'good',
+              },
+            },
+            {
+              label: 'Constantly, by a team of analysts',
+              next: {
+                result: 'Amazon Redshift',
+                detail: 'A columnar, massively parallel data warehouse. Dedicated compute pays for itself once querying is continuous rather than occasional.',
+                tone: 'good',
+              },
+            },
+          ],
+        },
+      },
+      {
+        label: 'Something with an unusual shape',
+        note: 'relationships, free text, sensor readings',
+        next: {
+          result: 'A purpose-built database',
+          detail: 'Neptune for graphs and relationships · OpenSearch for full-text search and logs · Timestream for time-series · DocumentDB for MongoDB workloads · QLDB for an immutable ledger.',
+          tone: 'good',
+        },
+      },
+    ],
+  }}
+/>
+
+<Scenario
+  who="A food delivery app in three cities"
+  problem="Everything lives in one large PostgreSQL instance. Looking up a restaurant's menu — the single most frequent query in the system — competes with order processing. The analytics team's nightly revenue report locks tables for twenty minutes. At 7pm on Fridays the database CPU pins at 100% and orders start failing."
+  solution="Orders and payments stay in RDS PostgreSQL, Multi-AZ, because they need real transactions. Menus and restaurant profiles move to DynamoDB, fetched by restaurant ID. ElastiCache for Redis holds the rendered menu and each user's session. Nightly, order data is exported to S3 and the analytics team queries it with Athena."
+  outcome="The Friday peak no longer touches the relational database for reads at all. The analysts stopped affecting production entirely, and the RDS instance was downsized twice."
+>
+Four data stores where there was one, and each choice is traceable to a *question* rather than
+to a preference. This shape — relational for the truth, key-value for the hot path, cache in
+front, analytics off to the side — is one of the most common real architectures on AWS.
+</Scenario>
+
+<Quiz
+  question="A gaming company needs to store player session data. The application requires single-digit millisecond read and write latency, will handle millions of requests per second at peak, and the data has no fixed schema. The team does not want to manage database servers. Which service should they choose?"
+  choose={1}
+  options={[
+    {
+      text: 'Amazon DynamoDB',
+      correct: true,
+      why: 'Every requirement in the question is a DynamoDB characteristic: single-digit millisecond latency, scale to millions of requests per second, flexible schema, and no servers to manage.',
+    },
+    {
+      text: 'Amazon RDS for MySQL with read replicas',
+      why: 'RDS can be made fast, but it requires a fixed schema, needs an instance size chosen and managed, and sustaining millions of requests per second would require substantial effort and cost.',
+    },
+    {
+      text: 'Amazon Redshift',
+      why: 'Redshift is a data warehouse for large analytical queries over history. It is the wrong shape entirely for high-frequency single-item reads and writes.',
+    },
+    {
+      text: 'Amazon Neptune',
+      why: 'Neptune is a graph database for querying relationships between entities. Session data keyed by player ID has no graph structure to exploit.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="An e-commerce application uses Amazon RDS. The product catalogue page runs the same expensive query thousands of times per minute, and database CPU is consistently above 90%. The data changes only a few times per day. What is the most cost-effective way to reduce database load?"
+  choose={1}
+  options={[
+    {
+      text: 'Put Amazon ElastiCache in front of the database and cache the query results',
+      correct: true,
+      why: 'The same query, repeated constantly, over data that rarely changes, is the textbook case for a cache. Results are served from memory in microseconds and the database stops seeing the query at all.',
+    },
+    {
+      text: 'Scale the RDS instance up to a larger instance class',
+      why: 'It would work, and it is the most expensive way to solve it — you would be paying continuously for more CPU to recompute an identical answer thousands of times a minute.',
+    },
+    {
+      text: 'Migrate the catalogue to Amazon Redshift',
+      why: 'Redshift is built for large analytical scans, not for high-frequency lookups from a website. Per-query latency would get worse, not better.',
+    },
+    {
+      text: 'Enable Multi-AZ on the RDS instance',
+      why: 'Multi-AZ provides a standby for failover. The standby serves no read traffic, so this adds cost and availability but does not reduce CPU by a single percent.',
+    },
+  ]}
+  explain="“The same expensive answer, over and over, over data that rarely changes” is always a caching question. Add <strong>ElastiCache</strong> in front of RDS, or <strong>DAX</strong> in front of DynamoDB."
+/>
+
+<Quiz
+  question="A company's analysts need to run occasional ad-hoc SQL queries over five years of log files already stored in Amazon S3. The queries run a few times per week. The company wants to avoid provisioning and paying for any infrastructure between queries. What should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'Amazon Athena',
+      correct: true,
+      why: 'Athena runs SQL directly against data in S3 with nothing to provision, and bills per terabyte scanned. For queries run a few times a week, you pay only for those scans.',
+    },
+    {
+      text: 'Amazon Redshift',
+      why: 'Redshift would answer the queries well, but it requires a provisioned cluster that costs money continuously — including the six days a week nobody is querying.',
+    },
+    {
+      text: 'Amazon RDS for PostgreSQL',
+      why: 'You would first have to load five years of logs into it, then pay for a running instance and enough storage to hold them all. Relational databases are also poorly suited to scanning log files.',
+    },
+    {
+      text: 'Amazon DynamoDB',
+      why: 'DynamoDB is for known access patterns fetched by key. Ad-hoc SQL over historical files is precisely the query style it cannot do.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Ask <strong>what question the application keeps asking</strong>. The question names the database.',
+    '<strong>RDS / Aurora</strong> — joins, transactions, fixed schema. Aurora when you need more speed, scale or Serverless elasticity.',
+    'Never confuse them: <strong>Multi-AZ = availability · read replicas = performance · backups = recovery.</strong>',
+    '<strong>DynamoDB</strong> — key-value, serverless, single-digit ms at any scale. DAX for microseconds, Global Tables for multi-Region, TTL to expire items.',
+    '<strong>ElastiCache</strong> in front of a database for repeated expensive reads. <strong>Redis</strong> persists and replicates; <strong>Memcached</strong> is simple and disposable.',
+    '<strong>Athena</strong> for occasional SQL over S3 (pay per scan) · <strong>Redshift</strong> when analysts query all day (dedicated compute).',
+    'Purpose-built giveaways: <strong>Neptune</strong> = graphs · <strong>OpenSearch</strong> = full-text and logs · <strong>Timestream</strong> = time-series · <strong>QLDB</strong> = immutable ledger.',
+  ]}
+/>

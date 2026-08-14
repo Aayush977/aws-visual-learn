@@ -1,0 +1,190 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import QuizRunner from '../../components/QuizRunner.astro';
+import { url } from '../../lib/paths';
+import {
+  QUESTIONS,
+  questionsForExam,
+  questionsForTrack,
+  countByTrack,
+  type Question,
+} from '../../lib/questions';
+import { EXAMS, EXAM_META, TRACKS, TRACK_META } from '../../content.config';
+
+/**
+ * One route for both kinds of set: the two exam-wide tests (/quiz/ccp,
+ * /quiz/saa) and a shorter test per track (/quiz/storage). Tracks with no
+ * questions yet are skipped rather than building an empty page.
+ */
+export function getStaticPaths() {
+  const perTrack = countByTrack();
+
+  const exams = EXAMS.map((exam) => ({
+    params: { set: exam.toLowerCase() },
+    props: {
+      kind: 'exam' as const,
+      exam,
+      label: EXAM_META[exam].full,
+      short: EXAM_META[exam].label,
+      blurb:
+        'Every question in the bank that is on this exam’s blueprint, shuffled. Aim for 80% before you book it — the real thing has a time limit and no explanations.',
+      questions: questionsForExam(exam),
+      backHref: `/path/${exam.toLowerCase()}`,
+      backLabel: `${EXAM_META[exam].label} study path`,
+    },
+  }));
+
+  const tracks = TRACKS.filter((t) => perTrack[t] > 0).map((track) => ({
+    params: { set: track },
+    props: {
+      kind: 'track' as const,
+      exam: undefined,
+      label: TRACK_META[track].label,
+      short: TRACK_META[track].label,
+      blurb: TRACK_META[track].blurb,
+      questions: questionsForTrack(track),
+      backHref: `/lessons#${track}`,
+      backLabel: `${TRACK_META[track].label} lessons`,
+    },
+  }));
+
+  return [...exams, ...tracks];
+}
+
+interface Props {
+  kind: 'exam' | 'track';
+  exam?: (typeof EXAMS)[number];
+  label: string;
+  short: string;
+  blurb: string;
+  questions: Question[];
+  backHref: string;
+  backLabel: string;
+}
+
+const { kind, exam, label, short, blurb, questions, backHref, backLabel } = Astro.props;
+
+// Which lessons this set draws on, so a reader can revise before starting.
+const lessonIds = [...new Set(questions.map((q) => q.lesson).filter(Boolean))] as string[];
+const passMark = kind === 'exam' ? 80 : 70;
+---
+
+<BaseLayout
+  title={`${label} — practice questions`}
+  description={`${questions.length} scored practice questions for ${label}, with an explanation on every option and a link back to the lesson behind each one.`}
+>
+  <div class="wrap page">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href={url('/quiz')}>Practice questions</a>
+      <span aria-hidden="true">/</span>
+      <span>{short}</span>
+    </nav>
+
+    <header class="page__head">
+      <p class="page__eyebrow">{kind === 'exam' ? 'Full practice test' : 'Topic test'}</p>
+      <h1>{label}</h1>
+      <p class="page__lead">{blurb}</p>
+    </header>
+
+    <QuizRunner
+      questions={questions}
+      label={label}
+      passMark={passMark}
+      groupBy={kind === 'exam' && exam === 'CCP' ? 'ccpDomain' : 'track'}
+    />
+
+    <footer class="page__foot">
+      <p>
+        <a href={url(backHref)}>← Back to the {backLabel}</a>
+      </p>
+      {
+        lessonIds.length > 0 && (
+          <details class="sources">
+            <summary>Which lessons these questions come from</summary>
+            <ul>
+              {lessonIds.map((id) => (
+                <li>
+                  <a href={url(`/lessons/${id}`)}>{id.replace(/-/g, ' ')}</a>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )
+      }
+      <p class="page__foot-note">
+        {QUESTIONS.length} questions in the bank across every topic. Try another set from the
+        <a href={url('/quiz')}>practice questions index</a>.
+      </p>
+    </footer>
+  </div>
+</BaseLayout>
+
+<style>
+  .page {
+    padding: var(--sp-6) 0 var(--sp-8);
+    width: min(100% - 2rem, 54rem);
+    margin-inline: auto;
+  }
+
+  .crumb {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: center;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+    margin-bottom: var(--sp-5);
+  }
+
+  .page__head {
+    margin-bottom: var(--sp-6);
+  }
+  .page__eyebrow {
+    margin: 0 0 var(--sp-2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .page__head h1 {
+    margin: 0 0 var(--sp-3);
+  }
+  .page__lead {
+    margin: 0;
+    font-size: var(--step-1);
+    color: var(--text-muted);
+    max-width: 42rem;
+  }
+
+  .page__foot {
+    margin-top: var(--sp-7);
+    padding-top: var(--sp-5);
+    border-top: 1px solid var(--border);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .page__foot p {
+    margin: 0 0 var(--sp-3);
+  }
+  .page__foot-note {
+    margin-bottom: 0;
+  }
+
+  .sources {
+    margin-bottom: var(--sp-4);
+  }
+  .sources summary {
+    cursor: pointer;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .sources ul {
+    margin: var(--sp-3) 0 0;
+    padding-left: var(--sp-5);
+    display: grid;
+    gap: var(--sp-1);
+  }
+  .sources a {
+    text-transform: capitalize;
+  }
+</style>

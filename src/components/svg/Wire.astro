@@ -1,0 +1,102 @@
+---
+/**
+ * An arrow connecting two points, and the rail a travelling packet runs along.
+ *
+ * Give it an `id` and reference that id from a step's `flow` to animate a dot
+ * travelling down it when the step plays:
+ *
+ *   <Wire id="user-to-dns" from={[120, 100]} to={[280, 100]} label="1. lookup" />
+ *   steps={[{ title: '…', body: '…', flow: 'user-to-dns' }]}
+ *
+ * Endpoints are absolute SVG coordinates — put them on the edge of the boxes
+ * you are joining, not at their centres.
+ */
+interface Props {
+  from: [number, number];
+  to: [number, number];
+  id?: string;
+  step?: number;
+  label?: string;
+  tone?: 'orange' | 'blue' | 'teal' | 'purple' | 'green' | 'red' | 'navy' | 'muted';
+  /** 'line' straight · 'arc' bowed · 'elbow-h' across-then-down · 'elbow-v' down-then-across */
+  shape?: 'line' | 'arc' | 'elbow-h' | 'elbow-v';
+  /** How far an 'arc' bows out. Negative bows the other way. */
+  bow?: number;
+  /**
+   * Where an elbow turns the corner — an x for 'elbow-h', a y for 'elbow-v'.
+   * Defaults to halfway. Use it to route around a box the midpoint runs through.
+   */
+  mid?: number;
+  dashed?: boolean;
+  /** Arrowheads on both ends. */
+  both?: boolean;
+  /** Nudge the label off the line. */
+  labelDx?: number;
+  labelDy?: number;
+}
+
+const {
+  from,
+  to,
+  id,
+  step,
+  label,
+  tone = 'muted',
+  shape = 'line',
+  bow = 40,
+  mid,
+  dashed = false,
+  both = false,
+  labelDx = 0,
+  labelDy = -10,
+} = Astro.props;
+
+const [x1, y1] = from;
+const [x2, y2] = to;
+
+function buildPath(): string {
+  if (shape === 'arc') {
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    // Perpendicular offset for the control point.
+    const cx = mx + (-dy / len) * bow;
+    const cy = my + (dx / len) * bow;
+    return `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
+  }
+  if (shape === 'elbow-h') {
+    const mx = mid ?? (x1 + x2) / 2;
+    return `M ${x1} ${y1} L ${mx} ${y1} L ${mx} ${y2} L ${x2} ${y2}`;
+  }
+  if (shape === 'elbow-v') {
+    const my = mid ?? (y1 + y2) / 2;
+    return `M ${x1} ${y1} L ${x1} ${my} L ${x2} ${my} L ${x2} ${y2}`;
+  }
+  return `M ${x1} ${y1} L ${x2} ${y2}`;
+}
+
+const d = buildPath();
+
+// Label sits at the midpoint (approximated for arcs, which is fine at this size).
+const lx = (x1 + x2) / 2 + labelDx;
+const ly = (y1 + y2) / 2 + labelDy;
+---
+
+<g class={`dg-wire dg-wire--${tone}`} data-step={step}>
+  <path
+    id={id}
+    class={`dg-wire__path ${dashed ? 'is-dashed' : ''}`}
+    d={d}
+    marker-end={`url(#dg-arrow-${tone})`}
+    marker-start={both ? `url(#dg-arrow-back-${tone})` : undefined}
+  ></path>
+  {
+    label && (
+      <text class="dg-wire__label" x={lx} y={ly}>
+        {label}
+      </text>
+    )
+  }
+</g>

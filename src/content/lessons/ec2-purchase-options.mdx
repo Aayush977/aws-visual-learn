@@ -1,0 +1,329 @@
+---
+title: Paying for EC2 — On-Demand, Reserved, Spot
+summary: The same instance, at five very different prices. What each discount asks you to give up, and how to recognise which one a scenario is describing.
+exams: [CCP, SAA]
+track: compute
+order: 20
+domains:
+  CCP: 'Domain 4 — Billing, Pricing, and Support'
+  SAA: 'Domain 4 — Design Cost-Optimized Architectures'
+minutes: 10
+hook: Every discount on EC2 is bought with the same currency — certainty. Commit to time, or accept interruption.
+updated: 2026-08-08
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import DecisionTree from '../../components/DecisionTree.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+An `m5.large` in London is one machine, but AWS will sell it to you at roughly five different
+prices. The instance is identical in every case — same CPU, same memory, same performance.
+What differs is **what you promised in exchange for the discount**.
+
+There are only two currencies you can pay with:
+
+1. **Certainty about time** — "I will be using this much compute for the next year or three."
+2. **Tolerance of interruption** — "Take it away whenever you need it back."
+
+Every pricing model is one of those, or neither, or a special case about licensing.
+
+<Diagram
+  title="The same instance, five prices"
+  viewBox="0 95 1000 355"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'On-Demand — the baseline',
+      body: 'Pay by the second, start and stop whenever you like, promise nothing. Everything else on this chart is a discount measured against this line.',
+    },
+    {
+      title: 'Savings Plans — commit to spend',
+      body: 'Promise to spend, say, £4 an hour on compute for <strong>one or three years</strong> and get up to <strong>72% off</strong>. You commit to an <em>amount of money</em>, not to a particular instance — so you can change size, family and Region freely.',
+    },
+    {
+      title: 'Reserved Instances — commit to a machine',
+      body: 'The older mechanism, similar discount, but you commit to a <strong>specific instance family in a specific Region</strong>. Less flexible than a Savings Plan, and rarely the better choice today.',
+    },
+    {
+      title: 'Spot Instances — take the spare capacity',
+      body: 'Up to <strong>90% off</strong> for capacity AWS is not currently using. The catch: it can be reclaimed at any moment with a <strong>two-minute warning</strong>. Brilliant for work that can be interrupted and retried.',
+    },
+    {
+      title: 'Dedicated Hosts — a whole physical server',
+      body: 'The most expensive option, and it is not about performance. You get an entire physical machine to yourself, which is what per-socket software licences and some compliance rules demand.',
+    },
+  ]}
+  caption="Bar length is roughly the price for identical compute. Spot is the same machine as On-Demand — you are simply agreeing to give it back on request."
+>
+  <Node x={145} y={140} w={250} h={54} label="On-Demand" icon="clock" tone="blue" step={1} />
+  <Node x={540} y={140} w={520} h={54} label="baseline price" sub="no commitment, no risk" tone="blue" step={1} />
+
+  <Node x={145} y={205} w={250} h={54} label="Savings Plans" icon="money" tone="green" step={2} />
+  <Node x={467} y={205} w={374} h={54} label="up to 72% off" sub="commit £/hour for 1–3 years" tone="green" step={2} />
+
+  <Node x={145} y={270} w={250} h={54} label="Reserved Instances" icon="tag" tone="teal" step={3} />
+  <Node x={384} y={270} w={208} h={54} label="up to 72% off" sub="locked to a family" tone="teal" step={3} />
+
+  <Node x={145} y={335} w={250} h={54} label="Spot Instances" icon="scale" tone="orange" step={4} />
+  <Node x={360} y={335} w={160} h={54} label="up to 90% off" sub="reclaimable" tone="orange" step={4} />
+
+  <Node x={145} y={400} w={250} h={54} label="Dedicated Hosts" icon="lock" tone="red" step={5} />
+  <Node x={580} y={400} w={600} h={54} label="most expensive" sub="a physical server, to yourself" tone="red" step={5} />
+</Diagram>
+
+## On-Demand — the one with no strings
+
+You pay per second (with a 60-second minimum for Linux), you start and stop whenever you
+want, and you have promised nothing. It is the most expensive per hour and the right answer
+surprisingly often.
+
+Reach for it when the workload is **short-lived, unpredictable, or brand new**. You cannot
+sensibly commit to three years of an instance size you picked last Tuesday, and a development
+environment that runs eight hours a day is already getting a two-thirds discount by simply
+being switched off at night.
+
+<Callout type="cost">
+The cheapest instance is the one that is not running. Before reaching for any discount, ask
+whether the thing needs to be on at all — turning off development and test environments
+outside working hours is a bigger saving than most Reserved Instance purchases, and it
+requires no commitment whatsoever.
+</Callout>
+
+## Savings Plans — commit to money, not to machines
+
+This is the modern default for steady workloads. You commit to spending a certain amount per
+hour on compute — say £4/hour — for **one or three years**, and everything up to that amount
+is billed at a heavily discounted rate. Anything above it falls back to On-Demand pricing.
+
+There are two kinds, and the difference is examinable:
+
+| | **Compute Savings Plans** | **EC2 Instance Savings Plans** |
+| --- | --- | --- |
+| Discount | Up to ~66% | Up to ~72% |
+| Applies to | EC2, **Fargate and Lambda** too | EC2 only |
+| You may change | Instance family, size, OS, Region — anything | Size and OS, within one family in one Region |
+| Choose it when | You expect your architecture to change | You are certain of the family and Region |
+
+You also choose how much to pay up front — **All Upfront** (biggest discount), **Partial
+Upfront**, or **No Upfront** (smallest discount, but still a large one, and no cash needed
+on day one).
+
+<Callout type="exam">
+If a question says the workload is steady but the team "may migrate to containers or
+serverless", the answer is a **Compute Savings Plan** — it is the only commitment that also
+covers Fargate and Lambda. If the question stresses maximum discount on a known, fixed
+instance family, it is an **EC2 Instance Savings Plan** or a Reserved Instance.
+</Callout>
+
+## Reserved Instances — the older way to do the same thing
+
+Reserved Instances predate Savings Plans and reach a similar discount, but you commit to a
+specific instance family in a specific Region for one or three years. Two flavours:
+
+- **Standard RIs** — the deepest discount, but you can only change the size within the family.
+- **Convertible RIs** — a smaller discount in exchange for the right to exchange them for a
+  different family, OS or tenancy later.
+
+Both can be sold on the **Reserved Instance Marketplace** if your plans change, which Savings
+Plans cannot. That aside, for new commitments a Savings Plan is usually the better instrument,
+and AWS's own guidance says so.
+
+## Spot — up to 90% off, if you can take a punch
+
+AWS always has capacity it has not sold. Rather than let it idle, it sells it at a steep
+discount on the condition that it can take it back with **two minutes' notice** when a paying
+On-Demand customer wants it.
+
+That two-minute warning arrives as an interruption notice your application can listen for —
+enough time to checkpoint work, drain connections, and exit cleanly.
+
+**Good Spot workloads** share one property: an interrupted unit of work can simply be run
+again.
+
+- Batch processing, ETL jobs, nightly report generation
+- CI/CD build agents
+- Video rendering and transcoding farms
+- Machine-learning training with checkpointing
+- Stateless web servers, *if* they sit behind a load balancer with On-Demand capacity as well
+
+**Bad Spot workloads** are the ones where an interruption is a real event: a database, a
+license server, anything holding state in memory that cannot be reconstructed, or a job with
+a hard deadline and no time to retry.
+
+<Callout type="gotcha">
+Spot is not an auction any more, and it is not "cheap because it is slower". It is the same
+hardware at the same performance — you are being paid to accept the risk of eviction. The
+common mistake is running a stateful application on Spot to save money and discovering what
+"reclaimed" means at 2 a.m.
+</Callout>
+
+## Dedicated Hosts and Dedicated Instances
+
+Both give you hardware that no other AWS customer is on. The difference is how much visibility
+you get:
+
+- **Dedicated Instance** — isolated hardware, but AWS decides which physical server. Billed
+  per instance.
+- **Dedicated Host** — an actual physical server allocated to you, with visible sockets and
+  cores. Billed per host, whether or not you fill it.
+
+You want a Dedicated Host almost exclusively for one reason: **software licensed per physical
+socket or core** — Windows Server, SQL Server, Oracle — where the licence requires you to
+prove which physical hardware it ran on. A minority of compliance regimes also require it.
+
+<Callout type="exam">
+"Bring your own licence", "per-socket licensing", "must run on dedicated physical hardware
+for compliance" → <strong>Dedicated Hosts</strong>. If the question is about performance or
+cost, it is never Dedicated Hosts — they are the most expensive option on the board.
+</Callout>
+
+<DecisionTree
+  title="Which EC2 pricing model?"
+  intro="Answer for one workload at a time. A real account usually mixes three or four of these."
+  tree={{
+    q: 'Can this workload survive being shut down with two minutes’ notice and retried later?',
+    options: [
+      {
+        label: 'Yes — it is batch, stateless or checkpointed',
+        next: {
+          result: 'Spot Instances',
+          detail: 'Up to 90% off. Use a Spot Fleet across several instance types and Availability Zones so a shortage of one type does not stop everything, and handle the two-minute interruption notice.',
+          tone: 'good',
+        },
+      },
+      {
+        label: 'No — an interruption would be a real problem',
+        next: {
+          q: 'Will this run more or less constantly for at least a year?',
+          options: [
+            {
+              label: 'No — it is short-lived, spiky or brand new',
+              next: {
+                result: 'On-Demand',
+                detail: 'Commit to nothing. Then reduce the bill by switching it off when it is not needed rather than by buying a discount you might not use.',
+                tone: 'good',
+              },
+            },
+            {
+              label: 'Yes — it is a steady baseline',
+              next: {
+                q: 'Does licensed software require specific physical hardware?',
+                options: [
+                  {
+                    label: 'Yes — per-socket or per-core licensing',
+                    next: {
+                      result: 'Dedicated Hosts',
+                      detail: 'The only option that gives you visibility of physical sockets and cores for licence compliance. Expensive, and chosen for legal reasons rather than technical ones.',
+                      tone: 'warn',
+                    },
+                  },
+                  {
+                    label: 'No, ordinary shared tenancy is fine',
+                    next: {
+                      q: 'Might you move this workload to containers, Lambda, or a different instance family?',
+                      options: [
+                        {
+                          label: 'Quite possibly',
+                          next: {
+                            result: 'Compute Savings Plan',
+                            detail: 'Up to ~66% off, and the commitment follows you across instance families, Regions, Fargate and Lambda. The flexible default for a changing architecture.',
+                            tone: 'good',
+                          },
+                        },
+                        {
+                          label: 'No, the shape is settled',
+                          next: {
+                            result: 'EC2 Instance Savings Plan or Reserved Instances',
+                            detail: 'Up to ~72% off in exchange for locking to one instance family in one Region. Take the extra discount only when you are genuinely confident nothing will move.',
+                            tone: 'good',
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  }}
+/>
+
+<Scenario
+  who="A visual-effects studio rendering frames for television"
+  problem="Rendering runs in enormous overnight bursts — three thousand instance-hours between 7pm and 6am, and almost nothing during the day. They currently run 60 On-Demand instances continuously because setting them up each evening was too much work, and the monthly bill has become the studio's second-largest expense."
+  solution="A small On-Demand baseline runs the job scheduler and the asset database. The render fleet moves to a Spot Fleet spread across six instance types in three Availability Zones. Each frame is an independent unit of work written to S3 on completion, so a reclaimed instance costs at most one unfinished frame, which is simply requeued."
+  outcome="Render compute costs drop by roughly 85%. Interruptions happen most nights and nobody notices, because the queue reassigns the frame within seconds."
+>
+The property that made this work was not the studio's cleverness — it was that **a frame is
+independent**. Ask that question first about any candidate for Spot: if one unit of work is
+lost, can it simply be done again?
+</Scenario>
+
+<Quiz
+  question="A company runs a batch data-processing job every night. The job is fault-tolerant: any task that fails is automatically retried from the last checkpoint. The company wants the lowest possible compute cost. Which purchasing option should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'Spot Instances',
+      correct: true,
+      why: 'Fault tolerance with automatic retry is precisely the property Spot requires. The discount reaches 90%, far beyond anything a commitment can offer.',
+    },
+    {
+      text: 'Reserved Instances for three years, all upfront',
+      why: 'A large discount, but the job only runs at night — you would be paying a committed rate around the clock for capacity used a few hours a day. It also ignores that the workload can tolerate interruption, which is worth more.',
+    },
+    {
+      text: 'On-Demand Instances',
+      why: 'Correct in the sense that it works, but it is the most expensive per hour. The question explicitly asks for the lowest cost, and the workload has the one characteristic that unlocks the biggest discount.',
+    },
+    {
+      text: 'Dedicated Hosts',
+      why: 'The most expensive option available, and it solves a licensing problem the question never mentions.',
+    },
+  ]}
+  explain="Scan for the word that unlocks Spot: <strong>fault-tolerant, interruptible, stateless, can be retried, flexible start and end times.</strong> When one of those appears next to a request for lowest cost, the answer is Spot."
+/>
+
+<Quiz
+  question="A company has a steady production workload running 24/7 on EC2. Over the next year they plan to migrate parts of it to AWS Fargate and AWS Lambda, but the timing is uncertain. They want to reduce compute costs now without risking a wasted commitment. What should they purchase?"
+  choose={1}
+  options={[
+    {
+      text: 'A Compute Savings Plan',
+      correct: true,
+      why: 'Compute Savings Plans apply to EC2, Fargate and Lambda alike, and are not tied to an instance family or Region. The commitment keeps paying off after the migration, which is exactly the uncertainty described.',
+    },
+    {
+      text: 'An EC2 Instance Savings Plan',
+      why: 'It offers a slightly larger discount, but it applies only to EC2 within one instance family and Region. As soon as the workload moves to Fargate or Lambda, that portion of the commitment stops being used.',
+    },
+    {
+      text: 'Standard Reserved Instances for three years',
+      why: 'The longest and least flexible commitment available, made against a specific instance family, at the exact moment the company has told you the architecture is about to change.',
+    },
+    {
+      text: 'Spot Instances',
+      why: 'This is a steady production workload with no mention of interruption tolerance. Spot would trade an availability risk they have not accepted for a discount they did not ask for.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Every EC2 discount is bought with one of two currencies: <strong>a commitment of time</strong>, or <strong>tolerance of interruption</strong>.',
+    '<strong>On-Demand</strong> — no commitment, highest hourly price. Right for short-lived, unpredictable and new workloads. Switching it off beats most discounts.',
+    '<strong>Savings Plans</strong> — commit £/hour for 1 or 3 years, up to 72% off. <em>Compute</em> SP also covers Fargate and Lambda; <em>EC2 Instance</em> SP discounts more but locks the family.',
+    '<strong>Reserved Instances</strong> — the older equivalent, tied to a family and Region, and the only one that can be resold on the Marketplace.',
+    '<strong>Spot</strong> — up to 90% off with a <strong>two-minute</strong> reclaim notice. Only for work where one lost unit can simply be redone.',
+    '<strong>Dedicated Hosts</strong> — most expensive, chosen for <strong>per-socket licensing and compliance</strong>, never for cost or speed.',
+  ]}
+/>

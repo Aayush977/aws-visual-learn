@@ -1,0 +1,273 @@
+---
+title: Ways to Deploy and Operate on AWS
+summary: Four ways to talk to AWS, three ways to describe infrastructure, and the services that watch it once it is running. The plumbing every other lesson quietly assumes.
+exams: [CCP, SAA]
+track: foundations
+order: 20
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 2 — Design Resilient Architectures'
+minutes: 11
+hook: Clicking in the console does not scale and cannot be reviewed. Everything past your first week is about describing infrastructure in a file.
+updated: 2026-08-11
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+Every lesson so far has described *what* AWS offers. This one is about *how you actually talk to
+it* — which sounds like plumbing, and is in fact an entire exam task statement, because the
+choice between clicking and describing is the difference between an estate you can reason about
+and one you cannot.
+
+Underneath, there is only one AWS: **every route ends at the same API.** The console is a
+website that calls it, the CLI is a program that calls it, CloudFormation is a file that calls
+it. Nothing can be done in one that cannot be done in another.
+
+<Diagram
+  title="Four front doors, one API"
+  viewBox="0 40 1040 520"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'The Management Console',
+      body: 'A web interface. Ideal for learning, exploring, and reading dashboards — and the worst possible way to build anything you will need to reproduce, because nothing records what you clicked.',
+      flow: 'w-console',
+    },
+    {
+      title: 'The AWS CLI',
+      body: 'The same operations from a terminal, scriptable and repeatable. <code>aws s3 ls</code>. This is where most people move once "do that again, but in the test account" comes up.',
+      flow: 'w-cli',
+    },
+    {
+      title: 'The SDKs',
+      body: 'Libraries for Python (boto3), JavaScript, Java, Go and the rest, so your <em>application</em> can call AWS. A Lambda function writing to DynamoDB is using an SDK.',
+      flow: 'w-sdk',
+    },
+    {
+      title: 'Infrastructure as Code',
+      body: '<strong>AWS CloudFormation</strong> takes a YAML or JSON template describing what you want and makes reality match it. The template is reviewable, diffable and version-controlled — infrastructure becomes a pull request.',
+      flow: 'w-cfn',
+      duration: 1400,
+    },
+    {
+      title: 'All four hit the same API',
+      body: 'Which means <strong>IAM applies identically to all of them</strong>, and <strong>CloudTrail records all of them</strong>. There is no back door: a permission you deny in the console is denied to the CLI too.',
+      flow: 'w-api',
+      duration: 1400,
+    },
+  ]}
+  caption="Because everything funnels through one API, a permission or an audit trail applies everywhere at once — a property worth quite a lot."
+>
+  <Node x={130} y={110} w={210} h={80} label="Management Console" sub="click it" icon="eye" tone="muted" step={1} />
+  <Node x={130} y={225} w={210} h={80} label="AWS CLI" sub="script it" icon="code" tone="blue" step={2} />
+  <Node x={130} y={340} w={210} h={80} label="SDKs" sub="your app calls it" icon="lambda" tone="purple" step={3} />
+  <Node x={130} y={455} w={210} h={80} label="CloudFormation" sub="describe it in a file" icon="file" tone="orange" step={4} />
+
+  <Node x={560} y={282} w={200} h={100} label="The AWS API" sub="one surface" icon="cloud" tone="green" step={5} />
+
+  <Boundary x={800} y={170} w={220} h={230} label="Applies to all of it" tone="teal" step={5} />
+  <Node x={910} y={250} w={180} h={70} label="IAM" sub="who may" icon="key" tone="teal" step={5} />
+  <Node x={910} y={340} w={180} h={70} label="CloudTrail" sub="who did" icon="file" tone="teal" step={5} />
+
+  <Wire id="w-console" from={[235, 110]} to={[460, 250]} shape="elbow-h" mid={400} tone="muted" step={1} />
+  <Wire id="w-cli" from={[235, 225]} to={[460, 270]} shape="elbow-h" mid={400} tone="blue" step={2} />
+  <Wire id="w-sdk" from={[235, 340]} to={[460, 295]} shape="elbow-h" mid={400} tone="purple" step={3} />
+  <Wire id="w-cfn" from={[235, 455]} to={[460, 315]} shape="elbow-h" mid={400} tone="orange" step={4} />
+  <Wire id="w-api" from={[660, 282]} to={[798, 285]} tone="green" step={5} />
+</Diagram>
+
+## Infrastructure as code, and why it matters more than it sounds
+
+**AWS CloudFormation** takes a template — YAML or JSON — describing the resources you want, and
+creates them as a **stack**. Change the template and it works out the difference; delete the
+stack and it removes everything it created.
+
+The properties that make this a different way of working:
+
+- **Repeatable.** The same template builds identical development, test and production
+  environments. "It works in test" stops being a coincidence.
+- **Reviewable.** Infrastructure changes arrive as a diff someone can read before they happen.
+- **Reversible.** A failed stack update rolls back automatically.
+- **Free.** You pay only for the resources it creates.
+
+Related names worth recognising:
+
+- **AWS CDK** — write the infrastructure in TypeScript, Python or Java and have it *generate*
+  CloudFormation. For teams who would rather use a programming language than YAML.
+- **AWS SAM** — a slimmer template dialect specifically for serverless applications.
+- **AWS Elastic Beanstalk** — you hand it application code, it provisions and manages the EC2
+  instances, load balancer, Auto Scaling group and monitoring for you. **Platform as a Service**,
+  and it is itself built on CloudFormation. Free; you pay for the resources underneath.
+
+<Callout type="exam">
+The pairing to keep straight: <strong>CloudFormation provisions infrastructure from a
+template</strong>. <strong>Elastic Beanstalk deploys an application</strong> and creates the
+infrastructure for you as a side effect. If a question says "the developer wants to upload code
+and not think about infrastructure", it is Beanstalk. If it says "provision a repeatable
+environment", it is CloudFormation.
+</Callout>
+
+## Operating what you deployed
+
+Deployment is the easy half. Four services cover running it, and the exam separates them
+cleanly:
+
+| Service | Answers |
+| --- | --- |
+| **Amazon CloudWatch** | "Is it healthy?" Metrics, logs, alarms, dashboards |
+| **AWS CloudTrail** | "Who changed it?" The API audit trail |
+| **AWS Systems Manager** | "Do the thing, on all of them." Patching, run commands, session access, parameters |
+| **AWS Trusted Advisor** | "What should we fix?" Best-practice checks across five categories |
+
+**CloudWatch** is the one worth a little more detail, because it appears constantly:
+
+- **Metrics** — numbers over time. CPU, request count, queue depth. Basic monitoring is every
+  5 minutes; **detailed monitoring** is every 1 minute and costs extra.
+- **Alarms** — thresholds that trigger an action: notify an SNS topic, scale an Auto Scaling
+  group, stop or reboot an instance.
+- **Logs** — application and system logs, searchable, with retention you set. Note that getting
+  OS-level metrics such as **memory usage** requires installing the **CloudWatch agent** — memory
+  is not visible to the hypervisor.
+- **EventBridge** — reacts to *events* (a state change, a schedule) rather than thresholds.
+
+**AWS Systems Manager** is a bundle rather than one thing, and three parts get named:
+
+- **Patch Manager** — patch a whole fleet on a schedule.
+- **Session Manager** — a shell on an instance **without SSH, without a bastion host, and without
+  opening port 22**, fully logged. A recurring right answer.
+- **Parameter Store** — free configuration and secret storage.
+
+<Mnemonic
+  title="Which operations service?"
+  phrase="Watch the Health, Trail the Hands, Manage the Fleet"
+  tone="teal"
+  items={[
+    { key: 'W', term: 'CloudWatch', note: 'metrics, logs, alarms, dashboards — is it healthy?' },
+    { key: 'T', term: 'CloudTrail', note: 'API calls — who did what, when?' },
+    { key: 'M', term: 'Systems Manager', note: 'act on the fleet — patch, run commands, shell in without SSH' },
+    { key: 'A', term: 'Trusted Advisor', note: 'best-practice checks — cost, performance, security, fault tolerance, limits' },
+  ]}
+/>
+
+<Callout type="gotcha">
+CloudWatch does <strong>not</strong> report memory or disk usage from inside an EC2 instance by
+default — the hypervisor cannot see them. A question about monitoring memory is asking you to
+install the <strong>CloudWatch agent</strong>.
+</Callout>
+
+## Where AWS runs when it is not a Region
+
+Three names for AWS outside the usual Regions, tested by their one-line purpose:
+
+- **AWS Outposts** — actual AWS racks installed **in your own data centre**, running the same
+  APIs. For workloads that must stay on-premises for latency or data residency.
+- **AWS Local Zones** — a small AWS footprint in a metropolitan area, for single-digit
+  millisecond latency to a nearby city.
+- **AWS Wavelength** — AWS infrastructure inside **5G mobile networks**, for ultra-low latency to
+  mobile devices.
+
+<Scenario
+  who="A team whose staging environment never matched production"
+  problem="Both environments had been built by clicking through the console, eighteen months apart, by two people who had since left. Staging had a different instance type, a security group nobody could explain and no encryption on its volumes. Releases passed in staging and failed in production roughly one time in four, and each investigation started with an afternoon of comparing screenshots."
+  solution="They wrote one CloudFormation template with a parameter for environment size, and rebuilt both environments from it. Deployments moved to Elastic Beanstalk so application releases stopped touching infrastructure at all. CloudWatch alarms on error rate and latency, plus Systems Manager Session Manager, replaced the shared SSH key and bastion host."
+  outcome="Staging and production now differ only by the parameters passed to one template. Environment drift stopped being a category of incident, and closing port 22 removed a standing audit finding."
+>
+The point is not that CloudFormation is clever — it is that <strong>an environment that exists
+only as a series of past clicks cannot be reasoned about</strong>. That is the Operational
+Excellence pillar in one story.
+</Scenario>
+
+<Quiz
+  question="A developer wants to deploy a web application to AWS by uploading their code. They do not want to configure EC2 instances, load balancers or Auto Scaling groups, but they do want to be able to access those resources later if needed. Which service should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'AWS Elastic Beanstalk',
+      correct: true,
+      why: 'Beanstalk provisions and manages the instances, load balancer, Auto Scaling group and monitoring from uploaded code, while leaving the underlying resources visible and accessible in your account.',
+    },
+    {
+      text: 'AWS CloudFormation',
+      why: 'CloudFormation would create the infrastructure, but the developer would have to write the template describing all of it — which is precisely the work they want to avoid.',
+    },
+    {
+      text: 'Amazon EC2 with an Auto Scaling group',
+      why: 'This is the manual approach: they would configure the AMI, the launch template, the load balancer and the scaling policies themselves.',
+    },
+    {
+      text: 'AWS Lambda',
+      why: 'Lambda runs functions in response to events and imposes a 15-minute limit and a different application model. It is not a way to deploy a conventional web application unchanged.',
+    },
+  ]}
+  explain="<strong>Beanstalk = give it code, get an environment. CloudFormation = give it a template, get infrastructure.</strong> Both are free; you pay for what they create."
+/>
+
+<Quiz
+  question="An operations team must connect to a shell on EC2 instances in private subnets for troubleshooting. Security requires that port 22 is not open and that no bastion host is maintained, and that all session activity is logged. What should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'AWS Systems Manager Session Manager',
+      correct: true,
+      why: 'Session Manager gives a browser or CLI shell through the SSM agent, requiring no inbound ports, no bastion host and no SSH keys, and it logs session activity to S3 or CloudWatch Logs.',
+    },
+    {
+      text: 'A bastion host in a public subnet with a restricted security group',
+      why: 'This works and is the traditional pattern, but the question explicitly rules out maintaining a bastion host.',
+    },
+    {
+      text: 'Open port 22 to the corporate IP range only',
+      why: 'This still opens port 22, which the requirement forbids, and it leaves SSH key management in place.',
+    },
+    {
+      text: 'AWS Direct Connect to the VPC',
+      why: 'Direct Connect provides a private network link from a data centre to AWS. It does not by itself provide shell access or session logging.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="Which statements about interacting with AWS are correct? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'The console, CLI, SDKs and CloudFormation all ultimately call the same AWS APIs',
+      correct: true,
+      why: 'There is one API surface. This is why IAM permissions and CloudTrail auditing apply identically no matter which route was used.',
+    },
+    {
+      text: 'Amazon CloudWatch does not collect EC2 memory utilisation without the CloudWatch agent',
+      correct: true,
+      why: 'Memory and disk usage are inside the guest operating system and invisible to the hypervisor, so the agent must be installed to report them.',
+    },
+    {
+      text: 'AWS CloudFormation charges an hourly fee per stack',
+      why: 'CloudFormation itself is free. You pay only for the resources the template creates.',
+    },
+    {
+      text: 'AWS Outposts is a Region designed for low-latency access from mobile 5G networks',
+      why: 'That describes AWS Wavelength. Outposts is AWS hardware installed in your own data centre.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Four front doors — <strong>console, CLI, SDKs, CloudFormation</strong> — and <strong>one API</strong> behind them, so IAM and CloudTrail cover all of them equally.',
+    '<strong>CloudFormation</strong> provisions infrastructure from a template: repeatable, reviewable, reversible, and free. <strong>CDK</strong> generates it from real code.',
+    '<strong>Elastic Beanstalk</strong> takes code and builds the environment for you — the answer when a developer does not want to think about infrastructure.',
+    '<strong>CloudWatch = health</strong> (metrics, logs, alarms) · <strong>CloudTrail = who</strong> · <strong>Systems Manager = act on the fleet</strong> · <strong>Trusted Advisor = what to fix</strong>.',
+    'CloudWatch needs the <strong>agent</strong> for memory and disk. Detailed monitoring is 1-minute and costs extra.',
+    '<strong>Session Manager</strong> gives a logged shell with <strong>no SSH, no bastion, no open port 22</strong>.',
+    'Outside Regions: <strong>Outposts</strong> in your data centre · <strong>Local Zones</strong> near a city · <strong>Wavelength</strong> inside 5G networks.',
+  ]}
+/>

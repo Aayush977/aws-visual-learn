@@ -1,0 +1,363 @@
+---
+title: EC2, Containers or Lambda?
+summary: The three ways to run code on AWS are one spectrum, not three products. Where you sit on it decides what you patch, what you pay for while idle, and what you are allowed to do.
+exams: [CCP, SAA]
+track: compute
+order: 10
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 2 — Design Resilient Architectures'
+minutes: 12
+hook: The question is never "which is best". It is "how much of this machine do I actually want to be responsible for?"
+updated: 2026-08-08
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import DecisionTree from '../../components/DecisionTree.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+AWS has dozens of ways to run code, and they intimidate people because they look like dozens
+of unrelated products. They are not. They are **positions on a single line**, and the line
+measures one thing: how much of the machine you are still holding.
+
+Every step along it takes work away from you and takes control away with it. That is the
+entire trade, and every exam question about compute is a disguised question about where on
+this line the scenario belongs.
+
+<Diagram
+  title="The compute spectrum: what you keep, what AWS takes"
+  viewBox="0 60 1100 380"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'EC2 — a virtual server',
+      body: 'A machine, with an operating system you chose. You install what you like and it runs until you stop it. Maximum control, and <strong>you patch the OS forever</strong>.',
+    },
+    {
+      title: 'Containers on EC2 — ECS or EKS',
+      body: 'Your app is packaged with its dependencies and packed alongside other containers on the same instances. Far better use of each machine — but the machines are still <strong>yours to patch and scale</strong>.',
+    },
+    {
+      title: 'Fargate — containers with no machines',
+      body: 'The same container image, but you never see an instance. You state how much CPU and memory a task needs and AWS finds somewhere to run it. <strong>Serverless containers.</strong>',
+    },
+    {
+      title: 'Lambda — just the function',
+      body: 'No server, no container to build, no capacity to choose. Your function runs when something calls it and you are billed per millisecond of execution. <strong>Nothing runs, nothing is billed.</strong>',
+    },
+    {
+      title: 'The line only trades one thing',
+      body: 'Left to right: less operational work, and less control. You cannot buy one without spending the other — which is why "best" is meaningless and "right for this workload" is the only real question.',
+    },
+  ]}
+  caption="The bottom row is the one that decides most real architectures: is anyone paying for this while it sits doing nothing?"
+>
+  <Node x={300} y={110} w={190} h={66} label="EC2" sub="virtual servers" icon="server" tone="orange" step={1} />
+  <Node x={510} y={110} w={190} h={66} label="ECS / EKS on EC2" sub="containers" icon="container" tone="blue" step={2} />
+  <Node x={720} y={110} w={190} h={66} label="AWS Fargate" sub="serverless containers" icon="container" tone="teal" step={3} />
+  <Node x={930} y={110} w={190} h={66} label="AWS Lambda" sub="functions" icon="lambda" tone="purple" step={4} />
+
+  <Node x={105} y={210} w={180} h={48} label="Patch the OS?" tone="muted" step={1} />
+  <Node x={300} y={210} w={190} h={48} label="You do" tone="orange" step={1} />
+  <Node x={510} y={210} w={190} h={48} label="You do" tone="orange" step={2} />
+  <Node x={720} y={210} w={190} h={48} label="AWS does" tone="teal" step={3} />
+  <Node x={930} y={210} w={190} h={48} label="AWS does" tone="teal" step={4} />
+
+  <Node x={105} y={268} w={180} h={48} label="Choose capacity?" tone="muted" step={1} />
+  <Node x={300} y={268} w={190} h={48} label="Instance size" tone="orange" step={1} />
+  <Node x={510} y={268} w={190} h={48} label="Instance size" tone="orange" step={2} />
+  <Node x={720} y={268} w={190} h={48} label="CPU per task" tone="orange" step={3} />
+  <Node x={930} y={268} w={190} h={48} label="Memory only" tone="teal" step={4} />
+
+  <Node x={105} y={326} w={180} h={48} label="Billed when idle?" tone="muted" step={1} />
+  <Node x={300} y={326} w={190} h={48} label="Yes — per second" tone="red" step={1} />
+  <Node x={510} y={326} w={190} h={48} label="Yes — per second" tone="red" step={2} />
+  <Node x={720} y={326} w={190} h={48} label="Yes — per second" tone="red" step={3} />
+  <Node x={930} y={326} w={190} h={48} label="No — nothing runs" tone="green" step={4} />
+
+  <Wire
+    id="w-spectrum"
+    from={[205, 395]}
+    to={[1025, 395]}
+    tone="purple"
+    step={5}
+    label="less to operate · less control"
+    labelDy={22}
+  />
+</Diagram>
+
+## EC2 — the one that feels like a server, because it is one
+
+**Amazon EC2** (Elastic Compute Cloud) gives you a virtual machine. You choose the operating
+system, the size, the disk, and the network it sits in, and then it is yours: log in, install
+things, and it keeps running until you stop it.
+
+Instance types are named in a pattern worth being able to read, because questions quote them
+without explanation. In `m5.large`:
+
+- **`m`** is the *family* — what the machine is optimised for.
+- **`5`** is the *generation*. Higher is newer, and usually cheaper per unit of work.
+- **`large`** is the *size*. Each step up roughly doubles CPU and memory, and the price.
+
+<Mnemonic
+  title="EC2 instance families"
+  phrase="Cheap Machines Rarely Get Idle Time"
+  tone="teal"
+  items={[
+    { key: 'C', term: 'C — Compute optimised', note: 'high CPU per £: batch processing, game servers, scientific modelling' },
+    { key: 'M', term: 'M — General purpose', note: 'balanced CPU and memory: web servers, small databases, the sensible default' },
+    { key: 'R', term: 'R — Memory optimised', note: 'lots of RAM: in-memory caches, large databases, real-time analytics' },
+    { key: 'G', term: 'G / P — Accelerated (GPU)', note: 'machine learning, rendering, video transcoding' },
+    { key: 'I', term: 'I / D — Storage optimised', note: 'very fast local disks: data warehouses, high-IOPS NoSQL' },
+    { key: 'T', term: 'T — Burstable', note: 'cheap, idles most of the time, earns credits to burst: dev boxes, low-traffic sites' },
+  ]}
+/>
+
+<Callout type="gotcha">
+`t` instances are the trap. They are cheap because they assume you are mostly idle — they
+accumulate **CPU credits** while quiet and spend them when busy. Run a `t3.micro` flat out
+and it will exhaust its credits and be throttled to a fraction of a CPU, or silently charge
+you for extra credits. Excellent for a dev box; wrong for a steady production load.
+</Callout>
+
+## Containers — the same app, packed more tightly
+
+A container is your application plus everything it needs to run, sealed into an image that
+behaves identically wherever it lands. That solves "it worked on my laptop", and it lets you
+run six applications on one machine without them fighting over library versions.
+
+AWS gives you two orchestrators — the thing that decides which container runs where, restarts
+the ones that die, and replaces them during a deployment:
+
+| | **Amazon ECS** | **Amazon EKS** |
+| --- | --- | --- |
+| What it is | AWS's own container orchestrator | Managed **Kubernetes** |
+| Reach for it when | You want the simplest path and you are all-in on AWS | You already use Kubernetes, or need to stay portable across clouds |
+| Cost of the control plane | Free | An hourly charge per cluster |
+| Learning curve | Modest | Substantial |
+
+Both can run their containers in one of two places, and **this is the distinction the exam
+actually tests**:
+
+- **On EC2 launch type** — the containers run on instances *you* own and can log into. You
+  pick their size, you patch them, you pay for them whether or not a container is on them.
+- **On Fargate** — you never see an instance. You declare "this task needs 0.5 vCPU and 1 GB"
+  and AWS runs it somewhere. No patching, no capacity planning, a higher price per unit of
+  compute, and no way to log into the host.
+
+<Callout type="exam">
+"The company wants to run containers but does not want to manage the underlying servers or
+patch operating systems" → **Fargate**. It is one of the most reliably worded questions on
+the SAA exam, and the words "manage the underlying infrastructure" are the tell.
+</Callout>
+
+## Lambda — code without a server in sight
+
+With **AWS Lambda** you upload a function, connect it to something that triggers it — an HTTP
+request through API Gateway, a file landing in S3, a message on a queue, a timer — and AWS
+runs it on demand. You are billed for the number of invocations and the milliseconds each one
+took, rounded to the nearest millisecond.
+
+When nothing calls it, you pay **nothing at all**. Not a reduced rate — nothing. For workloads
+that are quiet most of the day, this is not a small saving; it can be the difference between
+£300 a month and 40p.
+
+The constraints are what push workloads back off Lambda, and they are examinable:
+
+- **15-minute maximum** per invocation. A four-hour video transcode cannot be one Lambda.
+- **10 GB memory maximum**, and CPU is allocated in proportion to memory — you tune speed by
+  buying memory.
+- **Ephemeral**. Nothing you write to local disk survives reliably. State goes to S3, DynamoDB
+  or somewhere else outside the function.
+- **Cold starts.** The first invocation after a quiet period pays a start-up penalty, from
+  milliseconds to a couple of seconds depending on runtime. *Provisioned Concurrency* keeps
+  instances warm if that latency matters.
+
+<Callout type="gotcha">
+Serverless does not mean there is no server. It means <em>you</em> have no server: nothing to
+choose, nothing to patch, nothing to pay for while idle, and scaling that happens without you
+configuring it. Judge a service by those four properties, not by the marketing word.
+</Callout>
+
+## So which one?
+
+<DecisionTree
+  title="Which compute service should I use?"
+  intro="Walk it from the top. Most real workloads land in two or three clicks."
+  tree={{
+    q: 'Does the workload run constantly, or only when something triggers it?',
+    hint: 'Be honest about the quiet hours — that is where the cost difference lives.',
+    options: [
+      {
+        label: 'Only in response to events',
+        note: 'file uploads, API calls, scheduled jobs',
+        next: {
+          q: 'Can each individual run finish within 15 minutes?',
+          options: [
+            {
+              label: 'Yes, comfortably',
+              next: {
+                result: 'AWS Lambda',
+                detail: 'No servers, no idle cost, scales automatically. The cheapest and least operationally demanding option for spiky, event-driven work.',
+                tone: 'good',
+              },
+            },
+            {
+              label: 'No — some runs take hours',
+              next: {
+                result: 'Fargate task, or an EC2 batch job',
+                detail: 'Lambda’s 15-minute ceiling is hard. Run the job as a container task on Fargate (or AWS Batch), which starts on demand and stops when finished — event-driven, without the time limit.',
+                tone: 'good',
+              },
+            },
+          ],
+        },
+      },
+      {
+        label: 'It runs continuously',
+        note: 'a web application, an API, a background worker',
+        next: {
+          q: 'Do you need control of the operating system — a specific kernel, an agent, licensed software tied to hardware?',
+          options: [
+            {
+              label: 'Yes, I need OS-level access',
+              next: {
+                result: 'Amazon EC2',
+                detail: 'The only option that gives you the operating system. Put it in an Auto Scaling group across two Availability Zones so it is still highly available.',
+                tone: 'good',
+              },
+            },
+            {
+              label: 'No — I just need my app to run',
+              next: {
+                q: 'Are you already using Kubernetes, or do you need to stay portable to another cloud?',
+                options: [
+                  {
+                    label: 'Yes, Kubernetes matters to us',
+                    next: {
+                      result: 'Amazon EKS, on Fargate',
+                      detail: 'Managed Kubernetes control plane, with Fargate underneath so there are still no instances to patch. Pay the cluster fee and the complexity for genuine portability.',
+                      tone: 'warn',
+                    },
+                  },
+                  {
+                    label: 'No, we are happy on AWS',
+                    next: {
+                      result: 'Amazon ECS on Fargate',
+                      detail: 'Containers with nothing underneath them to own. The lowest-effort way to run a long-lived application on AWS, and the default worth arguing against rather than for.',
+                      tone: 'good',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  }}
+/>
+
+<Scenario
+  who="A company that processes insurance claim photographs"
+  problem="Claims arrive in bursts — nothing overnight, then two thousand photos between 9am and 11am. Each photo needs resizing, an OCR pass, and a fraud-detection model that takes about 40 minutes to run. Today it all sits on four EC2 instances sized for the 11am peak, running all night doing nothing."
+  solution="Resizing and OCR become Lambda functions triggered by the photo landing in S3 — seconds each, thousands in parallel, nothing running at 3am. The 40-minute fraud model becomes a Fargate task pulled from an SQS queue, started on demand and stopped when the queue empties."
+  outcome="Overnight compute cost goes to zero, the 9am burst is absorbed by Lambda scaling out automatically, and the four permanently-on instances are decommissioned."
+>
+Note that this workload was split across **two** compute services rather than forced into
+one. The 15-minute Lambda ceiling was the deciding fact for the fraud model — and recognising
+that ceiling is exactly what the corresponding exam question is checking.
+</Scenario>
+
+<Quiz
+  question="A company wants to run a containerised application on AWS. They have no Kubernetes experience and do not want to provision, patch or scale any EC2 instances. Which combination should a solutions architect recommend?"
+  choose={1}
+  options={[
+    {
+      text: 'Amazon ECS with the Fargate launch type',
+      correct: true,
+      why: 'ECS is the simpler orchestrator for a team with no Kubernetes background, and Fargate removes the instances entirely — nothing to provision, patch or scale.',
+    },
+    {
+      text: 'Amazon ECS with the EC2 launch type',
+      why: 'ECS is the right orchestrator, but the EC2 launch type means the container instances are yours: you size them, patch them and scale them. That is exactly what the company ruled out.',
+    },
+    {
+      text: 'Amazon EKS with self-managed node groups',
+      why: 'Two problems. EKS is Kubernetes, which the team does not know, and self-managed nodes are EC2 instances they would have to patch.',
+    },
+    {
+      text: 'EC2 instances in an Auto Scaling group running Docker',
+      why: 'Auto Scaling handles the scaling, but the instances still exist and still need patching — and you have taken on writing your own orchestration.',
+    },
+  ]}
+  explain="Two independent choices, every time: <strong>which orchestrator</strong> (ECS = simple, EKS = Kubernetes) and <strong>what it runs on</strong> (EC2 = your instances, Fargate = none). Questions usually constrain both."
+/>
+
+<Quiz
+  question="An application processes uploaded video files. Each file takes between 20 and 90 minutes to transcode. The team currently uses AWS Lambda and is seeing failures. What is the most likely cause, and what should they do?"
+  choose={1}
+  options={[
+    {
+      text: 'Lambda functions time out after 15 minutes; move the transcoding to a container task on Fargate or AWS Batch',
+      correct: true,
+      why: 'The 15-minute maximum execution time is a hard limit that cannot be raised. Any job that legitimately runs longer must move to a service without that ceiling.',
+    },
+    {
+      text: 'The function has insufficient memory; increase it to 10 GB',
+      why: 'More memory does allocate more CPU and would speed the job up, but not by a factor of six — and 90 minutes would still exceed the timeout regardless of memory.',
+    },
+    {
+      text: 'Enable Provisioned Concurrency to remove cold starts',
+      why: 'Provisioned Concurrency addresses start-up latency, measured in hundreds of milliseconds. It has no effect on how long a running function is permitted to execute.',
+    },
+    {
+      text: 'Increase the Lambda concurrency limit for the account',
+      why: 'Concurrency limits govern how many invocations run at the same time, not how long each one may run. Raising it would let more jobs fail simultaneously.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="Which of these characterise a serverless service on AWS? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'There are no operating systems for you to patch',
+      correct: true,
+      why: 'A defining property. If you are responsible for applying OS patches, you are not on a serverless service.',
+    },
+    {
+      text: 'You are not charged while the workload is idle',
+      correct: true,
+      why: 'The second defining property, and usually the one that decides the architecture. Lambda charges per invocation and per millisecond, so an idle function costs nothing.',
+    },
+    {
+      text: 'The code does not run on a physical server anywhere',
+      why: 'It certainly does. "Serverless" describes what you are responsible for, not the absence of hardware — this wording is a deliberate distractor.',
+    },
+    {
+      text: 'The service is always cheaper than an equivalent EC2 instance',
+      why: 'Not always. A workload that is genuinely busy 24 hours a day can cost more per unit of compute on Lambda or Fargate than on a well-sized, committed EC2 instance.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'One spectrum, not three products: <strong>EC2 → containers on EC2 → Fargate → Lambda</strong>. Each step removes work and removes control together.',
+    '<strong>EC2</strong> when you need the operating system. Read the name: family, generation, size — and beware <code>t</code> instances’ CPU credits under steady load.',
+    'Orchestrator and host are <strong>separate choices</strong>. ECS or EKS decides <em>who schedules</em>; EC2 or Fargate decides <em>what it runs on</em>.',
+    '"No servers to manage or patch" → <strong>Fargate</strong>. "Run code in response to events, pay nothing when idle" → <strong>Lambda</strong>.',
+    'Lambda’s hard limits: <strong>15 minutes</strong>, 10 GB memory, no durable local disk. A job that outgrows any of these moves to a container.',
+    'Serverless means <strong>nothing to patch, nothing to size, nothing billed when idle, scaling you did not configure</strong> — not the absence of servers.',
+  ]}
+/>

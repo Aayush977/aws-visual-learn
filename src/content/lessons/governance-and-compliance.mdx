@@ -1,0 +1,277 @@
+---
+title: Governance, Compliance and Auditing
+summary: Who did what, does it still match policy, and can you prove it to an auditor? CloudTrail, Config, Organizations, Control Tower, Artifact and Audit Manager, in the order you would actually adopt them.
+exams: [CCP, SAA]
+track: security
+order: 50
+domains:
+  CCP: 'Domain 2 — Security and Compliance'
+  SAA: 'Domain 1 — Design Secure Architectures'
+minutes: 11
+hook: CloudTrail says who did it. Config says what it looks like now. Auditors want both, in writing.
+updated: 2026-08-11
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+Security services stop bad things happening. **Governance** is the separate question of whether
+you can *demonstrate* that your account looks the way you claim it does — to a regulator, an
+auditor, or your own security team six months after everyone forgot what they configured.
+
+The Cloud Practitioner exam leans on this more heavily than people expect, and it does it with
+four services that are easy to blur together.
+
+<Diagram
+  title="Four different records of the same account"
+  viewBox="0 40 1040 540"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'CloudTrail — the log of who did what',
+      body: 'Every API call in the account: the identity, the action, the source IP, the timestamp. It is on by default for the last 90 days of management events; create a <strong>trail</strong> to keep them in S3 indefinitely. This is the <strong>audit</strong> record.',
+      flow: 'w-api-ct',
+    },
+    {
+      title: 'Config — the record of what things look like',
+      body: '<strong>AWS Config</strong> records the configuration of every resource over time, so you can ask "what did this security group look like in March?" — and it evaluates <strong>rules</strong>, flagging anything non-compliant, such as an unencrypted volume or a public bucket.',
+      flow: 'w-res-cfg',
+      duration: 1400,
+    },
+    {
+      title: 'Organizations — the boundary nothing escapes',
+      body: 'Multiple accounts under one roof, with <strong>Service Control Policies</strong> setting the maximum permissions any account may have. Prevention rather than detection: an action outside the guardrail simply cannot happen.',
+      flow: 'w-scp',
+    },
+    {
+      title: 'Control Tower — the whole thing, set up for you',
+      body: 'Builds a multi-account landing zone with Organizations, CloudTrail, Config and a catalogue of <strong>guardrails</strong> already wired together, and an Account Factory for provisioning new accounts that comply from birth.',
+      flow: 'w-ct-all',
+      duration: 1400,
+    },
+    {
+      title: 'Artifact and Audit Manager — the paperwork',
+      body: '<strong>AWS Artifact</strong> is the download portal for AWS’s own compliance reports — SOC, PCI, ISO — the evidence that <em>AWS</em> is compliant. <strong>Audit Manager</strong> continuously collects evidence that <em>you</em> are.',
+      flow: ['w-art', 'w-am'],
+      duration: 1400,
+    },
+  ]}
+  caption="The split that decides most questions: CloudTrail is an event log, Config is a state record. Auditors nearly always want both."
+>
+  <Node x={90} y={140} w={150} h={80} label="Any API call" sub="console · CLI · SDK" icon="code" tone="muted" step={1} />
+  <Node x={90} y={300} w={150} h={80} label="Your resources" icon="server" tone="muted" step={2} />
+
+  <Node x={360} y={140} w={200} h={86} label="CloudTrail" sub="who did what, when" icon="file" tone="orange" step={1} />
+  <Node x={360} y={300} w={200} h={86} label="AWS Config" sub="what it looks like now" icon="eye" tone="teal" step={2} />
+
+  <Boundary x={630} y={80} w={380} h={200} label="AWS Organizations" icon="users" tone="purple" step={3} />
+  <Node x={820} y={180} w={220} h={86} label="Service Control Policies" sub="the hard ceiling" icon="shield" tone="purple" step={3} />
+
+  <Node x={820} y={350} w={220} h={86} label="Control Tower" sub="landing zone + guardrails" icon="gear" tone="blue" step={4} />
+
+  <Node x={360} y={480} w={200} h={86} label="AWS Artifact" sub="AWS's compliance reports" icon="allow" tone="green" step={5} />
+  <Node x={700} y={480} w={220} h={86} label="Audit Manager" sub="evidence that you comply" icon="table" tone="green" step={5} />
+
+  <Wire id="w-api-ct" from={[165, 140]} to={[258, 140]} tone="orange" step={1} />
+  <Wire id="w-res-cfg" from={[165, 300]} to={[258, 300]} tone="teal" step={2} />
+  <Wire id="w-scp" from={[460, 180]} to={[708, 180]} tone="purple" step={3} />
+  <Wire id="w-ct-all" from={[820, 307]} to={[820, 223]} tone="blue" step={4} />
+  <Wire id="w-art" from={[360, 429]} to={[360, 345]} tone="green" step={5} />
+  <Wire id="w-am" from={[560, 343]} to={[700, 435]} shape="elbow-v" mid={420} tone="green" step={5} />
+</Diagram>
+
+## CloudTrail versus Config — the distinction everything else rests on
+
+Both record things. They record **different** things, and swapping them is the single most
+common wrong answer in this area.
+
+| | **AWS CloudTrail** | **AWS Config** |
+| --- | --- | --- |
+| Records | **Events** — API calls | **State** — resource configuration over time |
+| Answers | "*Who* deleted the bucket, and when?" | "*What did* the bucket's settings look like last Tuesday?" |
+| Also does | Delivers logs to S3 and CloudWatch Logs | Evaluates **rules** and flags non-compliance |
+| Default | Last 90 days of management events, free | Off; charged per configuration item recorded |
+
+A useful sentence: **CloudTrail is CCTV of the door; Config is a photograph of the room, taken
+every time anything moves.**
+
+<Callout type="exam">
+Watch for the verb. "<strong>Who</strong> made this change?" and "audit trail of API activity"
+are <strong>CloudTrail</strong>. "<strong>Which</strong> resources are non-compliant?", "alert
+when a security group allows 0.0.0.0/0", and "configuration history" are <strong>Config</strong>.
+</Callout>
+
+## Organizations and Control Tower
+
+**AWS Organizations** groups many AWS accounts, gives you one bill, and — the governance part —
+lets you attach **Service Control Policies** that cap what a member account may ever do. This
+is *preventive*: an action outside the boundary fails, even for that account's root user.
+
+Separate accounts are the strongest isolation boundary AWS offers, so the recommended pattern
+is many accounts (production, development, security, logging) inside one organisation,
+organised into **organizational units** with SCPs attached at the OU level.
+
+**AWS Control Tower** does that setup for you. It creates a **landing zone** — Organizations,
+a log-archive account, an audit account, CloudTrail, Config — plus a catalogue of
+**guardrails** you switch on:
+
+- **Preventive** guardrails are implemented as SCPs. They stop the action.
+- **Detective** guardrails are implemented as Config rules. They report the drift.
+
+Its **Account Factory** provisions new accounts that already comply on day one.
+
+<Callout type="gotcha">
+"Guardrail" is a Control Tower word covering both mechanisms, and the exam sometimes tests which
+is which. <strong>Preventive = SCP = it cannot happen. Detective = Config rule = it happened and
+here is the finding.</strong>
+</Callout>
+
+## Artifact and Audit Manager — two directions of compliance
+
+These sound identical and point in opposite directions.
+
+- **AWS Artifact** is a **download portal**. It gives you AWS's own audit reports — SOC 1/2/3,
+  PCI DSS, ISO 27001, FedRAMP — and lets you accept agreements such as the BAA for HIPAA. This
+  is evidence about **AWS's** side of the shared responsibility model, and it is what you hand
+  an auditor who asks whether your provider is certified.
+- **AWS Audit Manager** continuously collects evidence from **your** account and maps it to a
+  framework (PCI DSS, GDPR, SOC 2, HIPAA), producing an assessment report. This is evidence
+  about **your** side.
+
+<Mnemonic
+  title="Which governance service?"
+  phrase="Trails log Actions, Config logs Appearance, Artifact ships Attestations"
+  tone="teal"
+  items={[
+    { key: 'C', term: 'CloudTrail', note: 'who did what, when — the API event log' },
+    { key: 'C', term: 'AWS Config', note: 'what resources look like over time, and which break your rules' },
+    { key: 'O', term: 'Organizations + SCPs', note: 'the maximum permissions an account may ever have' },
+    { key: 'T', term: 'Control Tower', note: 'sets up the multi-account landing zone with guardrails' },
+    { key: 'A', term: 'Artifact', note: 'download AWS’s compliance reports — evidence about AWS' },
+    { key: 'M', term: 'Audit Manager', note: 'collect evidence about you, mapped to a framework' },
+  ]}
+/>
+
+## The compliance vocabulary the exam uses
+
+You are not expected to know these standards, only to recognise that AWS holds them and where
+to get the paperwork:
+
+- **SOC 1 / 2 / 3** — controls at a service organisation. Available in Artifact.
+- **PCI DSS** — handling card data. AWS is a certified Level 1 Service Provider; you are still
+  responsible for your own application.
+- **ISO 27001** — information security management.
+- **HIPAA** — US health data. AWS supports it under a Business Associate Addendum accepted in
+  Artifact.
+- **GDPR** — EU personal data. AWS provides a Data Processing Addendum; where the data lives is
+  your choice, which is why **Region selection** is a compliance decision.
+
+<Callout type="exam">
+Under the Shared Responsibility Model, <strong>AWS's certifications never make your application
+compliant.</strong> A question describing a company that "must be PCI compliant" is asking about
+what <em>they</em> must configure — Artifact only proves AWS's half.
+</Callout>
+
+<Scenario
+  who="A healthcare startup preparing for its first SOC 2 audit"
+  problem="The auditor asked three questions the team could not answer: who had changed the production database's security group in the last year, whether any S3 bucket had ever been public, and how they could show that AWS's own data centres were certified. They had one AWS account shared by everyone, CloudTrail switched off beyond the default 90 days, and no configuration history at all."
+  solution="They split into separate production, development and logging accounts under Organizations, with an SCP denying anyone the ability to stop CloudTrail. A trail now writes to a locked S3 bucket in the logging account. Config records every resource with rules for public buckets and unencrypted volumes. AWS's SOC 2 report came from Artifact in about a minute, and Audit Manager was pointed at the SOC 2 framework to gather their own evidence continuously."
+  outcome="All three questions became reports rather than archaeology, and the SCP means no future engineer can turn off the audit trail even by accident."
+>
+Notice the ordering. <strong>CloudTrail answered "who", Config answered "what did it look like",
+Artifact covered AWS's half and Audit Manager covered theirs.</strong> Four questions, four
+services, no overlap — which is exactly how these appear on the exam.
+</Scenario>
+
+<Quiz
+  question="An auditor asks a company to demonstrate which IAM user deleted a production S3 bucket and at what time. Which service provides this information?"
+  choose={1}
+  options={[
+    {
+      text: 'AWS CloudTrail',
+      correct: true,
+      why: 'CloudTrail records API activity — the identity that made the call, the action, the source IP and the timestamp. "Who did what, when" is precisely its job.',
+    },
+    {
+      text: 'AWS Config',
+      why: 'Config would tell you the bucket existed and what its configuration was, and that it later disappeared — but the record of which principal issued the delete call is CloudTrail’s.',
+    },
+    {
+      text: 'Amazon CloudWatch',
+      why: 'CloudWatch collects metrics, logs and alarms about performance and operational health. It is not the account audit trail.',
+    },
+    {
+      text: 'AWS Artifact',
+      why: 'Artifact is a portal for downloading AWS’s own compliance reports. It has no visibility of activity in your account.',
+    },
+  ]}
+  explain="The pairing to memorise: <strong>CloudTrail = who did it (events) · Config = what it looked like (state).</strong>"
+/>
+
+<Quiz
+  question="A company must be alerted whenever any EBS volume in the account is created without encryption, and must keep a history of every configuration change to their resources. Which service should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'AWS Config, with a rule evaluating volume encryption',
+      correct: true,
+      why: 'Config records resource configuration over time and continuously evaluates rules, flagging any resource that becomes non-compliant. Both requirements are core Config features.',
+    },
+    {
+      text: 'AWS CloudTrail',
+      why: 'CloudTrail would record the CreateVolume call, but it does not evaluate resources against compliance rules or maintain a configuration history you can query.',
+    },
+    {
+      text: 'Amazon Inspector',
+      why: 'Inspector scans workloads for software vulnerabilities and unintended network exposure, not for resource configuration compliance.',
+    },
+    {
+      text: 'AWS Trusted Advisor',
+      why: 'Trusted Advisor makes best-practice recommendations across five fixed categories, but it does not offer custom rules or a per-resource configuration timeline.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="A company needs to obtain AWS’s SOC 2 report to give to their own auditors. Where do they get it?"
+  choose={1}
+  options={[
+    {
+      text: 'AWS Artifact',
+      correct: true,
+      why: 'Artifact is the self-service portal for AWS’s compliance reports and agreements — SOC, PCI DSS, ISO and others — downloadable on demand from the console.',
+    },
+    {
+      text: 'AWS Audit Manager',
+      why: 'Audit Manager collects evidence about *your* environment against a framework. It does not supply AWS’s own certifications.',
+    },
+    {
+      text: 'AWS Security Hub',
+      why: 'Security Hub aggregates security findings from your account and scores them against standards. It is not a source of AWS corporate audit reports.',
+    },
+    {
+      text: 'By opening a support case with AWS',
+      why: 'Unnecessary — the reports are self-service in Artifact, which is why the service exists.',
+    },
+  ]}
+  explain="Two directions: <strong>Artifact = proof about AWS. Audit Manager = proof about you.</strong>"
+/>
+
+<Takeaways
+  items={[
+    '<strong>CloudTrail = events</strong> ("who deleted it?"). <strong>Config = state</strong> ("what did it look like, and is it compliant?"). Never swap them.',
+    'CloudTrail keeps 90 days of management events free; create a <strong>trail to S3</strong> for longer retention.',
+    '<strong>Organizations + SCPs</strong> set a hard ceiling on what an account may do — preventive, and it binds the root user too.',
+    '<strong>Control Tower</strong> builds the multi-account landing zone. Its guardrails are <strong>preventive (SCPs)</strong> or <strong>detective (Config rules)</strong>.',
+    '<strong>Artifact</strong> downloads AWS’s compliance reports; <strong>Audit Manager</strong> gathers evidence about your own environment.',
+    'AWS’s certifications cover <strong>AWS’s half only</strong>. Your application’s compliance is still yours.',
+  ]}
+/>

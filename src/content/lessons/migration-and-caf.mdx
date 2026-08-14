@@ -1,0 +1,366 @@
+---
+title: Moving to AWS — the 7 R's and the CAF
+summary: How a company actually gets from its own data centre onto AWS. Six migration strategies, the six perspectives of the Cloud Adoption Framework, and the services that shift the data.
+exams: [CCP]
+track: foundations
+order: 30
+domains:
+  CCP: 'Domain 1 — Cloud Concepts'
+minutes: 11
+hook: Most of migration is not technical. The Cloud Adoption Framework exists because the people and the process fail more often than the network does.
+updated: 2026-08-11
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import DecisionTree from '../../components/DecisionTree.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+Every other lesson on this site assumes you are building something new. Most real companies are
+not — they have two hundred applications in a data centre with a lease expiring in eighteen
+months, and the question is what to do with each one.
+
+This was added to the Cloud Practitioner blueprint deliberately, and it is examined in two
+halves: the **strategies** for moving an application, and the **framework** for organising the
+whole programme.
+
+## The 7 R's — one decision per application
+
+You do not migrate a company. You migrate an application, two hundred times, and each time you
+choose one strategy for it. They are ordered here by effort.
+
+You will see these called **the 6 R's** in most study material, and AWS's own documentation now
+lists **seven** — *Relocate* was added for VMware estates. Learn all seven; if a question offers
+six, Relocate is simply the one left out.
+
+<Diagram
+  title="The seven migration strategies, cheapest effort first"
+  viewBox="0 60 1060 480"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Retire — switch it off',
+      body: 'A surprising share of any estate is not used any more. The cheapest migration is the one you do not do — typically <strong>10–20%</strong> of applications in a real portfolio assessment.',
+    },
+    {
+      title: 'Retain — leave it where it is',
+      body: 'Not everything should move. A mainframe nobody dares touch, hardware amortised until 2029, or data that legally cannot leave the building. Revisit later; this is a <strong>deliberate</strong> choice, not a failure.',
+    },
+    {
+      title: 'Rehost — "lift and shift"',
+      body: 'Move the server as it is, onto EC2, without changing the application. <strong>Fastest</strong> route off the hardware, and the usual choice under a deadline. Optimise afterwards, once it is running.',
+      flow: 'w-rehost',
+    },
+    {
+      title: 'Relocate — move the hypervisor',
+      body: 'Transfer VMware workloads to AWS without converting anything, keeping the same tooling. A special case of rehosting for VMware estates.',
+    },
+    {
+      title: 'Repurchase — buy the SaaS instead',
+      body: 'Drop your self-hosted CRM and subscribe to a SaaS one. You are not moving the application; you are <strong>replacing</strong> it, and dropping the operational burden entirely.',
+    },
+    {
+      title: 'Replatform — "lift, tinker and shift"',
+      body: 'Move it, but take one or two easy wins on the way: self-managed MySQL becomes <strong>Amazon RDS</strong>, so you stop patching a database. Modest effort, large operational payoff.',
+      flow: 'w-replatform',
+    },
+    {
+      title: 'Refactor — rebuild it cloud-native',
+      body: 'Rewrite around managed and serverless services. <strong>The most expensive and the highest payoff</strong>, and only worth it when the business case is strong — usually scale or speed of change the old design cannot deliver.',
+      flow: 'w-refactor',
+    },
+  ]}
+  caption="Most real programmes are mostly rehost, with a handful of replatforms and a couple of refactors where the value is."
+>
+  <Node x={120} y={140} w={190} h={80} label="Retire" sub="switch it off" icon="deny" tone="muted" step={1} />
+  <Node x={120} y={250} w={190} h={80} label="Retain" sub="leave it there" icon="lock" tone="muted" step={2} />
+
+  <Node x={400} y={140} w={200} h={80} label="Rehost" sub="lift and shift" icon="server" tone="blue" step={3} />
+  <Node x={400} y={250} w={200} h={80} label="Relocate" sub="VMware as-is" icon="container" tone="blue" step={4} />
+  <Node x={400} y={360} w={200} h={80} label="Repurchase" sub="buy SaaS instead" icon="tag" tone="purple" step={5} />
+
+  <Node x={700} y={195} w={200} h={80} label="Replatform" sub="lift and tinker" icon="gear" tone="teal" step={6} />
+  <Node x={700} y={330} w={200} h={80} label="Refactor" sub="rebuild cloud-native" icon="lambda" tone="orange" step={7} />
+
+  <Node x={960} y={265} w={160} h={90} label="Running on AWS" icon="cloud" tone="green" step={3} />
+
+  <Wire id="w-rehost" from={[500, 140]} to={[880, 240]} shape="elbow-h" mid={930} tone="blue" step={3} />
+  <Wire id="w-replatform" from={[800, 195]} to={[880, 250]} tone="teal" step={6} />
+  <Wire id="w-refactor" from={[800, 330]} to={[880, 295]} tone="orange" step={7} />
+</Diagram>
+
+<Mnemonic
+  title="The 7 R's, in order of effort"
+  tone="orange"
+  items={[
+    { key: 'R', term: 'Retire', note: 'nobody uses it — turn it off and save the licence' },
+    { key: 'R', term: 'Retain', note: 'deliberately leave on-premises, for now or forever' },
+    { key: 'R', term: 'Rehost', note: 'lift and shift onto EC2, unchanged. Fastest' },
+    { key: 'R', term: 'Relocate', note: 'move VMware workloads without converting them' },
+    { key: 'R', term: 'Repurchase', note: 'abandon it and subscribe to SaaS instead' },
+    { key: 'R', term: 'Replatform', note: 'lift and tinker — e.g. move the database to RDS on the way' },
+    { key: 'R', term: 'Refactor', note: 'rewrite around cloud-native services. Costliest, highest payoff' },
+  ]}
+/>
+
+<Callout type="exam">
+The two most-confused pairs. <strong>Rehost</strong> changes nothing; <strong>replatform</strong>
+makes a small optimisation on the way (the classic example is self-managed MySQL → RDS).
+<strong>Repurchase</strong> means abandoning your application for a SaaS product;
+<strong>refactor</strong> means rewriting it yourself. If the question says "without changing the
+application", it is rehost.
+</Callout>
+
+## The Cloud Adoption Framework — six perspectives
+
+The **AWS Cloud Adoption Framework (CAF)** is about the *organisation*, not the servers. It
+splits the work of adopting cloud into six **perspectives**, and the exam expects you to know
+that the first two are business-facing and the last four are technical.
+
+| Perspective | Owned by | Concerned with |
+| --- | --- | --- |
+| **Business** | Executives, finance | Does this create measurable business value? |
+| **People** | HR, team leads | Skills, roles, culture, training the staff you already have |
+| **Governance** | Programme, finance | Managing the portfolio, cost control, measuring benefit |
+| **Platform** | Architects, engineers | Building the target environment and patterns |
+| **Security** | Security, compliance | Meeting objectives for confidentiality, integrity, compliance |
+| **Operations** | Operations teams | Running and recovering workloads to agreed service levels |
+
+<Mnemonic
+  title="The six CAF perspectives"
+  phrase="Business People Govern Platforms, Securely Operated"
+  tone="purple"
+  items={[
+    { key: 'B', term: 'Business', note: 'the business case and measurable value' },
+    { key: 'P', term: 'People', note: 'skills, roles, culture, change management' },
+    { key: 'G', term: 'Governance', note: 'portfolio management, cost control, risk' },
+    { key: 'P', term: 'Platform', note: 'the target architecture and how you build it' },
+    { key: 'S', term: 'Security', note: 'compliance and protection objectives' },
+    { key: 'O', term: 'Operations', note: 'running it, and recovering when it breaks' },
+  ]}
+/>
+
+<Callout type="gotcha">
+The first two perspectives — <strong>Business and People</strong> — are the ones migrations
+actually fail on, and the ones people forget in the exam because they are not technical. If a
+question describes a skills gap or a team that resists the move, that is the
+<strong>People</strong> perspective, not Platform.
+</Callout>
+
+CAF also describes the migration itself in three phases: **Assess** (portfolio discovery and
+business case), **Mobilise** (build the landing zone, close skill gaps, pilot), and
+**Migrate and Modernise** (move at scale).
+
+## The services that actually move the data
+
+Recognise these by the constraint in the question:
+
+| Service | Use it for |
+| --- | --- |
+| **AWS Migration Hub** | The single dashboard tracking progress of a migration across tools and Regions |
+| **AWS Application Migration Service (MGN)** | The primary **rehost** tool — replicates servers and cuts over with minimal downtime |
+| **AWS Database Migration Service (DMS)** | Moves databases, with the **source staying online** during the migration |
+| **AWS Schema Conversion Tool (SCT)** | Converts schema and code when the engine changes, e.g. Oracle → Aurora PostgreSQL |
+| **AWS DataSync** | Automated transfer of file data **over the network** to S3, EFS or FSx |
+| **AWS Storage Gateway** | Hybrid — keeps on-premises applications working while data lives in AWS |
+| **AWS Snowball / Snowmobile** | Physical devices for **very large** transfers where the network would take too long |
+| **AWS Transfer Family** | Managed SFTP/FTPS/FTP into S3 |
+
+<Callout type="exam">
+The Snow family question is always about <strong>time and bandwidth</strong>, not size alone. If
+the scenario mentions petabytes, a slow or metered connection, or "would take months over the
+network", the answer is <strong>Snowball</strong>. If the link is decent and the transfer is
+ongoing rather than one-off, it is <strong>DataSync</strong>.
+</Callout>
+
+<Callout type="cost">
+DMS plus SCT is the standard pairing for a <em>heterogeneous</em> migration — one where the
+database engine changes. If the engine stays the same (Oracle to Oracle), DMS alone is enough
+and SCT is an unnecessary answer.
+</Callout>
+
+<DecisionTree
+  title="What should we do with this application?"
+  intro="Run it once per application. In a real portfolio the answers are lopsided — mostly rehost."
+  tree={{
+    q: 'Is anyone still using it?',
+    options: [
+      {
+        label: 'No — the logs are empty',
+        next: {
+          result: 'Retire',
+          detail: 'Switch it off and reclaim the licences and the hardware. Typically 10–20% of a real estate, and the cheapest possible outcome.',
+          tone: 'good',
+        },
+      },
+      {
+        label: 'Yes, it is in use',
+        next: {
+          q: 'Is there a compliance, licensing or latency reason it cannot leave the data centre?',
+          options: [
+            {
+              label: 'Yes, it genuinely must stay',
+              next: {
+                result: 'Retain',
+                detail: 'A deliberate decision, not a failure. Connect it with Direct Connect or VPN so it can work alongside what you do move, and revisit when the constraint changes.',
+                tone: 'warn',
+              },
+            },
+            {
+              label: 'No, it could move',
+              next: {
+                q: 'Is there a commercial SaaS product that does this job well enough?',
+                options: [
+                  {
+                    label: 'Yes — email, CRM, HR, ticketing',
+                    next: {
+                      result: 'Repurchase',
+                      detail: 'Subscribe to the SaaS product and decommission yours. You lose customisation and gain the whole operational burden back.',
+                      tone: 'good',
+                    },
+                  },
+                  {
+                    label: 'No, it is ours and it is specific',
+                    next: {
+                      q: 'How much time and appetite is there for change right now?',
+                      options: [
+                        {
+                          label: 'Very little — the lease expires soon',
+                          next: {
+                            result: 'Rehost (lift and shift)',
+                            detail: 'Use AWS Application Migration Service to replicate the servers and cut over. Nothing changes, nothing new breaks, and you can optimise once it is running on AWS.',
+                            tone: 'good',
+                          },
+                        },
+                        {
+                          label: 'Some — we can take easy wins on the way',
+                          next: {
+                            result: 'Replatform (lift and tinker)',
+                            detail: 'Move it, and swap one component for a managed one — self-managed MySQL to RDS is the canonical example. Small effort, and you stop patching a database forever.',
+                            tone: 'good',
+                          },
+                        },
+                        {
+                          label: 'Plenty, and the old design is holding the business back',
+                          next: {
+                            result: 'Refactor',
+                            detail: 'Rebuild around managed and serverless services. The most expensive strategy by a wide margin — justify it with scale or speed of change the current architecture cannot deliver.',
+                            tone: 'warn',
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  }}
+/>
+
+<Scenario
+  who="An insurer closing a data centre in fourteen months"
+  problem="Two hundred and forty applications, one hard deadline, and a team who had never used AWS. The first instinct was to modernise everything onto containers — an estimate that came back at four years. Meanwhile 80 TB of claim documents needed to move over a connection that would have taken about seven months to carry them."
+  solution="A portfolio assessment retired 41 applications nobody used and retained 12 for licensing reasons. The remaining 187 were mostly rehosted with Application Migration Service, tracked in Migration Hub. Nineteen were replatformed — self-managed databases moved to RDS using DMS, which kept the source online during the cutover. Two customer-facing applications were refactored, because scale was the actual business problem. The 80 TB of documents went on Snowball devices."
+  outcome="The data centre closed with six weeks to spare. Roughly a fifth of the estate never moved at all, and the two refactored applications delivered most of the measured business benefit."
+>
+The shape here is the exam's model answer: <strong>retire and retain first</strong> (they are
+free), <strong>rehost the bulk</strong> against a deadline, and <strong>refactor only where the
+business case is real</strong>. Optimisation comes after the lease expires, not before.
+</Scenario>
+
+<Quiz
+  question="A company is moving a self-managed MySQL database running on an on-premises server to AWS. As part of the move they will run it on Amazon RDS instead of managing it themselves, but the application code is unchanged. Which migration strategy is this?"
+  choose={1}
+  options={[
+    {
+      text: 'Replatform',
+      correct: true,
+      why: 'Replatforming — "lift and tinker" — means moving with a targeted optimisation on the way. Swapping a self-managed database for the managed equivalent is the textbook example.',
+    },
+    {
+      text: 'Rehost',
+      why: 'Rehosting means moving the server as it is, with no change. Here the database moved to a managed service, which is a deliberate change to the platform.',
+    },
+    {
+      text: 'Refactor',
+      why: 'Refactoring means substantially rewriting the application around cloud-native services. The question says the application code is unchanged.',
+    },
+    {
+      text: 'Repurchase',
+      why: 'Repurchasing means abandoning the application in favour of a commercial SaaS product. They kept their application.',
+    },
+  ]}
+  explain="The ladder: <strong>rehost = no change · replatform = small change on the way · refactor = rewrite · repurchase = replace with SaaS.</strong>"
+/>
+
+<Quiz
+  question="A company must transfer 200 TB of archived data to Amazon S3. Their internet connection would take approximately eight months to complete the transfer. What should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'AWS Snowball',
+      correct: true,
+      why: 'The Snow family exists for exactly this: physical devices shipped to you, loaded, and returned, when transferring over the network would take impractically long.',
+    },
+    {
+      text: 'AWS DataSync',
+      why: 'DataSync accelerates and automates transfers over the network, but it cannot overcome the physical limit of the connection. Eight months would remain roughly eight months.',
+    },
+    {
+      text: 'AWS Storage Gateway',
+      why: 'Storage Gateway gives on-premises applications hybrid access to AWS storage. It is not a bulk one-off migration tool, and it uses the same constrained link.',
+    },
+    {
+      text: 'Amazon S3 Transfer Acceleration',
+      why: 'Transfer Acceleration routes uploads via edge locations to improve long-distance throughput, but the bottleneck here is the local connection itself.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="Which two perspectives of the AWS Cloud Adoption Framework focus on business capabilities rather than technical ones? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'Business',
+      correct: true,
+      why: 'The Business perspective ensures the cloud investment is tied to measurable business outcomes, and is owned by executives and finance.',
+    },
+    {
+      text: 'People',
+      correct: true,
+      why: 'The People perspective covers skills, roles, culture and change management — the bridge between business and technology, and where migrations most often stall.',
+    },
+    {
+      text: 'Platform',
+      why: 'Platform is a technical perspective, covering the target architecture and how workloads are built and delivered.',
+    },
+    {
+      text: 'Operations',
+      why: 'Operations is a technical perspective, covering how workloads are run, monitored and recovered to agreed service levels.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'The <strong>7 R\'s</strong>: Retire, Retain, Rehost, Relocate, Repurchase, Replatform, Refactor. Ordered by effort, and most real programmes are mostly <strong>rehost</strong>. Older material calls these the 6 R\'s and omits Relocate.',
+    '<strong>Rehost = no change · Replatform = small optimisation (MySQL → RDS) · Refactor = rewrite · Repurchase = swap for SaaS.</strong>',
+    'The cheapest migrations are <strong>Retire</strong> and <strong>Retain</strong> — do the portfolio assessment before moving anything.',
+    'The <strong>CAF</strong> has six perspectives: <strong>Business, People</strong> (business capabilities) and <strong>Governance, Platform, Security, Operations</strong> (technical).',
+    'CAF phases: <strong>Assess → Mobilise → Migrate and Modernise</strong>.',
+    'Tools: <strong>MGN</strong> rehosts servers · <strong>DMS</strong> moves databases with the source online · <strong>SCT</strong> converts schemas when the engine changes · <strong>Migration Hub</strong> tracks it all.',
+    '<strong>Snowball</strong> when the network would take too long; <strong>DataSync</strong> when the link is fine and the transfer is ongoing.',
+  ]}
+/>

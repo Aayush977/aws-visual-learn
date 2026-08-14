@@ -1,0 +1,303 @@
+---
+title: Scaling and Staying Up
+summary: Turning one fragile server into something that survives a failed instance, a failed Availability Zone and a Monday morning — with Auto Scaling, statelessness and queues.
+exams: [CCP, SAA]
+track: architecture
+order: 10
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 2 — Design Resilient Architectures'
+minutes: 13
+hook: Scaling up buys you a bigger thing to lose. Scaling out buys you something you can afford to lose.
+updated: 2026-08-09
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+Most systems begin as one server. It works, until the day it does not, and then it fails
+completely — because there is nothing else to take over and no way to grow except by buying a
+bigger one.
+
+Fixing that is not one change. It is four, in a specific order, and each one is meaningless
+without the ones before it. Play it through.
+
+<Diagram
+  title="From one fragile server to something that survives a bad day"
+  viewBox="0 70 880 590"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Start with the problem',
+      body: 'Traffic arrives. Behind one server, every visitor depends on one operating system, one disk and one Availability Zone. Growing means <strong>scaling up</strong> — a bigger instance — which buys a bigger thing to lose.',
+    },
+    {
+      title: 'Scale out, across two zones',
+      body: 'Two instances in <strong>different Availability Zones</strong>, behind an <strong>Application Load Balancer</strong>. The load balancer health-checks each one and quietly stops sending traffic to anything that stops answering. One dead instance is now invisible.',
+      flow: ['w-user-alb', 'w-alb-a', 'w-alb-b'],
+      duration: 1400,
+    },
+    {
+      title: 'Let the count change itself',
+      body: 'An <strong>Auto Scaling group</strong> keeps a desired number of instances running between a minimum and a maximum. It replaces unhealthy ones automatically and adds more when demand rises — so capacity follows the traffic rather than the other way round.',
+    },
+    {
+      title: 'Move the state off the instances',
+      body: 'None of this works if a user’s shopping basket lives in one instance’s memory — killing that instance loses their session. Push state to <strong>DynamoDB</strong> or <strong>ElastiCache</strong> and every instance becomes interchangeable. <strong>Stateless is the prerequisite for everything above.</strong>',
+      flow: ['w-a-sess', 'w-b-sess'],
+      duration: 1300,
+    },
+    {
+      title: 'Decouple the slow work',
+      body: 'Long jobs — generating a PDF, encoding a video — do not belong in a web request. Put them on an <strong>SQS queue</strong> and let a separate fleet consume it. Now a slow or failed worker delays a job instead of breaking the website.',
+      flow: ['w-ec2-sqs', 'w-sqs-worker'],
+      duration: 1400,
+    },
+  ]}
+  caption="Read it bottom-up as a dependency chain: statelessness makes instances disposable, disposability makes Auto Scaling possible, and Auto Scaling is what makes the load balancer's health checks useful."
+>
+  <Node x={90} y={120} w={140} h={70} label="Users" icon="user" tone="muted" step={1} />
+  <Node x={350} y={120} w={200} h={76} label="Load balancer" sub="health checks" icon="balancer" tone="blue" step={2} />
+
+  <Boundary x={250} y={230} w={560} h={200} label="Auto Scaling group · min 2, desired 2, max 10" icon="scale" tone="green" step={3} />
+  <Boundary x={270} y={270} w={250} h={140} label="AZ 2a" icon="zone" tone="teal" step={2} />
+  <Boundary x={540} y={270} w={250} h={140} label="AZ 2b" icon="zone" tone="teal" step={2} />
+  <Node x={395} y={345} w={180} h={64} label="EC2" icon="server" tone="blue" step={2} />
+  <Node x={665} y={345} w={180} h={64} label="EC2" icon="server" tone="blue" step={2} />
+
+  <Node x={530} y={490} w={220} h={76} label="DynamoDB" sub="sessions, baskets" icon="database" tone="purple" step={4} />
+  <Node x={350} y={600} w={200} h={70} label="SQS queue" icon="queue" tone="orange" step={5} />
+  <Node x={700} y={600} w={220} h={70} label="Workers" sub="their own ASG" icon="server" tone="teal" step={5} />
+
+  <Wire id="w-user-alb" from={[160, 120]} to={[248, 120]} tone="blue" step={2} />
+  <Wire id="w-alb-a" from={[350, 158]} to={[395, 313]} shape="elbow-v" mid={200} tone="blue" step={2} />
+  <Wire id="w-alb-b" from={[350, 158]} to={[665, 313]} shape="elbow-v" mid={200} tone="blue" step={2} />
+  <Wire id="w-a-sess" from={[395, 377]} to={[470, 452]} shape="elbow-v" mid={440} tone="purple" step={4} />
+  <Wire id="w-b-sess" from={[665, 377]} to={[590, 452]} shape="elbow-v" mid={440} tone="purple" step={4} />
+  <Wire id="w-ec2-sqs" from={[313, 377]} to={[350, 565]} shape="elbow-v" mid={545} tone="orange" step={5} />
+  <Wire id="w-sqs-worker" from={[450, 600]} to={[588, 600]} tone="orange" step={5} />
+</Diagram>
+
+## Up or out
+
+**Scaling up** (vertical) means replacing the instance with a bigger one. It is simple, it
+requires no application changes, and it has two hard limits: there is a largest instance type,
+and you still have exactly one of them. Rebooting into a new size means downtime.
+
+**Scaling out** (horizontal) means running more instances. There is no ceiling worth worrying
+about, a failure removes a fraction of capacity rather than all of it, and you can add and
+remove capacity without downtime. It requires your application to tolerate having copies of
+itself — which is the statelessness problem below.
+
+<Callout type="exam">
+When a question asks for <strong>high availability</strong>, the answer almost always involves
+scaling <em>out</em> across <strong>multiple Availability Zones</strong>. A bigger instance is
+never a high-availability answer, no matter how big — it is still one instance in one zone.
+</Callout>
+
+Two related words the exam distinguishes:
+
+- **Scalability** — the system *can* handle more load, by adding resources.
+- **Elasticity** — it adds and removes them **automatically**, matching demand as it changes.
+  Elasticity is what saves money, because it includes shrinking.
+
+## The load balancer, and what health checks really buy
+
+An **Elastic Load Balancer** takes incoming requests and spreads them across registered
+targets. The part that matters for availability is the **health check**: the load balancer
+polls each target on a path you choose, and stops sending traffic to anything that fails.
+
+That is what turns a dead instance into a non-event. Nobody is paged, no user sees an error,
+and if an Auto Scaling group is watching, a replacement appears within minutes.
+
+To enable multi-AZ properly you must **enable the load balancer in each Availability Zone** you
+want to use. A load balancer that only has a presence in one zone cannot save you from losing
+that zone.
+
+## Auto Scaling groups
+
+An **Auto Scaling group (ASG)** maintains a fleet. You give it:
+
+- A **launch template** — the AMI, instance type, security groups and user data for any new
+  instance it creates.
+- **Minimum, desired and maximum** counts. It will never go below the minimum or above the
+  maximum, and it works to keep the desired number healthy and running.
+- A list of **subnets across several Availability Zones**, which it balances instances across.
+- **Health checks** — its own, or (better) the load balancer's, so an instance that is running
+  but not serving traffic still gets replaced.
+
+Even with no scaling policy at all, an ASG with min = desired = 2 is worth having: it means
+"there will always be two healthy instances", and it will rebuild them if they die.
+
+Scaling policies decide when the number changes:
+
+<Mnemonic
+  title="The four Auto Scaling policy types"
+  phrase="Target, Step, Schedule, Soothsayer"
+  tone="teal"
+  items={[
+    { key: 'T', term: 'Target tracking', note: '“keep average CPU at 50%” — AWS works out the rest. The default choice' },
+    { key: 'S', term: 'Step scaling', note: '“+2 instances above 70% CPU, +4 above 85%” — when you need graded responses' },
+    { key: 'S', term: 'Scheduled scaling', note: '“20 instances at 08:00 on weekdays” — for demand you can predict from a calendar' },
+    { key: 'S', term: 'Predictive scaling', note: 'machine learning on your own history, scaling <em>before</em> the load arrives' },
+  ]}
+/>
+
+<Callout type="gotcha">
+Scaling out takes minutes — an instance must boot, pass health checks and warm up. If your
+traffic spikes in seconds, reactive scaling arrives late and users see the spike anyway. That
+is what <strong>scheduled</strong> and <strong>predictive</strong> scaling are for, and it is
+why questions about a known daily peak want scheduled scaling rather than target tracking.
+</Callout>
+
+## Statelessness: the precondition for all of it
+
+If any user's data lives in one instance's memory or on its local disk, then instances are not
+interchangeable, and everything above collapses. Terminating an instance logs people out;
+scaling out sends users to a server that has never heard of them.
+
+Where state actually goes:
+
+| State | Put it in |
+| --- | --- |
+| Session data, shopping baskets | **DynamoDB** (with TTL) or **ElastiCache for Redis** |
+| Uploaded files | **Amazon S3** |
+| Shared files a filesystem must see | **Amazon EFS** |
+| The application's data | **RDS**, **Aurora** or **DynamoDB** |
+| Nothing at all | The instance's local disk |
+
+Load balancers do offer **sticky sessions**, which pin a user to one instance. Treat it as a
+crutch for applications you cannot change: it unbalances the fleet, and when that instance
+dies the user loses their session anyway.
+
+## Decoupling: stop things failing together
+
+**Tight coupling** is when component A calls component B directly and waits. If B is slow, A is
+slow. If B is down, A is down — and the failure travels outward to the user.
+
+**Amazon SQS** puts a queue between them. The web tier writes a message and returns immediately;
+workers read messages when they can. Now:
+
+- A slow worker creates a backlog, not an outage.
+- Workers can be scaled on **queue depth**, which is a far better signal than CPU.
+- A worker that crashes mid-job does not lose it — the message becomes visible again after the
+  **visibility timeout** and another worker picks it up.
+- The web tier and the worker tier can be deployed, scaled and broken independently.
+
+Its companions:
+
+- **Amazon SNS** — publish/subscribe. One message, many subscribers. The classic pattern is
+  **fan-out**: publish to an SNS topic with several SQS queues subscribed, so each downstream
+  system gets its own copy.
+- **Amazon EventBridge** — an event bus that routes by rules, including events from AWS services
+  and third-party SaaS. The modern choice for event-driven architecture.
+
+<Callout type="exam">
+Watch for the words <strong>"decouple"</strong>, <strong>"the components should scale
+independently"</strong> or <strong>"requests must not be lost during a spike"</strong>. Those
+point at <strong>SQS</strong>. If one message must reach <em>several</em> different consumers,
+that is <strong>SNS</strong>, usually fanning out to SQS queues.
+</Callout>
+
+<Scenario
+  who="An online exam platform used by schools"
+  problem="Everything runs on two large EC2 instances behind a load balancer, and it mostly works — except that student sessions are held in each instance's memory, so a deployment logs everyone out mid-exam. Automatic marking runs in the same process as the web request, so during the 9am rush the site slows to a crawl and some submissions time out and are lost."
+  solution="Sessions move to ElastiCache for Redis, making the instances interchangeable. The web tier goes into an Auto Scaling group across three AZs with scheduled scaling to 12 instances at 08:30 on weekdays, since the peak is known from the timetable. Marking becomes a message on an SQS queue consumed by a separate worker ASG that scales on queue depth."
+  outcome="Deployments no longer interrupt exams. The 9am peak is met by capacity that was already running. No submission has been lost since — a slow marking backlog now drains over ten minutes instead of failing the request."
+>
+The order matters. Moving sessions out had to come first: without it, scaling out would have
+logged students out more often, not less. This is the usual sequence — <strong>make it
+stateless, then make it elastic, then decouple what is slow.</strong>
+</Scenario>
+
+<Quiz
+  question="A web application runs on EC2 instances behind an Application Load Balancer in an Auto Scaling group. Users report being logged out at random. The application stores session data in memory on each instance. What should a solutions architect recommend?"
+  choose={1}
+  options={[
+    {
+      text: 'Store session data in Amazon ElastiCache or DynamoDB so any instance can serve any user',
+      correct: true,
+      why: 'Externalising session state makes the instances stateless and interchangeable, which is what allows the Auto Scaling group to add and remove them without affecting users.',
+    },
+    {
+      text: 'Enable sticky sessions on the Application Load Balancer',
+      why: 'This masks the symptom by pinning each user to one instance. Traffic becomes unevenly distributed, and when Auto Scaling terminates that instance the user is logged out anyway.',
+    },
+    {
+      text: 'Increase the Auto Scaling group’s minimum instance count',
+      why: 'More instances does not help — it makes it more likely that a given request lands on an instance that does not hold the user’s session.',
+    },
+    {
+      text: 'Replace the Application Load Balancer with a Network Load Balancer',
+      why: 'Changing the load balancer layer does not change where session state lives. The application would behave identically.',
+    },
+  ]}
+  explain="“Users are randomly logged out” behind a scaling fleet is always the same diagnosis: <strong>state on the instance</strong>. Move it to ElastiCache or DynamoDB — sticky sessions are the trap answer."
+/>
+
+<Quiz
+  question="An application's web tier calls a reporting service synchronously. When the reporting service is slow, the entire website becomes unresponsive. The company wants the two components to fail and scale independently. What should be introduced between them?"
+  choose={1}
+  options={[
+    {
+      text: 'An Amazon SQS queue that the web tier writes to and the reporting service consumes from',
+      correct: true,
+      why: 'A queue decouples them in time. The web tier returns as soon as the message is enqueued, so a slow or failed consumer creates a backlog rather than an outage, and each tier scales on its own signal.',
+    },
+    {
+      text: 'An Application Load Balancer in front of the reporting service',
+      why: 'A load balancer spreads requests across healthy reporting instances, but the web tier is still waiting synchronously for a response. Slowness still propagates straight to the user.',
+    },
+    {
+      text: 'An Amazon CloudFront distribution in front of the reporting service',
+      why: 'CloudFront caches responses at the edge. Reports are generated per request and are not cacheable, and the coupling between the two tiers is unchanged.',
+    },
+    {
+      text: 'A larger instance type for the reporting service',
+      why: 'This may delay the problem but does not change the architecture. The moment the reporting service is slow for any reason, the website is slow again.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="A company's traffic increases sharply at 09:00 every weekday and drops at 17:00. Their target tracking policy scales on CPU, but users report slow responses for the first ten minutes each morning. What is the most appropriate change?"
+  choose={1}
+  options={[
+    {
+      text: 'Add a scheduled scaling action that increases the desired capacity before 09:00',
+      correct: true,
+      why: 'The peak is predictable from the clock, so capacity can be added before demand arrives instead of in reaction to it. Scheduled scaling exists precisely for known, calendar-driven load.',
+    },
+    {
+      text: 'Lower the CPU target in the target tracking policy',
+      why: 'It would trigger scaling slightly earlier, but instances still need minutes to boot and pass health checks after the load has already arrived. It also costs more all day for a problem that lasts ten minutes.',
+    },
+    {
+      text: 'Increase the Auto Scaling group’s maximum capacity',
+      why: 'The maximum is not what is limiting them — the group is reaching sufficient capacity eventually. The problem is when, not how many.',
+    },
+    {
+      text: 'Move the application to a larger instance type',
+      why: 'This scales up rather than out and pays for peak capacity 24 hours a day to solve a problem that occurs for ten minutes each morning.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Scale <strong>out</strong>, not up, for availability. Multiple instances across <strong>multiple Availability Zones</strong> is the answer to almost every “highly available” question.',
+    '<strong>Scalability</strong> is being able to grow. <strong>Elasticity</strong> is growing <em>and shrinking</em> automatically — the shrinking is where the savings are.',
+    'Load balancer <strong>health checks</strong> are what make a dead instance invisible; an <strong>Auto Scaling group</strong> is what replaces it.',
+    'Policies: <strong>target tracking</strong> by default · <strong>step</strong> for graded responses · <strong>scheduled</strong> for known peaks · <strong>predictive</strong> for learned ones.',
+    '<strong>Stateless first.</strong> Sessions to ElastiCache or DynamoDB, files to S3. Sticky sessions are a workaround, not a design.',
+    '<strong>SQS</strong> to decouple one producer from one consumer group · <strong>SNS</strong> to fan one message out to many · <strong>EventBridge</strong> to route events by rule.',
+  ]}
+/>

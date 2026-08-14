@@ -1,0 +1,190 @@
+---
+import { url } from '../lib/paths';
+
+const here = Astro.url.pathname.replace(/\/$/, '');
+const links = [
+  { href: url('/'), label: 'Home' },
+  { href: url('/lessons'), label: 'All lessons' },
+  { href: url('/path/ccp'), label: 'Cloud Practitioner' },
+  { href: url('/path/saa'), label: 'Solutions Architect' },
+  { href: url('/quiz'), label: 'Practice questions' },
+];
+const isCurrent = (href: string) => here === href.replace(/\/$/, '');
+---
+
+<header class="hd">
+  <div class="wrap hd__inner">
+    <a class="hd__brand" href={url('/')}>
+      <span class="hd__mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 16.5c3 2 6 3 9 3s6-1 9-3"></path>
+          <path d="M7 13V8l5-3 5 3v5"></path>
+          <path d="M12 5v8"></path>
+        </svg>
+      </span>
+      <span class="hd__name">AWS <em>Visual</em> Learn</span>
+    </a>
+
+    <nav class="hd__nav" aria-label="Main">
+      <ul>
+        {
+          links.map((l) => (
+            <li>
+              <a href={l.href} aria-current={isCurrent(l.href) ? 'page' : undefined}>
+                {l.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <button type="button" class="hd__theme" data-theme-toggle aria-label="Switch colour theme">
+      <svg class="hd__sun" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"
+        ></path>
+      </svg>
+      <svg class="hd__moon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"></path>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<script>
+  // Theme is applied by an inline script in BaseLayout before paint; this only
+  // handles the toggle click.
+  document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
+    const root = document.documentElement;
+    const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;
+    try {
+      localStorage.setItem('theme', next);
+    } catch {
+      /* private browsing — theme just won't persist */
+    }
+  });
+</script>
+
+<style>
+  .hd {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hd__inner {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-5);
+    min-height: 3.75rem;
+  }
+
+  .hd__brand {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    text-decoration: none;
+    color: var(--text);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+  .hd__brand em {
+    font-style: normal;
+    color: var(--aws-orange);
+  }
+  .hd__mark svg {
+    display: block;
+    width: 26px;
+    height: 26px;
+    fill: none;
+    stroke: var(--aws-orange);
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .hd__nav {
+    margin-left: auto;
+  }
+  .hd__nav ul {
+    display: flex;
+    gap: var(--sp-1);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex-wrap: wrap;
+  }
+  .hd__nav a {
+    display: block;
+    padding: 0.35rem 0.7rem;
+    border-radius: var(--radius);
+    font-size: var(--step--1);
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .hd__nav a:hover {
+    background: var(--bg-sunken);
+    color: var(--text);
+  }
+  .hd__nav a[aria-current='page'] {
+    color: var(--text);
+    background: var(--accent-soft);
+  }
+
+  .hd__theme {
+    display: grid;
+    place-items: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text-muted);
+    cursor: pointer;
+    flex: none;
+  }
+  .hd__theme:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+  .hd__theme svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .hd__moon {
+    display: none;
+  }
+  :global(:root[data-theme='dark']) .hd__sun {
+    display: none;
+  }
+  :global(:root[data-theme='dark']) .hd__moon {
+    display: block;
+  }
+
+  @media (max-width: 720px) {
+    .hd__inner {
+      flex-wrap: wrap;
+      padding-block: var(--sp-2);
+    }
+    .hd__nav {
+      order: 3;
+      width: 100%;
+      margin-left: 0;
+    }
+    .hd__theme {
+      margin-left: auto;
+    }
+  }
+</style>

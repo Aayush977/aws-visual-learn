@@ -1,0 +1,369 @@
+---
+title: What Cloud Computing Actually Is
+summary: Start here. Why anyone rents someone else's computers, what changes the moment you stop buying servers, and the three service models every later lesson assumes you know.
+exams: [CCP]
+track: foundations
+order: 5
+domains:
+  CCP: 'Domain 1 — Cloud Concepts'
+minutes: 10
+hook: You do not buy a generator to run a kettle. You plug into the grid and pay for the electricity you actually used.
+updated: 2026-08-08
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+If you have never touched AWS, ignore the service names for a moment. Every one of them
+exists to solve the same underlying problem, and that problem is much older than the cloud.
+
+**Computers are lumpy.** You cannot buy 1.4 servers. You buy one, or two, and you buy them
+weeks before you need them, and you keep paying for them long after the reason you bought
+them has gone away. Cloud computing is the business of turning that lump into a dial.
+
+<Callout type="analogy">
+You do not buy a diesel generator to boil a kettle. You plug into the grid, turn the tap
+of electricity up and down as you please, and at the end of the month you pay for exactly
+what flowed through the meter. Nobody calls that "renting electricity" — it is just how
+electricity works now. Cloud computing is that same shift, applied to computers.
+</Callout>
+
+## The story the whole industry turns on
+
+Here is one week in the life of a small website, told twice — once where you own the
+hardware, once where you rent it by the hour. Press play.
+
+<Diagram
+  title="The same traffic spike, with and without the cloud"
+  viewBox="0 0 1000 570"
+  autoplay
+  mode="build"
+  steps={[
+    {
+      title: 'Monday: 200 visitors',
+      body: 'One small server handles it comfortably, either way. At this size the two options look identical — which is exactly why the difference is invisible until something changes.',
+      flow: ['w-v-a', 'w-v-b'],
+    },
+    {
+      title: 'Tuesday: someone posts your link',
+      body: 'Traffic goes up <strong>a hundredfold</strong> in about nine minutes. You did not plan it, you were not asked, and it will be over by Thursday.',
+      flow: ['w-v-a', 'w-v-b'],
+      duration: 900,
+    },
+    {
+      title: 'Your own data centre: you are simply down',
+      body: 'The server saturates and the site stops answering. You can order more — and they will be racked and cabled in about <strong>twelve weeks</strong>. The spike is long over by then.',
+      duration: 1400,
+    },
+    {
+      title: 'On AWS: the capacity already exists',
+      body: 'Auto Scaling notices the load and starts nine more identical instances. They are serving traffic in <strong>about two minutes</strong>, because AWS bought the hardware years ago and is renting you a slice of it.',
+      flow: 'w-b1-b2',
+      duration: 1300,
+    },
+    {
+      title: 'Thursday: back to 200 visitors',
+      body: 'This is the half people forget. In your data centre you now own ten servers you will never fill again. On AWS the nine extra instances are terminated and <strong>the billing simply stops</strong>.',
+      flow: 'w-b2-b3',
+      duration: 1300,
+    },
+  ]}
+  caption="Elasticity is not only the ability to grow. Being able to give capacity back is the half that saves the money."
+>
+  <Node x={95} y={290} w={130} label="Visitors" icon="user" tone="muted" />
+  <Node x={95} y={170} w={130} h={62} label="×100" sub="unplanned" icon="chart" tone="orange" step={2} />
+
+  <Boundary x={200} y={60} w={760} h={200} label="Option A — servers you own" icon="server" tone="red" solid step={1} />
+  <Node x={330} y={160} w={150} h={86} label="1 server" sub="£6,000, owned" icon="server" tone="red" step={1} />
+  <Node x={560} y={160} w={150} h={86} label="Overloaded" sub="site is down" icon="deny" tone="red" step={3} />
+  <Node x={800} y={160} w={180} h={86} label="10 more servers" sub="arrive in 12 weeks" icon="server" tone="red" step={3} />
+  <Wire id="w-a1-a2" from={[405, 160]} to={[485, 160]} tone="red" step={3} />
+  <Wire id="w-a2-a3" from={[635, 160]} to={[710, 160]} tone="red" step={3} dashed label="too late" labelDy={-14} />
+
+  <Boundary x={200} y={320} w={760} h={210} label="Option B — capacity you rent by the hour" icon="cloud" tone="green" step={1} />
+  <Node x={330} y={420} w={150} h={86} label="1 instance" sub="pennies per hour" icon="server" tone="green" step={1} />
+  <Node x={560} y={420} w={150} h={86} label="+9 instances" sub="in ~2 minutes" icon="scale" tone="green" step={4} />
+  <Node x={800} y={420} w={170} h={86} label="Back to 1" sub="billing stops" icon="money" tone="green" step={5} />
+  <Wire id="w-b1-b2" from={[405, 420]} to={[485, 420]} tone="green" step={4} />
+  <Wire id="w-b2-b3" from={[635, 420]} to={[715, 420]} tone="green" step={5} />
+
+  <Wire id="w-v-a" from={[160, 290]} to={[255, 160]} shape="elbow-h" mid={205} tone="muted" step={1} />
+  <Wire id="w-v-b" from={[160, 290]} to={[255, 420]} shape="elbow-h" mid={205} tone="muted" step={1} />
+</Diagram>
+
+Nothing in that story is about technology being clever. It is about **who holds the risk of
+guessing wrong**. When you own the servers, you have to predict next year's traffic today,
+and you pay for being wrong in either direction — outages if you under-guess, idle metal if
+you over-guess. When you rent by the hour, the guess stops mattering.
+
+<Callout type="gotcha">
+"The cloud is cheaper" is not quite the claim, and the exam is careful about this. A server
+running flat out, 24 hours a day, for four years, is often *cheaper to own*. What the cloud
+removes is the **cost of being wrong** — and almost no real workload is flat.
+</Callout>
+
+## The six advantages, and why each one is really the same idea
+
+AWS publishes six "advantages of cloud computing", and the Cloud Practitioner exam quotes
+them almost word for word. They are worth learning as a list, but they make far more sense
+once you notice that four of them are just the story above, told from different angles.
+
+<Mnemonic
+  title="The six advantages of cloud computing"
+  phrase="Every Cloud Sale Should Go Global"
+  tone="orange"
+  items={[
+    { key: 'E', term: 'Economies of scale', note: 'AWS buys hardware by the shipping container, so its unit price beats yours' },
+    { key: 'C', term: 'Capital expense becomes variable expense', note: 'no £6,000 up front — pay per hour instead' },
+    { key: 'S', term: 'Stop guessing capacity', note: 'scale up and down to match real demand' },
+    { key: 'S', term: 'Speed and agility', note: 'minutes to provision, so experiments become cheap' },
+    { key: 'G', term: 'Get out of the data-centre business', note: 'nobody on your team racks servers or replaces failed disks' },
+    { key: 'G', term: 'Go global in minutes', note: 'deploy into another continent without owning a building there' },
+  ]}
+/>
+
+The two that are genuinely separate ideas are worth a sentence each:
+
+- **Economies of scale.** AWS runs millions of servers. Its cost per unit of compute, per
+  gigabyte stored, per watt of cooling is far below what any single company can reach. Some
+  of that saving is passed on — which is why AWS has cut prices well over a hundred times
+  without anyone asking.
+- **Go global in minutes.** Serving users in Sydney from a London server means every click
+  crosses the planet twice. Owning a building in Sydney to fix that is a year-long project.
+  On AWS it is a deployment into another Region, and you can undo it on Friday.
+
+<Callout type="cost">
+The capital-versus-variable distinction has a name the exam likes: **CapEx** (money spent up
+front on assets you own) becomes **OpEx** (money spent on what you consumed this month). If
+a question mentions "avoid large up-front investment" or "no upfront capital expenditure",
+it is pointing at this advantage.
+</Callout>
+
+## The three service models: where the line is drawn
+
+Every cloud service is a decision about how much of the stack somebody else operates. There
+are only three named positions on that line, and once you can place a service on it you can
+usually predict what it costs and what it stops you from doing.
+
+<Diagram
+  title="Who manages what: IaaS, PaaS and SaaS"
+  viewBox="0 0 1000 610"
+  mode="build"
+  steps={[
+    {
+      title: 'On-premises: all of it is yours',
+      body: 'From the air-conditioning in the room to the code in production. Total control, and total operational burden — including the 3 a.m. call when a disk dies.',
+    },
+    {
+      title: 'IaaS — you rent the machine',
+      body: '<strong>Infrastructure as a Service.</strong> AWS runs the building, the hardware and the virtualisation; you still choose the operating system and patch it. This is <strong>Amazon EC2</strong>, and it is the model that feels most like the server you used to own.',
+    },
+    {
+      title: 'PaaS — you rent the platform',
+      body: '<strong>Platform as a Service.</strong> AWS also runs the operating system, the runtime and the scaling. You hand over code and configuration. This is <strong>AWS Lambda</strong>, <strong>Elastic Beanstalk</strong> and, in spirit, <strong>Amazon RDS</strong>.',
+    },
+    {
+      title: 'SaaS — you just use the thing',
+      body: '<strong>Software as a Service.</strong> Somebody else runs the entire stack and you log in. <strong>Amazon WorkMail</strong>, <strong>QuickSight</strong> — and every consumer product you already use, from Gmail to Dropbox.',
+    },
+    {
+      title: 'The trade, in one sentence',
+      body: 'Moving up the stack removes work and removes control, in that order and always together. There is no model where you get both.',
+    },
+  ]}
+  caption="Notice the one row that never changes colour: your data is yours in every single model. That row is the whole of the Shared Responsibility Model in miniature."
+>
+  <Node x={250} y={172} w={190} h={44} label="You manage" tone="orange" step={1} />
+  <Node x={470} y={172} w={190} h={44} label="AWS manages" tone="blue" step={1} />
+
+  <Node x={175} y={252} w={200} h={64} label="On-premises" sub="your own room" icon="server" tone="muted" step={1} />
+  <Node x={400} y={252} w={200} h={64} label="IaaS" sub="EC2" icon="server" tone="orange" step={2} />
+  <Node x={625} y={252} w={200} h={64} label="PaaS" sub="Lambda · Beanstalk · RDS" icon="lambda" tone="purple" step={3} />
+  <Node x={850} y={252} w={200} h={64} label="SaaS" sub="WorkMail · QuickSight" icon="cloud" tone="teal" step={4} />
+
+  {/* Row 1 — your data. Orange in every column: it is never AWS's. */}
+  <Node x={175} y={320} w={200} h={42} label="Your data" tone="orange" step={1} />
+  <Node x={400} y={320} w={200} h={42} label="Your data" tone="orange" step={2} />
+  <Node x={625} y={320} w={200} h={42} label="Your data" tone="orange" step={3} />
+  <Node x={850} y={320} w={200} h={42} label="Your data" tone="orange" step={4} />
+
+  {/* Row 2 — application code. */}
+  <Node x={175} y={368} w={200} h={42} label="Application code" tone="orange" step={1} />
+  <Node x={400} y={368} w={200} h={42} label="Application code" tone="orange" step={2} />
+  <Node x={625} y={368} w={200} h={42} label="Application code" tone="orange" step={3} />
+  <Node x={850} y={368} w={200} h={42} label="Application code" tone="blue" step={4} />
+
+  {/* Row 3 — runtime, middleware, scaling. */}
+  <Node x={175} y={416} w={200} h={42} label="Runtime & scaling" tone="orange" step={1} />
+  <Node x={400} y={416} w={200} h={42} label="Runtime & scaling" tone="orange" step={2} />
+  <Node x={625} y={416} w={200} h={42} label="Runtime & scaling" tone="blue" step={3} />
+  <Node x={850} y={416} w={200} h={42} label="Runtime & scaling" tone="blue" step={4} />
+
+  {/* Row 4 — operating system and patching. */}
+  <Node x={175} y={464} w={200} h={42} label="Operating system" tone="orange" step={1} />
+  <Node x={400} y={464} w={200} h={42} label="Operating system" tone="orange" step={2} />
+  <Node x={625} y={464} w={200} h={42} label="Operating system" tone="blue" step={3} />
+  <Node x={850} y={464} w={200} h={42} label="Operating system" tone="blue" step={4} />
+
+  {/* Row 5 — virtualisation. */}
+  <Node x={175} y={512} w={200} h={42} label="Virtualisation" tone="orange" step={1} />
+  <Node x={400} y={512} w={200} h={42} label="Virtualisation" tone="blue" step={2} />
+  <Node x={625} y={512} w={200} h={42} label="Virtualisation" tone="blue" step={3} />
+  <Node x={850} y={512} w={200} h={42} label="Virtualisation" tone="blue" step={4} />
+
+  {/* Row 6 — the building, the power, the metal. */}
+  <Node x={175} y={560} w={200} h={42} label="Hardware & building" tone="orange" step={1} />
+  <Node x={400} y={560} w={200} h={42} label="Hardware & building" tone="blue" step={2} />
+  <Node x={625} y={560} w={200} h={42} label="Hardware & building" tone="blue" step={3} />
+  <Node x={850} y={560} w={200} h={42} label="Hardware & building" tone="blue" step={4} />
+</Diagram>
+
+A quick way to place any service you meet: **ask what you would have to patch.**
+
+| If you must patch… | You are using | Example |
+| --- | --- | --- |
+| The operating system | **IaaS** | EC2 |
+| Nothing, but you deploy code | **PaaS** | Lambda, Elastic Beanstalk |
+| Nothing, and you deploy nothing | **SaaS** | WorkMail, QuickSight |
+
+<Callout type="exam">
+Cloud Practitioner questions rarely say "IaaS" outright. They describe a requirement —
+"the team wants full control over the operating system" (IaaS / EC2) or "the company wants
+to run code without managing servers" (PaaS / Lambda) — and you have to recognise the shape.
+</Callout>
+
+## The three deployment models
+
+A much shorter list, and it comes up mostly as a vocabulary check.
+
+- **Cloud** — everything runs on AWS. A company founded after about 2010 is usually here.
+- **Hybrid** — some workloads on AWS, some in your own data centre, connected together
+  (typically with **AWS Direct Connect** or a **Site-to-Site VPN**). This is where most large
+  established companies actually live, often for years.
+- **On-premises** — everything in your own facility. Sometimes called "private cloud" when it
+  is virtualised and self-service internally, which confuses people; the distinguishing
+  feature is still that you own the hardware.
+
+<Callout type="gotcha">
+Hybrid is not a failure state or a halfway house someone forgot to finish. Regulated data
+that legally cannot leave a country, a mainframe nobody dares move, or a factory floor that
+must keep running when the internet drops — these are permanent, deliberate reasons to stay
+hybrid.
+</Callout>
+
+<Scenario
+  who="A 15-person company that sells revision guides to students"
+  problem="Traffic is nothing for ten months and enormous for two, right before exams. They own four servers sized for exam season, so for most of the year they are paying to cool idle metal — and last May they still fell over, because the guess was wrong in the other direction."
+  solution="Move the site onto EC2 behind a load balancer in an Auto Scaling group, with the files on S3 and CloudFront in front. Set the group to a minimum of two instances and let it grow to twenty when CPU rises."
+  outcome="Quiet months cost roughly a fifth of the old hosting bill; exam season scales to twenty instances for six weeks and then gives them back."
+>
+This is the single most common reason a real company moves to AWS, and it is worth noticing
+that the win came from the **shape** of their demand, not its size. A workload that is
+genuinely flat around the clock is the one case where owning the hardware can still win.
+</Scenario>
+
+## What you are actually buying
+
+Before the service-by-service lessons, one framing that makes the rest of this site easier.
+AWS sells you four things, and almost every service is a variation on one of them:
+
+1. **Compute** — somewhere to run code. *(EC2, Lambda, ECS)*
+2. **Storage** — somewhere to keep bytes. *(S3, EBS, EFS)*
+3. **Networking** — how the bytes and the requests move. *(VPC, Route 53, CloudFront)*
+4. **Databases** — storage that understands the shape of your data. *(RDS, DynamoDB)*
+
+Everything else — security, monitoring, billing tools — exists to control, watch or pay for
+those four. When a new service name appears, asking "which of the four is this?" gets you
+most of the way to understanding it.
+
+<Quiz
+  question="A company is deciding how to host a new application. They want to avoid a large up-front hardware purchase and pay only for the capacity they consume each month. Which benefit of cloud computing does this describe?"
+  choose={1}
+  options={[
+    {
+      text: 'Trading capital expense for variable expense',
+      correct: true,
+      why: 'Capital expenditure is money spent up front on assets you own; variable expenditure is money spent on what you actually consumed. Avoiding an up-front purchase in favour of monthly consumption is exactly this trade.',
+    },
+    {
+      text: 'Benefiting from massive economies of scale',
+      why: 'Economies of scale explain why AWS’s unit prices are low — its enormous purchasing power. That is about the price per hour, not about whether you pay up front or monthly.',
+    },
+    {
+      text: 'Going global in minutes',
+      why: 'This is about deploying into other geographic Regions to reduce latency for distant users. Nothing in the question mentions users in other countries.',
+    },
+    {
+      text: 'Increasing speed and agility',
+      why: 'Speed and agility is about how quickly you can provision resources and therefore how cheaply you can experiment. The question is about the payment model, not provisioning time.',
+    },
+  ]}
+  explain="Watch for the giveaway phrases. <strong>“Up-front”, “capital”, “pay only for what you use”</strong> point at CapEx → OpEx. <strong>“Users in Asia are experiencing high latency”</strong> points at going global. <strong>“Provision in minutes rather than weeks”</strong> points at agility."
+/>
+
+<Quiz
+  question="A development team wants to run a custom application on a Linux distribution they have chosen themselves, and they need to install specific kernel modules. They do not want to own or maintain any physical hardware. Which service model best fits?"
+  choose={1}
+  options={[
+    {
+      text: 'Infrastructure as a Service (IaaS)',
+      correct: true,
+      why: 'Choosing your own operating system and installing kernel modules requires operating-system-level access, which is precisely what IaaS gives you. On AWS this is Amazon EC2.',
+    },
+    {
+      text: 'Platform as a Service (PaaS)',
+      why: 'In PaaS the provider manages the operating system and runtime for you — which is convenient, but it means you cannot choose the distribution or install kernel modules.',
+    },
+    {
+      text: 'Software as a Service (SaaS)',
+      why: 'SaaS is finished software you log in and use. There is no place to run a custom application at all.',
+    },
+    {
+      text: 'On-premises deployment',
+      why: 'This would give the required control, but the team explicitly does not want to own or maintain hardware — which is the defining characteristic of on-premises.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="Which of the following are advantages of cloud computing as described by AWS? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'You can stop guessing about capacity',
+      correct: true,
+      why: 'One of the six named advantages. You scale to match actual demand instead of predicting a peak months in advance and buying for it.',
+    },
+    {
+      text: 'You can go global in minutes',
+      correct: true,
+      why: 'Another of the six. Deploying into additional Regions puts your application near distant users without building anything physical there.',
+    },
+    {
+      text: 'AWS becomes responsible for the security of your application data',
+      why: 'It does not. Your data remains your responsibility in every service model — this is the Shared Responsibility Model, and misreading it is a classic exam trap.',
+    },
+    {
+      text: 'Running any workload in the cloud is always cheaper than owning hardware',
+      why: 'AWS never claims this, and it is not true. A completely flat, fully utilised, long-lived workload can be cheaper to own. The cloud’s advantage grows with how much your demand varies.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Cloud computing is <strong>on-demand delivery of IT resources over the internet, with pay-as-you-go pricing</strong>. Learn that sentence — it is close to the exam’s own wording.',
+    'The core win is <strong>elasticity</strong>: growing when demand arrives, and — the half people forget — <strong>giving capacity back</strong> when it leaves.',
+    'Six advantages: <strong>E</strong>conomies of scale, <strong>C</strong>apEx→OpEx, <strong>S</strong>top guessing capacity, <strong>S</strong>peed and agility, <strong>G</strong>et out of the data-centre business, <strong>G</strong>o global in minutes.',
+    '<strong>IaaS</strong> you patch the OS · <strong>PaaS</strong> you deploy code · <strong>SaaS</strong> you just log in. Moving up removes work <em>and</em> control together.',
+    'Deployment models: <strong>cloud, hybrid, on-premises</strong>. Hybrid is a permanent, deliberate choice for plenty of real companies.',
+    'Almost every AWS service is <strong>compute, storage, networking or a database</strong> — or a tool to secure, watch or pay for those.',
+  ]}
+/>

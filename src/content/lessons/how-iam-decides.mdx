@@ -1,0 +1,510 @@
+---
+title: 'How IAM Decides: Users, Roles and Policies'
+summary: Every action on AWS is a request that gets evaluated against a fixed set of rules. Learn the order those rules run in and IAM stops being guesswork.
+exams: [CCP, SAA]
+track: security
+order: 20
+domains:
+  CCP: 'Domain 2 — Security and Compliance'
+  SAA: 'Domain 1 — Design Secure Architectures'
+minutes: 12
+hook: At 02:14 the pager went off. Somebody was running GPUs in four Regions on the company card — and AWS had said yes to every single request. This is the story of why.
+updated: 2026-08-14
+---
+
+import Diagram from '../../components/Diagram.astro';
+import IamSimulator from '../../components/IamSimulator.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## 02:14 — the billing alarm
+
+A four-person analytics company. Two days earlier a developer had pushed a tidy little
+refactor: the reporting service moved from a hard-coded path to a config file. The config file
+had a comment above it that said `# TODO: move to secrets manager`, and underneath the comment,
+in plain text, an AWS access key.
+
+The repository was private. On Tuesday it was made public, because someone wanted to show a
+recruiter their work.
+
+**Nine minutes** after that push, GPU instances started launching in Regions the company had
+never used. Not because anybody guessed a password — because bots continuously scrape public
+commits for anything matching `AKIA…`, and a leaked AWS key is worth money the moment it is
+found. By 02:14 the bill was past $8,000 and climbing in four Regions at once.
+
+Here is the part that matters for the exam, and for your job:
+
+> **AWS was not breached. AWS did exactly what it was told.** Every one of those
+> `RunInstances` calls was evaluated against the same rules as every other request, and every
+> one came back *Allow*.
+
+The post-mortem question is not "how did they get in". It is **why did the answer come back
+yes** — and that question has a fixed, four-step answer you can memorise today.
+
+## Every action is a request
+
+Clicking a button in the console, running a CLI command, an application calling an API — all of
+it arrives at AWS as the same kind of thing: a **request** carrying *who* is asking, *what* they
+want to do, *which* resource they want to do it to, and context such as source IP and whether
+MFA was used.
+
+**IAM** (Identity and Access Management) is the service that answers yes or no. It is free, it
+is global rather than per-Region, and it runs the same sequence on every single request —
+including the ones launching mining rigs at two in the morning.
+
+<Diagram
+  title="How AWS evaluates a request"
+  viewBox="0 50 1020 450"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'A request arrives',
+      body: 'It carries the <strong>principal</strong> (which user or role), the <strong>action</strong> (<code>s3:DeleteObject</code>), the <strong>resource</strong> it targets, and context such as source IP address and whether MFA was used.',
+      flow: 'w-in',
+    },
+    {
+      title: 'Is there an explicit Deny anywhere?',
+      body: 'AWS gathers <em>every</em> policy that applies and looks for an explicit <code>"Effect": "Deny"</code>. If it finds one, the request is refused immediately. <strong>Nothing can override an explicit Deny</strong> — not an administrator policy, not the account owner.',
+      flow: 'w-deny1',
+    },
+    {
+      title: 'Do the organisation’s guardrails permit it?',
+      body: 'If the account belongs to an <strong>AWS Organization</strong>, <strong>Service Control Policies</strong> set the maximum permissions the account may ever have. An SCP grants nothing — it only limits. Outside the boundary, the answer is no even for the root user.',
+      flow: ['w-2', 'w-deny2'],
+    },
+    {
+      title: 'Is there an explicit Allow?',
+      body: 'Now AWS looks for a policy that actually permits the action — attached to the identity, attached to the resource, or both. Without one, the search ends here.',
+      flow: ['w-3', 'w-deny3'],
+    },
+    {
+      title: 'Everything that is not allowed is denied',
+      body: 'The default is <strong>implicit deny</strong>. A brand-new IAM user can do precisely nothing until someone grants a permission — which is the opposite of how most systems you have used behave.',
+      flow: 'w-allow',
+      duration: 1400,
+    },
+  ]}
+  caption="Two sentences cover most of IAM: an explicit Deny always wins, and no Allow means no."
+>
+  <Node x={110} y={250} w={170} h={90} label="Request" sub="who · what · which" icon="user" tone="muted" step={1} />
+
+  <Node x={350} y={250} w={180} h={86} label="Explicit Deny?" icon="deny" tone="red" step={2} />
+  <Node x={590} y={250} w={180} h={86} label="SCP allows it?" icon="shield" tone="purple" step={3} />
+  <Node x={830} y={250} w={180} h={86} label="Any Allow?" icon="key" tone="blue" step={4} />
+
+  <Node x={350} y={110} w={190} h={70} label="DENIED" sub="explicit deny wins" tone="red" step={2} />
+  <Node x={590} y={110} w={190} h={70} label="DENIED" sub="outside the guardrail" tone="red" step={3} />
+  <Node x={830} y={110} w={190} h={70} label="DENIED" sub="implicit — the default" tone="red" step={4} />
+
+  <Node x={830} y={430} w={210} h={76} label="ALLOWED" icon="allow" tone="green" step={5} />
+
+  <Wire id="w-in" from={[195, 250]} to={[258, 250]} tone="muted" step={1} />
+  <Wire id="w-2" from={[440, 250]} to={[498, 250]} tone="teal" step={3} label="no" labelDy={-10} />
+  <Wire id="w-3" from={[680, 250]} to={[738, 250]} tone="teal" step={4} label="yes" labelDy={-10} />
+
+  <Wire id="w-deny1" from={[350, 207]} to={[350, 147]} tone="red" step={2} label="yes" labelDx={24} labelDy={4} />
+  <Wire id="w-deny2" from={[590, 207]} to={[590, 147]} tone="red" step={3} label="no" labelDx={24} labelDy={4} />
+  <Wire id="w-deny3" from={[830, 207]} to={[830, 147]} tone="red" step={4} label="no" labelDx={24} labelDy={4} />
+
+  <Wire id="w-allow" from={[830, 293]} to={[830, 390]} tone="green" step={5} label="yes" labelDx={24} labelDy={0} />
+</Diagram>
+
+<Mnemonic
+  title="Policy evaluation, in order"
+  phrase="Deny beats Guardrail beats Allow beats Nothing"
+  tone="purple"
+  items={[
+    { key: '1', term: 'Explicit Deny', note: 'found anywhere, in any policy — stop, refuse. Unoverridable' },
+    { key: '2', term: 'Service Control Policy', note: 'the organisation’s ceiling. It limits; it never grants' },
+    { key: '3', term: 'Explicit Allow', note: 'from an identity policy or a resource policy' },
+    { key: '4', term: 'Implicit Deny', note: 'nothing said yes, so the answer is no' },
+  ]}
+/>
+
+### Now run the stolen key through those four steps
+
+`RunInstances` in `ap-northeast-1`, using the key from the config file. Walk the gates:
+
+1. **Explicit Deny?** There were no Deny statements anywhere in the account. Nobody had written
+   one, because nobody had imagined needing one. → *pass*
+2. **SCP guardrail?** The company had a single AWS account and no AWS Organization, so there
+   was no ceiling to be outside of. → *pass*
+3. **Any Allow?** The key belonged to an IAM user in the `Developers` group, and that group had
+   `AdministratorAccess` attached, because in month one it was easier than working out what the
+   reporting service actually needed. `"Action": "*"` on `"Resource": "*"`. → *pass*
+4. **Verdict:** Allow. Four Regions. $8,000.
+
+Every gate did its job. The gates were simply all wide open.
+
+<Callout type="gotcha" title="The nine minutes are real">
+AWS itself scans public repositories for exposed keys and will attach a quarantine policy
+(`AWSCompromisedKeyQuarantineV2`) when it finds one — but that is a backstop measured in
+minutes, and mining bots are faster. Treat any key that has ever touched a repository, a log, a
+screenshot or a Slack message as **already public**: deactivate it, delete it, and check
+CloudTrail for what it did in the meantime.
+</Callout>
+
+## Be the evaluator
+
+Same company, rebuilt. Alice now deletes an old report through a role, with a Region guardrail
+overhead and a bucket policy that insists on MFA. The command is real, the error messages are
+the ones AWS actually returns.
+
+Flip the switches and find every way to get told no — then read the last few words of each
+`AccessDenied`. **That tail names the gate that stopped you**, and it is the single most useful
+IAM debugging habit you can build.
+
+<IamSimulator />
+
+<Callout type="exam" title="Read the tail of the error">
+Those three endings are worth memorising, because they map exactly onto the evaluation order:
+<br />· <code>…with an explicit deny in a resource-based policy</code> → a bucket, KMS key or
+queue policy said Deny.
+<br />· <code>…with an explicit deny in a service control policy</code> → you are outside the
+organisation's ceiling; fixing IAM in the account will not help.
+<br />· <code>…because no identity-based policy allows the action</code> → nothing denied you,
+nothing allowed you either. Implicit deny. Go and grant the permission.
+</Callout>
+
+## The four things IAM is made of
+
+Four nouns, and the incident above involved three of them going wrong.
+
+**Users** are people, or occasionally a legacy application. A user has a name, optionally a
+console password, and optionally long-lived **access keys** for programmatic use. Users are
+permanent identities, and their credentials sit around until somebody rotates them —
+*which is exactly why one could still launch instances two days after it was pasted into a
+config file.*
+
+**Groups** are just a convenient bundle of users. Attach the policy to `Developers` once
+instead of to fourteen people individually. Groups cannot be nested, and a group is **not an
+identity** — you cannot make a group the principal of anything. *The reporting service was in
+`Developers` because that was the group that already existed. Convenience is how blast radius
+grows.*
+
+**Roles** are identities that **nobody owns and anybody approved can temporarily become**.
+A role has permissions but no password and no permanent keys. When something assumes a role it
+receives temporary credentials that expire in an hour or so. Roles are how an EC2 instance
+talks to S3, how a Lambda function reads DynamoDB, how one AWS account grants access to
+another, and how a user logging in through your company's identity provider gets permissions.
+
+**Policies** are JSON documents that say what is permitted. Attached to a user, group or role
+they are *identity-based*; attached to an S3 bucket, a KMS key or an SQS queue they are
+*resource-based*.
+
+<Callout type="analogy">
+A user is an employee with a permanent staff badge. A role is the hi-vis jacket hanging by the
+loading-bay door: nobody owns it, it grants exactly the access needed on the loading bay, and
+you hang it back up when you leave. If someone steals a badge they have it forever. If they
+find the jacket after hours, it has already stopped working.
+</Callout>
+
+## What a policy actually says
+
+Here is the policy that cost $8,000. It is the real `AdministratorAccess`, and it is four lines
+long:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{ "Effect": "Allow", "Action": "*", "Resource": "*" }]
+}
+```
+
+And here is what the reporting service was actually doing all along — read one file per night
+from one prefix:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadNightlyReportsOnly",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject"],
+      "Resource": "arn:aws:s3:::company-reports/2026/*",
+      "Condition": {
+        "Bool": { "aws:MultiFactorAuthPresent": "true" }
+      }
+    }
+  ]
+}
+```
+
+Same document format, same evaluation, wildly different worst case. Every statement answers
+five questions, and being able to read one is worth more than memorising service names:
+
+- **Effect** — `Allow` or `Deny`.
+- **Action** — which API calls, in `service:Operation` form. Wildcards are permitted, and
+  `"Action": "*"` is how you accidentally grant everything, including `iam:CreateUser` and
+  `ec2:RunInstances` in Regions you have never opened.
+- **Resource** — which ARNs it applies to. Note the `/2026/*`: permissions can be narrowed to a
+  prefix inside a bucket, not just to the bucket.
+- **Condition** — optional extra tests. This one refuses unless the caller authenticated with
+  MFA. Conditions are also how you restrict by source IP, by time of day, by tag, and by Region.
+- **Principal** — *who* it applies to. It appears only in **resource-based** policies; in an
+  identity-based policy the principal is whatever the policy is attached to.
+
+<Callout type="gotcha" title="Bool vs BoolIfExists — the MFA trap">
+Writing a **Deny** with `"Bool": {"aws:MultiFactorAuthPresent": "false"}` looks right and
+quietly does nothing in the cases you care about. For calls that never had an MFA context — an
+EC2 instance role, a Lambda — the key is **absent** rather than `false`, the condition does not
+match, and the Deny never fires. Use `BoolIfExists` for that check, which treats "missing" as
+"not MFA".
+</Callout>
+
+<Callout type="exam">
+Watch for questions where a user "has an Allow from their group but still cannot access the
+bucket". Look for an explicit <strong>Deny</strong> somewhere — in another attached policy, a
+bucket policy, an SCP or a permissions boundary. The explicit Deny always wins, and that is
+almost always what the question is testing.
+</Callout>
+
+## Roles, and the rule about access keys
+
+The whole story turns on one line in one config file, so this rule is worth stating bluntly:
+
+> **Never put access keys on an EC2 instance. Attach an IAM role.**
+
+Access keys hard-coded into an application, baked into an AMI or left in a configuration file
+are permanent credentials that leak — into Git repositories, into logs, into screenshots, into
+the Slack message where someone asks why the job is failing. An IAM role attached to the
+instance delivers **temporary credentials** through the instance metadata service, rotates them
+automatically, and there is nothing on disk to steal. The `# TODO: move to secrets manager`
+comment is the tell: if you are writing that comment, you already know, and a role is less work
+than the TODO.
+
+The same reasoning applies everywhere:
+
+- **EC2 needs to read S3** → an instance profile with an IAM role.
+- **Lambda needs to write to DynamoDB** → an execution role.
+- **An application in another AWS account needs your bucket** → cross-account role assumption.
+- **Your staff need console access** → **IAM Identity Center** (formerly AWS SSO) federating to
+  your existing directory, so people keep one corporate login and you create no IAM users at all.
+- **A mobile app needs to upload photos** → temporary credentials from **Amazon Cognito**, never
+  embedded keys.
+
+<Callout type="gotcha">
+The <strong>root user</strong> — the email address the account was created with — can do
+absolutely anything, including closing the account and undoing security controls. Set up MFA on
+it, delete any access keys it has, and then do not use it. AWS lists only a handful of tasks
+that genuinely require it (changing the account's support plan, closing the account, some
+billing settings). Everything else should be an IAM identity.
+</Callout>
+
+## Least privilege, and the tools that get you there
+
+**Least privilege** means granting exactly the permissions needed and no more. It is easy to
+say and tedious to do, so AWS provides help:
+
+- **IAM Access Analyzer** finds resources shared outside your account, and can generate a
+  tightly-scoped policy from what an identity has *actually* used in CloudTrail.
+- **Last accessed information** shows which services a user or role has not touched in months —
+  a straightforward list of permissions to remove.
+- **Permissions boundaries** cap the maximum permissions an identity can have, which lets you
+  safely let a team create their own roles without letting them create an administrator.
+- **IAM Policy Simulator** answers "would this request be allowed?" before you find out the
+  hard way. From the CLI:
+
+  ```bash
+  aws iam simulate-principal-policy \
+    --policy-source-arn arn:aws:iam::123456789012:role/reporting-service \
+    --action-names s3:GetObject \
+    --resource-arns arn:aws:s3:::company-reports/2026/q3.pdf
+  ```
+
+## The rebuild, in three artifacts
+
+This is what the company shipped in the week after, and it is a template worth stealing. Notice
+that each piece plugs into a different gate of the evaluation you just learned.
+
+**Gate 2 — a Region guardrail.** An SCP on the organisation, denying everything outside the two
+Regions they operate in. This is the one that would have ended the incident at minute one:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyUnapprovedRegions",
+      "Effect": "Deny",
+      "NotAction": ["iam:*", "sts:*", "cloudfront:*", "route53:*", "support:*"],
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:RequestedRegion": ["eu-west-1", "eu-west-2"]
+        }
+      }
+    }
+  ]
+}
+```
+
+The `NotAction` list matters: IAM, STS, CloudFront and Route 53 are **global** services whose
+calls land in `us-east-1`, so a naive Region lock locks you out of your own account.
+
+**Gate 3 — a role instead of a key.** The reporting service now assumes a role. The *trust*
+policy says who may become it; the permissions policy says what they can then do:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Service": "ec2.amazonaws.com" },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
+Credentials now arrive through the instance metadata service, expire in an hour, and are never
+written to disk. There is nothing left in the repository to leak.
+
+**Gate 1 — an explicit Deny on the data itself.** A bucket policy that refuses deletes from
+anyone who did not authenticate with MFA, no matter what their identity policy says:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "NoDeletesWithoutMFA",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:DeleteObject",
+      "Resource": "arn:aws:s3:::company-reports/*",
+      "Condition": {
+        "BoolIfExists": { "aws:MultiFactorAuthPresent": "false" }
+      }
+    }
+  ]
+}
+```
+
+That is the exact switch labelled *"Bucket policy denies without MFA"* in the simulator above —
+scroll back and turn it on, and watch it beat an Allow that is still sitting right there.
+
+<Callout type="note" title="Three commands for the next time you are stuck">
+· <code>aws sts get-caller-identity</code> — who am I *actually* right now? Answers more
+"permission" problems than you would expect, because the answer is often "a different principal
+than you assumed".
+<br />· <code>aws iam simulate-principal-policy …</code> — would this be allowed? Test before
+you deploy.
+<br />· CloudTrail, filtered to <code>errorCode = AccessDenied</code> — every refusal is logged
+with the principal, the action and the resource. This is the audit trail that answered "what did
+the leaked key do" in the story above.
+</Callout>
+
+<Scenario
+  who="An engineer on their first week, three months after the incident"
+  problem="They need to delete an obsolete report. Their role has AdministratorAccess. The console shows the object, the delete button is there, and it fails every time with AccessDenied. They spend an afternoon adding more Allow statements to their role, which changes nothing at all."
+  solution="Read the tail of the error: 'with an explicit deny in a resource-based policy'. That is not the identity policy talking — it is the bucket. The NoDeletesWithoutMFA statement is refusing because they signed in through a session without MFA. They sign out, sign back in with their authenticator, and the delete succeeds first try."
+  outcome="Nothing was misconfigured. The guardrail worked exactly as designed, and the fix took nine seconds once they read the last eight words of the message instead of the first two."
+>
+This is the most common IAM afternoon in the industry: **piling Allows onto a problem that an
+explicit Deny is causing**. No quantity of Allow will ever outvote one Deny. Learn to read the
+error tail and you skip the afternoon entirely.
+</Scenario>
+
+<Quiz
+  question="An application running on an Amazon EC2 instance needs to read objects from an S3 bucket. What is the most secure way to grant this access?"
+  choose={1}
+  options={[
+    {
+      text: 'Attach an IAM role to the EC2 instance granting read access to the bucket',
+      correct: true,
+      why: 'The role delivers temporary credentials through the instance metadata service and rotates them automatically. Nothing is stored on disk, so there is nothing to leak into a repository, a log or a backup.',
+    },
+    {
+      text: 'Create an IAM user, generate access keys, and store them in a configuration file on the instance',
+      why: 'Long-lived credentials sitting on disk are the single most common cause of AWS account compromise. They leak into version control and backups, and they do not expire.',
+    },
+    {
+      text: 'Store the access keys as environment variables on the instance',
+      why: 'Environment variables are marginally tidier than a file, but the credentials are still long-lived and still present on the instance. The exposure is essentially identical.',
+    },
+    {
+      text: 'Make the S3 bucket public so no credentials are needed',
+      why: 'This grants read access to the entire internet in order to grant it to one instance. Public buckets are among the most frequently reported causes of data breaches on AWS.',
+    },
+  ]}
+  explain="Say it as a rule: <strong>applications get roles, never access keys.</strong> EC2, Lambda, ECS, CodeBuild — every one of them supports a role, and every one of them should use one."
+/>
+
+<Quiz
+  question="A user is a member of an IAM group whose policy allows all Amazon S3 actions. The user also has an inline policy that explicitly denies s3:DeleteObject. What can the user do?"
+  choose={1}
+  options={[
+    {
+      text: 'Perform all S3 actions except deleting objects',
+      correct: true,
+      why: 'Permissions from all attached policies are combined, but an explicit Deny always overrides any Allow. The group grants everything; the explicit Deny removes exactly one action.',
+    },
+    {
+      text: 'Perform all S3 actions, because the group policy is more permissive',
+      why: 'Precedence is not decided by how permissive a policy is, nor by where it is attached. An explicit Deny wins over any Allow, always.',
+    },
+    {
+      text: 'Perform no S3 actions, because a Deny invalidates the group policy',
+      why: 'The Deny applies only to the action it names. Every other S3 action still has a valid Allow from the group policy.',
+    },
+    {
+      text: 'Only delete objects, since the inline policy is evaluated last',
+      why: 'Policies are not evaluated in attachment order, and this inverts the meaning of Deny.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="A company uses AWS Organizations. A Service Control Policy attached to an organizational unit denies all actions in the ap-southeast-2 Region. An IAM user in a member account has the AdministratorAccess policy attached. What happens when that user tries to launch an EC2 instance in ap-southeast-2?"
+  choose={1}
+  options={[
+    {
+      text: 'The request is denied — an SCP sets a ceiling that no policy in the member account can exceed',
+      correct: true,
+      why: 'Service Control Policies define the maximum available permissions for an account. Anything outside that boundary is unavailable regardless of IAM policies inside the account — including to the root user.',
+    },
+    {
+      text: 'The request succeeds, because AdministratorAccess grants all actions',
+      why: 'AdministratorAccess grants everything the account is permitted to do, but the SCP has reduced what the account is permitted to do in the first place. IAM cannot grant beyond the ceiling.',
+    },
+    {
+      text: 'The request succeeds only if the user has MFA enabled',
+      why: 'MFA can be required by a Condition in a policy, but no amount of authentication moves an SCP boundary.',
+    },
+    {
+      text: 'The request succeeds because SCPs apply only to the management account',
+      why: 'This is backwards. SCPs apply to member accounts and do not restrict the management account, which is one reason to run no workloads in it.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Evaluation order, memorised: <strong>explicit Deny → SCP guardrail → explicit Allow → implicit Deny</strong>. An explicit Deny cannot be overridden by anything.',
+    'The default is <strong>no access</strong>. A new IAM identity can do nothing until you grant something.',
+    '<strong>Users</strong> are permanent identities · <strong>groups</strong> are bundles of users and never a principal · <strong>roles</strong> are temporarily assumed and issue expiring credentials.',
+    '<strong>Applications get roles, never access keys.</strong> EC2, Lambda and ECS all support them, and there is nothing on disk to leak.',
+    'A policy statement is <strong>Effect, Action, Resource, Condition</strong> — plus <strong>Principal</strong> when it is attached to a resource rather than an identity.',
+    'An <strong>SCP</strong> limits and never grants. It caps a whole account, root user included.',
+    'Protect the <strong>root user</strong> with MFA, delete its access keys, and use it for nothing else.',
+    'When something is refused, <strong>read the last words of the AccessDenied message</strong> — it names which of the four rules stopped you, and therefore which one you have to change.',
+  ]}
+/>
+
+---
+
+The company in this lesson is still trading. Nothing about their recovery was clever: a role
+instead of a key, a Region guardrail, an explicit Deny on the data that matters, and MFA on the
+humans. Four small artifacts, each one plugging into a gate you can now name in order.
+
+That is the whole trick. IAM is not a wall of jargon — it is one sequence, run on every request
+ever made, and you have just watched it run.

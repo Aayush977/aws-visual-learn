@@ -1,0 +1,331 @@
+/* =========================================================================
+   Design tokens.
+   Everything visual on the site reads from these. To reskin the whole site,
+   change values here and nowhere else.
+   ========================================================================= */
+
+:root {
+  /* --- AWS brand-adjacent palette. Used inside diagrams so the colours you
+         learn here match the colours in the real console. --- */
+  --aws-squid: #232f3e; /* navy, the console chrome */
+  --aws-orange: #ff9900; /* the AWS orange */
+  --aws-teal: #01a88d; /* database / analytics family */
+  --aws-blue: #4d8fd1; /* networking family */
+  --aws-purple: #8c4fff; /* security & identity family */
+  --aws-green: #3f9c35; /* storage family */
+  --aws-red: #d13212; /* errors, denies, failures */
+
+  /* --- Semantic surface + text. Light theme. --- */
+  --bg: #ffffff;
+  --bg-sunken: #f4f6f8;
+  --bg-raised: #ffffff;
+  --border: #d5dbdb;
+  --border-strong: #aab7b8;
+  --text: #16191f;
+  --text-muted: #56616b;
+  --text-inverse: #ffffff;
+
+  --accent: #0972d3;
+  --accent-hover: #033160;
+  --accent-soft: #f0f7ff;
+
+  /* Diagram-specific surfaces */
+  --diagram-bg: #fbfcfd;
+  --diagram-grid: #e9edf1;
+  --diagram-boundary: #7d8998;
+  --diagram-dim: 0.16;
+
+  /* Type */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  --step--1: clamp(0.83rem, 0.8rem + 0.15vw, 0.9rem);
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.09rem);
+  --step-1: clamp(1.2rem, 1.12rem + 0.4vw, 1.45rem);
+  --step-2: clamp(1.45rem, 1.3rem + 0.75vw, 1.95rem);
+  --step-3: clamp(1.75rem, 1.5rem + 1.25vw, 2.6rem);
+
+  /* Space */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+  --sp-8: 4rem;
+
+  --radius: 8px;
+  --radius-lg: 14px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 4px 12px rgb(0 0 0 / 0.05);
+
+  --content-width: 46rem;
+  --wide-width: 76rem;
+}
+
+:root[data-theme='dark'] {
+  --bg: #0f1b2a;
+  --bg-sunken: #0a1420;
+  --bg-raised: #16263a;
+  --border: #2b3f56;
+  --border-strong: #3f5670;
+  --text: #eef2f6;
+  --text-muted: #9fb0c3;
+  --text-inverse: #0f1b2a;
+
+  --accent: #6cb6ff;
+  --accent-hover: #a6d3ff;
+  --accent-soft: #14283f;
+
+  --diagram-bg: #0c1826;
+  --diagram-grid: #1b2c40;
+  --diagram-boundary: #6b8199;
+  --diagram-dim: 0.2;
+
+  --aws-blue: #7fb4e8;
+  --aws-teal: #2fd4b8;
+  --aws-purple: #b18cff;
+  --aws-green: #6fc862;
+  --aws-red: #ff6b4a;
+
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 18px rgb(0 0 0 / 0.35);
+}
+
+/* =========================================================================
+   Reset & base
+   ========================================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--step-0);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--step-3);
+  margin: 0 0 var(--sp-3);
+}
+h2 {
+  font-size: var(--step-2);
+  margin: var(--sp-7) 0 var(--sp-3);
+}
+h3 {
+  font-size: var(--step-1);
+  margin: var(--sp-6) 0 var(--sp-2);
+}
+
+p {
+  margin: 0 0 var(--sp-4);
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 0.2em;
+}
+a:hover {
+  color: var(--accent-hover);
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+
+pre {
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-4);
+  overflow-x: auto;
+}
+pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: var(--sp-7) 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--sp-5) 0;
+  font-size: var(--step--1);
+}
+th,
+td {
+  text-align: left;
+  padding: var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+th {
+  background: var(--bg-sunken);
+  font-weight: 650;
+}
+tbody tr:hover {
+  background: var(--bg-sunken);
+}
+
+blockquote {
+  margin: var(--sp-5) 0;
+  padding-left: var(--sp-4);
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-muted);
+}
+
+:where(a, button, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* =========================================================================
+   Buttons
+
+   Used on the home page, the study paths and the quiz runner, so they live
+   here rather than being scoped to one component.
+   ========================================================================= */
+
+.btn {
+  display: inline-block;
+  padding: 0.65rem 1.15rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 650;
+  font-size: var(--step--1);
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn--primary {
+  background: var(--aws-orange);
+  border-color: var(--aws-orange);
+  color: #16191f;
+}
+.btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--aws-orange) 85%, #000);
+  border-color: color-mix(in srgb, var(--aws-orange) 85%, #000);
+  color: #16191f;
+}
+
+/* =========================================================================
+   Layout primitives
+   ========================================================================= */
+
+.wrap {
+  width: min(100% - 2rem, var(--wide-width));
+  margin-inline: auto;
+}
+
+.prose {
+  width: min(100% - 2rem, var(--content-width));
+  margin-inline: auto;
+}
+
+/*
+ * Inside a lesson, let diagrams break out of the reading column.
+ * `--bleed-w` is how wide they are allowed to get; layouts that put something
+ * beside the reading column (like the lesson sidebar) narrow it.
+ */
+.prose {
+  --bleed-w: min(var(--wide-width), calc(100vw - 2rem));
+}
+.prose > .bleed {
+  width: var(--bleed-w);
+  margin-inline: calc(50% - var(--bleed-w) / 2);
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--sp-4);
+  top: -4rem;
+  z-index: 100;
+  background: var(--accent);
+  color: #fff;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius);
+  transition: top 0.15s;
+}
+.skip-link:focus {
+  top: var(--sp-4);
+  color: #fff;
+}

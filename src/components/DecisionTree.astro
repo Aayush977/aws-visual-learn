@@ -1,0 +1,365 @@
+---
+/**
+ * "Which service do I pick?" — a clickable decision tree.
+ *
+ * With JavaScript it walks one question at a time and keeps a breadcrumb of the
+ * answers you gave. Without JavaScript every branch renders as a labelled
+ * outline, so the whole tree is still readable (and printable).
+ *
+ *   <DecisionTree
+ *     title="Which S3 storage class?"
+ *     tree={{
+ *       q: 'How often will you read this object?',
+ *       options: [
+ *         { label: 'Several times a week', next: { result: 'S3 Standard' } },
+ *         { label: 'A few times a year', next: { q: '…', options: [ … ] } },
+ *       ],
+ *     }}
+ *   />
+ */
+export type DecisionLeaf = {
+  result: string;
+  detail?: string;
+  tone?: 'good' | 'warn' | 'bad';
+};
+export type DecisionQuestion = {
+  q: string;
+  hint?: string;
+  options: { label: string; note?: string; next: DecisionNode }[];
+};
+export type DecisionNode = DecisionLeaf | DecisionQuestion;
+
+interface Props {
+  title: string;
+  tree: DecisionNode;
+  intro?: string;
+}
+
+const { title, tree, intro } = Astro.props;
+
+const uid = 'dt-' + Math.random().toString(36).slice(2, 9);
+
+type Panel =
+  | { kind: 'q'; id: string; path: string[]; q: string; hint?: string; options: { label: string; note?: string; next: string }[] }
+  | { kind: 'r'; id: string; path: string[]; result: string; detail?: string; tone: 'good' | 'warn' | 'bad' };
+
+const panels: Panel[] = [];
+
+function isLeaf(n: DecisionNode): n is DecisionLeaf {
+  return 'result' in n;
+}
+
+function walk(node: DecisionNode, id: string, path: string[]) {
+  if (isLeaf(node)) {
+    panels.push({ kind: 'r', id, path, result: node.result, detail: node.detail, tone: node.tone ?? 'good' });
+    return;
+  }
+  panels.push({
+    kind: 'q',
+    id,
+    path,
+    q: node.q,
+    hint: node.hint,
+    options: node.options.map((o, i) => ({ label: o.label, note: o.note, next: `${id}-${i}` })),
+  });
+  node.options.forEach((o, i) => walk(o.next, `${id}-${i}`, [...path, o.label]));
+}
+
+walk(tree, `${uid}-0`, []);
+---
+
+<section class="dt" aria-labelledby={`${uid}-h`} data-root={`${uid}-0`}>
+  <header class="dt__head">
+    <p class="dt__eyebrow">Decide</p>
+    <h4 class="dt__title" id={`${uid}-h`}>{title}</h4>
+    {intro && <p class="dt__intro">{intro}</p>}
+  </header>
+
+  <div class="dt__panels">
+    {
+      panels.map((p) => (
+        <div class="dt__panel" id={p.id} data-panel data-depth={p.path.length} tabindex="-1">
+          {p.path.length > 0 && (
+            <p class="dt__crumbs">
+              {p.path.map((c, i) => (
+                <>
+                  {i > 0 && <span class="dt__crumbSep" aria-hidden="true">→</span>}
+                  <span class="dt__crumb">{c}</span>
+                </>
+              ))}
+            </p>
+          )}
+
+          {p.kind === 'q' ? (
+            <>
+              <p class="dt__q">{p.q}</p>
+              {p.hint && <p class="dt__hint">{p.hint}</p>}
+              <ul class="dt__options">
+                {p.options.map((o) => (
+                  <li>
+                    <a class="dt__option" href={`#${o.next}`} data-goto={o.next}>
+                      <span class="dt__optionLabel">{o.label}</span>
+                      {o.note && <span class="dt__optionNote">{o.note}</span>}
+                      <svg class="dt__chev" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m9 5 7 7-7 7" />
+                      </svg>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <div class={`dt__result dt__result--${p.tone}`}>
+              <p class="dt__resultLabel">Use</p>
+              <p class="dt__resultName">{p.result}</p>
+              {p.detail && <p class="dt__resultDetail">{p.detail}</p>}
+            </div>
+          )}
+        </div>
+      ))
+    }
+  </div>
+
+  <div class="dt__foot">
+    <button type="button" class="dt__nav" data-act="back">← Back</button>
+    <button type="button" class="dt__nav" data-act="restart">Start over</button>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLElement>('.dt').forEach((root) => {
+    const rootId = root.dataset.root!;
+    const panels = new Map<string, HTMLElement>();
+    root.querySelectorAll<HTMLElement>('[data-panel]').forEach((p) => panels.set(p.id, p));
+
+    const backBtn = root.querySelector<HTMLButtonElement>('[data-act="back"]')!;
+    const restartBtn = root.querySelector<HTMLButtonElement>('[data-act="restart"]')!;
+    const history: string[] = [];
+    let current = rootId;
+
+    // Only start hiding panels once JS is definitely running.
+    root.classList.add('is-ready');
+
+    function show(id: string, announce = true) {
+      const next = panels.get(id);
+      if (!next) return;
+      for (const p of panels.values()) p.hidden = p.id !== id;
+      current = id;
+      backBtn.disabled = history.length === 0;
+      restartBtn.disabled = history.length === 0;
+      if (announce) next.focus({ preventScroll: true });
+    }
+
+    root.addEventListener('click', (e) => {
+      const link = (e.target as HTMLElement).closest<HTMLAnchorElement>('[data-goto]');
+      if (link) {
+        e.preventDefault();
+        history.push(current);
+        show(link.dataset.goto!);
+        return;
+      }
+      const act = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-act]')?.dataset.act;
+      if (act === 'back' && history.length) show(history.pop()!);
+      if (act === 'restart') {
+        history.length = 0;
+        show(rootId);
+      }
+    });
+
+    show(rootId, false);
+  });
+</script>
+
+<style>
+  .dt {
+    margin: var(--sp-6) 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .dt__head {
+    padding: var(--sp-4);
+    background: var(--bg-sunken);
+    border-bottom: 1px solid var(--border);
+  }
+  .dt__eyebrow {
+    margin: 0 0 var(--sp-1);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .dt__title {
+    margin: 0;
+    font-size: var(--step-1);
+  }
+  .dt__intro {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .dt__panels {
+    padding: var(--sp-4);
+    display: grid;
+    gap: var(--sp-5);
+  }
+  /* Before JS boots, every branch is visible as an outline. */
+  .dt.is-ready .dt__panels {
+    gap: 0;
+  }
+  .dt__panel {
+    scroll-margin-top: 6rem;
+  }
+  .dt.is-ready .dt__panel:not([hidden]) {
+    outline: none;
+  }
+  .dt:not(.is-ready) .dt__panel {
+    padding-left: calc(var(--depth, 0) * 0);
+    border-left: 2px solid var(--border);
+    padding-left: var(--sp-4);
+  }
+
+  .dt__crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .dt__crumb {
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.1rem 0.55rem;
+  }
+  .dt__crumbSep {
+    opacity: 0.6;
+  }
+
+  .dt__q {
+    margin: 0 0 var(--sp-1);
+    font-size: var(--step-1);
+    font-weight: 650;
+  }
+  .dt__hint {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .dt__options {
+    list-style: none;
+    margin: var(--sp-3) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--sp-2);
+  }
+  .dt__option {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--text);
+    background: var(--bg);
+    transition:
+      border-color 0.15s,
+      background 0.15s,
+      transform 0.15s;
+  }
+  .dt__option:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--text);
+    transform: translateX(2px);
+  }
+  .dt__optionLabel {
+    font-weight: 600;
+  }
+  .dt__optionNote {
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .dt__chev {
+    margin-left: auto;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: var(--text-muted);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .dt__result {
+    --r-tone: var(--aws-green);
+    border: 1px solid color-mix(in srgb, var(--r-tone) 40%, var(--border));
+    border-left: 4px solid var(--r-tone);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--r-tone) 8%, var(--bg));
+    padding: var(--sp-4);
+  }
+  .dt__result--warn {
+    --r-tone: var(--aws-orange);
+  }
+  .dt__result--bad {
+    --r-tone: var(--aws-red);
+  }
+  .dt__resultLabel {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .dt__resultName {
+    margin: 0 0 var(--sp-2);
+    font-size: var(--step-1);
+    font-weight: 700;
+  }
+  .dt__resultDetail {
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .dt__foot {
+    display: none;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4);
+    border-top: 1px solid var(--border);
+    background: var(--bg-sunken);
+  }
+  .dt.is-ready .dt__foot {
+    display: flex;
+  }
+  .dt__nav {
+    font: inherit;
+    font-size: var(--step--1);
+    font-weight: 600;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .dt__nav:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .dt__nav:not(:disabled):hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+</style>
