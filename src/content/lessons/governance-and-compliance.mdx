@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 2 — Security and Compliance'
   SAA: 'Domain 1 — Design Secure Architectures'
 minutes: 11
-hook: CloudTrail says who did it. Config says what it looks like now. Auditors want both, in writing.
-updated: 2026-08-11
+hook: Three questions from an auditor. Everyone in the room knew the answers were knowable, and nobody could produce one — because the evidence had been overwritten 90 days ago by default.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -21,6 +21,31 @@ import Mnemonic from '../../components/Mnemonic.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## Three questions, no answers
+
+Aldgate Health's first SOC 2 audit lasted about four minutes before it stopped being
+comfortable. The auditor asked three questions, in a mild tone, one after another.
+
+*Who changed the production database's security group last March?*
+
+*Has any S3 bucket in this account ever been public?*
+
+*Show me the certification covering the physical data centre this runs in.*
+
+Nobody in the room thought these were unfair. Every one of them was, in principle, a knowable
+fact about a system they owned. And they could not answer a single one.
+
+The first was gone — CloudTrail's default free view holds 90 days of management events, and
+March was long past. The second had never been recorded at all, because nothing was tracking
+what resources *looked like* over time, only what people did. The third they could have had in
+sixty seconds from a service they did not know existed, and instead they emailed their account
+manager and waited nine days.
+
+The team's security was genuinely fine. They had simply never separated two things that sound
+identical: **being secure, and being able to demonstrate it afterwards.**
+
+## Demonstrating, not securing
 
 Security services stop bad things happening. **Governance** is the separate question of whether
 you can *demonstrate* that your account looks the way you claim it does — to a regulator, an
@@ -275,3 +300,21 @@ services, no overlap — which is exactly how these appear on the exam.
     'AWS’s certifications cover <strong>AWS’s half only</strong>. Your application’s compliance is still yours.',
   ]}
 />
+
+---
+
+Map the auditor's three questions onto the four services and the whole topic arranges itself:
+
+| The question | The service | Why |
+| --- | --- | --- |
+| *Who changed it?* | **CloudTrail** | A log of API calls, with a name and a timestamp |
+| *What did it look like, and when?* | **Config** | A timeline of resource state, plus rules that flag drift |
+| *Is AWS's half certified?* | **Artifact** | AWS's own SOC 2, ISO and PCI reports, downloadable |
+| *Is our half certified?* | **Audit Manager** | Continuously gathers evidence against a framework |
+
+Aldgate passed on the second attempt, and the change that mattered was not a new control. It was
+an SCP that makes it impossible for anyone in the organisation to stop CloudTrail — because the
+lesson of the first audit was never that somebody had done something wrong.
+
+It was that **evidence has to be collected before you know you need it**, by something that
+cannot be switched off by whoever most wants it switched off.

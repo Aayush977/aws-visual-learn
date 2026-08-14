@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 2 — Design Resilient Architectures'
 minutes: 12
-hook: If you can draw this one diagram from memory, a surprising number of exam questions answer themselves.
-updated: 2026-08-07
+hook: A shopper in Sydney taps a link at 40 milliseconds past the hour. Follow that one request all the way to the database and back — every service you need to know sits somewhere on its path.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -22,11 +22,23 @@ import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
 
-Individual AWS services make much more sense once you have seen where they sit in the
-path of a single request. This is the reference architecture that turns up, in some
-form, in most Solutions Architect scenario questions.
+## One tap, 11,000 miles
 
-Play it all the way through, then read the section for each hop.
+It is 21:40 in Sydney. A shopper who has never heard of Yorkshire taps a link to a Kettle & Fox
+enamel mug, because a friend sent it to her.
+
+Between that tap and the photograph appearing on her screen, her request will be answered by a
+name server that has never seen the product, pass through a building in Sydney that holds a
+copy of the image, cross the planet exactly once, be handed to a machine chosen a few
+milliseconds earlier on the grounds that it is still answering, and cause a database in Ireland
+to be asked one question. Total elapsed time: about a third of a second.
+
+Nobody designed that journey as one thing. It is six services, each solving one problem, and
+**almost every AWS service you need to know sits somewhere on this path.** Learn the path and
+the services stop being a list.
+
+This is also the reference architecture that turns up, in some form, in most Solutions
+Architect scenario questions. Play it all the way through, then read the section for each hop.
 
 <Diagram
   title="One request, end to end"
@@ -128,6 +140,11 @@ load balancer. Route 53 is the only one of the two that can move traffic across 
 
 **CloudFront** is the CDN. It keeps copies of your content at hundreds of edge locations
 and serves them from whichever one is closest to the user.
+
+Our shopper in Sydney is about to get the mug photograph from a building in Sydney, because
+somebody else in Australia looked at the same mug forty minutes ago. The photograph never
+crosses the Pacific for her at all. The *price and stock* still do — that part is not cacheable
+— which is why the page arrives in two pieces and the heavy piece arrives first.
 
 Two consequences that matter more than they first appear:
 
@@ -286,3 +303,13 @@ scenario questions are constructed.
     '<strong>Multi-AZ = availability. Read replica = performance. Backup = recovery.</strong>',
   ]}
 />
+
+---
+
+The mug arrived in Sydney in about a third of a second, and not one part of that journey was
+clever. Each hop solved one narrow problem and then handed the request on.
+
+That is why this diagram is worth memorising rather than merely reading. A scenario question
+almost never asks you to design the whole path — it describes a symptom and expects you to name
+**which hop is wrong**. Users in Asia are slow? Hop 2. Failover to another Region? Hop 1. One
+instance died and took the site with it? Hop 3. Reads are hammering the database? Hop 5.

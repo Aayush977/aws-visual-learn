@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 2 — Security and Compliance'
   SAA: 'Domain 1 — Design Secure Architectures'
 minutes: 11
-hook: Encryption is not the hard part — AWS gives it away. Deciding who is allowed to hold the key is the whole subject.
-updated: 2026-08-11
+hook: 'Is the data encrypted? Yes — all of it. Then prove the contractor who left in March can no longer read it. Everything was encrypted, and nobody could answer the second question.'
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -22,6 +22,26 @@ import DecisionTree from '../../components/DecisionTree.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## The question after the question
+
+A contractor left a fintech in March, under a cloud, having had broad access for eighteen
+months. In April the general counsel asked the engineering lead two questions.
+
+The first was easy. *Is the customer data encrypted?* Yes. All of it, at rest and in transit,
+every bucket and every database, ticked and evidenced.
+
+The second question took four weeks. *Then prove he can no longer read it.*
+
+Nobody could. Not because anything was wrong — the encryption was real, the ciphertext was
+genuinely unreadable without a key — but because the data was encrypted under **AWS managed
+keys**, which are handed out to whoever the IAM policies say can use them, and those policies
+were spread across a dozen roles that eighteen months of urgent tickets had quietly widened.
+
+"Is it encrypted?" and "who can decrypt it?" felt like the same question. They are not remotely
+the same question, and only the second one has ever protected anybody.
+
+## Encryption is the easy half
 
 Encrypting data on AWS is close to free and usually a checkbox. That is precisely why the exam
 does not ask *whether* to encrypt — it asks **who holds the key**, and what happens when
@@ -115,6 +135,13 @@ encryption**.
 The consequence is the thing worth remembering: **access to encrypted data is an IAM question,
 not a cryptography question.** Remove a principal from the key policy and their access ends
 immediately, without touching a single byte of stored data.
+
+This is exactly what the fintech could not do. A key policy is a short document naming who may
+use a key; when you use AWS managed keys you do not get to write one, so "who can decrypt this?"
+has no single place to look — it is the union of a dozen IAM policies, and answering it means
+auditing all of them. Move to a customer managed key naming three roles, and the same question
+takes **one screen and about nine seconds**.
+
 
 Three kinds of key, and the exam distinguishes them:
 
@@ -380,3 +407,16 @@ about revoking or proving access point at KMS rather than at bucket policies.
     'S3 and DynamoDB encrypt by default. <strong>RDS cannot be encrypted in place</strong> — snapshot, copy with encryption, restore.',
   ]}
 />
+
+---
+
+The fintech's four-week answer is now a one-line one: three roles are named in one key policy,
+and every `Decrypt` call against that key is in CloudTrail with a name and a timestamp.
+
+Nothing about their cryptography changed. The same algorithm, the same ciphertext, the same
+checkbox ticked in the same console. What changed is that somebody can now **answer the second
+question** — and the second question is the only one an auditor, a regulator or an attacker has
+ever cared about.
+
+Encryption is a checkbox. Key management is a decision. Only one of them is on the exam, and
+only one of them would have helped in April.

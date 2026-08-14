@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 2 — Design Resilient Architectures'
 minutes: 9
-hook: A Region is a city. An Availability Zone is a building in that city, on its own power supply. An Edge Location is a corner shop near your house.
-updated: 2026-08-07
+hook: A digger went through a fibre duct outside a datacentre in Dublin. Half a company vanished; the other half never noticed. The difference was one dropdown nobody had thought about.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -21,6 +21,29 @@ import Callout from '../../components/Callout.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## The dropdown nobody thought about
+
+Two teams at the same company, both running in Ireland, both perfectly sensible engineers.
+
+One team launched their instances and took the defaults. Their three servers landed in
+`eu-west-1a` — the same zone, which in practice means the same handful of buildings on the same
+power and the same fibre.
+
+The other team spread theirs across `eu-west-1a`, `1b` and `1c`. It cost them nothing. It took
+about four extra seconds in the launch wizard, and one of them later admitted they had done it
+mostly because the dropdown was there.
+
+Then somebody's digger went through a duct.
+
+For four hours the first team was simply gone, and no amount of restarting helped, because
+there was nothing left to restart onto. The second team lost a third of their capacity, the
+load balancer noticed inside thirty seconds, and not one customer filed a ticket.
+
+**Same Region. Same money, near enough. Completely different afternoon.** That difference has a
+name, and it is the reason "the cloud" is not one big computer.
+
+## Where your rented computer actually is
 
 "The cloud" is a rented computer in someone else's building. Everything else in AWS
 is a consequence of that one fact — including the three words that show up on
@@ -114,6 +137,12 @@ means you can run the same application in two or three of them, and survive losi
 That is the whole idea behind the phrase **high availability**, and it is why
 almost every "how do I make this resilient?" answer on the exam involves the words
 *across multiple Availability Zones*.
+
+It is also the whole difference between the two teams above. Zones are joined by high-bandwidth,
+low-latency private links — a millisecond or two apart, near enough that spreading across them
+costs you nothing you will notice — but they are **deliberately far enough apart, on separate
+power, cooling and networking, that no single flood, fire or digger reaches two of them.** You
+are being handed independence for free. The first team declined it by accident.
 
 <Mnemonic
   title="What lives at each level"
@@ -253,3 +282,13 @@ A few AWS services are not tied to a Region at all. These come up as trick answe
     'IAM, Route 53 and CloudFront are <strong>global</strong>. An S3 bucket has a globally unique name but lives in one Region.',
   ]}
 />
+
+---
+
+The team that survived the digger did not have a better architect, a bigger budget or a
+disaster-recovery plan. They used a dropdown.
+
+That is the most valuable habit this lesson can give you: **when a console asks you which
+Availability Zone, the answer is never "whichever".** It is the cheapest resilience you will
+ever buy, and it is bought before anything has gone wrong — which is the only time it is
+purchasable at all.

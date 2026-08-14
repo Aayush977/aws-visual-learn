@@ -7,8 +7,8 @@ order: 20
 domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
 minutes: 10
-hook: The last exam task statement is simply "identify services from other categories". It is worth about six marks and takes an afternoon.
-updated: 2026-08-11
+hook: A burst pipe closed the office for three weeks and nobody could work, because the software only ran on a £4,000 workstation that was inside it. The fix was one service most people cannot name.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -20,6 +20,29 @@ import Mnemonic from '../../components/Mnemonic.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## The three weeks nobody could work
+
+A burst pipe closed an architecture firm's office for three weeks in February.
+
+Their CAD software ran on workstations costing several thousand pounds each, which is why every
+architect had one, bolted under a desk, in the building that now had no ceiling. The project
+files were far too large to email and had to stay on the office server for insurance reasons.
+
+Twenty-six people, all of whom had a perfectly good laptop at home, could do no work at all —
+not because anything was broken, but because the work was physically located somewhere they
+could not go.
+
+The service that fixes this is **AppStream 2.0**, which streams the application itself to
+whatever device somebody happens to have. It is on nobody's list of famous AWS services. It took
+an afternoon to set up. The only reason it went unused for three weeks is that **nobody in the
+firm knew it existed.**
+
+That is the whole value of this lesson, and it is worth being blunt about it: you will never be
+asked to configure any of these. You are asked to recognise, from one sentence, that a service
+for this exists — which is also exactly how it works at work, on the day your office floods.
+
+## One sentence per service
 
 The final task statement on the Cloud Practitioner blueprint is the vaguest — "identify services
 from other in-scope AWS service categories" — and it is the one most people leave to chance.
@@ -242,3 +265,16 @@ for a whole desktop.</strong> The firm needed both, for two different groups of 
     '<strong>CloudWatch says it is slow; X-Ray says which part.</strong> <strong>SES emails customers; SNS notifies systems.</strong>',
   ]}
 />
+
+---
+
+The architecture firm never bought another workstation. Their refresh budget was cancelled,
+project files stopped travelling on personal laptops, and the next time the building was
+unusable it was an inconvenience rather than three lost weeks.
+
+Everything in this lesson is like that: unglamorous, individually shallow, and occasionally the
+difference between a bad month and an ordinary one.
+
+So do not study this list to pass a task statement. Study it so that **the sentence "there's
+probably a service for that" is followed, in your head, by a name.** That is the only skill
+being tested here, on the exam and otherwise.

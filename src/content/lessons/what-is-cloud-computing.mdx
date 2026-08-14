@@ -7,8 +7,8 @@ order: 5
 domains:
   CCP: 'Domain 1 — Cloud Concepts'
 minutes: 10
-hook: You do not buy a generator to run a kettle. You plug into the grid and pay for the electricity you actually used.
-updated: 2026-08-08
+hook: A presenter held up their mug on daytime television. Nine minutes later the website was down, and the capacity to save it was sitting idle in a rack 200 miles away.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -21,8 +21,31 @@ import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
 
+## The Tuesday that broke Kettle & Fox
+
+Kettle & Fox sell enamel mugs and wool blankets out of a converted mill in Yorkshire. Two
+people, one website, and one server in a rack in Leeds that had taken every order since 2019
+without once complaining. About 200 visitors on a good day.
+
+On a Tuesday in November a presenter held up one of their mugs on daytime television and said
+where she had bought it.
+
+Nine minutes later the site was down. Not slow — down. The server was, technically, fine: it
+was doing precisely what it had always done, just for twenty thousand people instead of two
+hundred. Orders that would have paid for the year went nowhere, and the shop found out from
+Twitter.
+
+The part that stung came later. **The capacity they needed already existed.** It was racked,
+powered, cooled and idle, two hundred miles away, owned by somebody else — and there was no way
+on earth for Kettle & Fox to borrow six hours of it.
+
+That gap, between capacity that exists and capacity you can actually get at, is the entire
+subject of this website.
+
+## Computers are lumpy
+
 If you have never touched AWS, ignore the service names for a moment. Every one of them
-exists to solve the same underlying problem, and that problem is much older than the cloud.
+exists to solve the problem Kettle & Fox hit, and that problem is much older than the cloud.
 
 **Computers are lumpy.** You cannot buy 1.4 servers. You buy one, or two, and you buy them
 weeks before you need them, and you keep paying for them long after the reason you bought
@@ -98,10 +121,15 @@ hardware, once where you rent it by the hour. Press play.
   <Wire id="w-v-b" from={[160, 290]} to={[255, 420]} shape="elbow-h" mid={205} tone="muted" step={1} />
 </Diagram>
 
+Option A is the Tuesday that happened. Option B is the Tuesday that was available for about
+eleven pounds.
+
 Nothing in that story is about technology being clever. It is about **who holds the risk of
 guessing wrong**. When you own the servers, you have to predict next year's traffic today,
 and you pay for being wrong in either direction — outages if you under-guess, idle metal if
-you over-guess. When you rent by the hour, the guess stops mattering.
+you over-guess. When you rent by the hour, the guess stops mattering. Kettle & Fox were not
+punished for buying a bad server; they were punished for having to decide, in 2019, how famous
+they would be in November 2026.
 
 <Callout type="gotcha">
 "The cloud is cheaper" is not quite the claim, and the exam is careful about this. A server
@@ -283,6 +311,12 @@ Everything else — security, monitoring, billing tools — exists to control, w
 those four. When a new service name appears, asking "which of the four is this?" gets you
 most of the way to understanding it.
 
+Kettle & Fox needed one of each: somewhere to run the shop, somewhere to keep the product
+photographs, something to spread the load across more than one machine, and somewhere to hold
+the orders. You will build exactly that, piece by piece, over the next few lessons — and when
+you reach **scaling and high availability**, you will build the thing that would have saved
+their Tuesday.
+
 <Quiz
   question="A company is deciding how to host a new application. They want to avoid a large up-front hardware purchase and pay only for the capacity they consume each month. Which benefit of cloud computing does this describe?"
   choose={1}
@@ -367,3 +401,19 @@ most of the way to understanding it.
     'Almost every AWS service is <strong>compute, storage, networking or a database</strong> — or a tool to secure, watch or pay for those.',
   ]}
 />
+
+---
+
+One last thing about Kettle & Fox, because it is the reason this site exists.
+
+Nothing that went wrong on their Tuesday was a hard technical problem. Nobody was hacked, no
+code was wrong, no disk failed. They lost their best day of the year to a decision made in 2019
+about how much computer to buy — a decision they were forced to make years before they could
+possibly have known the answer.
+
+**Everything else on this site is a variation on removing that decision.** Auto Scaling removes
+it for compute. S3 removes it for storage. Serverless removes it so thoroughly that there is
+nothing left to size at all.
+
+When a service name starts to feel like jargon, ask what guess it is saving you from. There is
+almost always one.

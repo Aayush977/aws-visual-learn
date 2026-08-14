@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 2 — Design Resilient Architectures'
 minutes: 13
-hook: Scaling up buys you a bigger thing to lose. Scaling out buys you something you can afford to lose.
-updated: 2026-08-09
+hook: Kettle & Fox went down in nine minutes on live television. This is the rebuild — four changes in a fixed order, each one useless without the ones before it.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -22,12 +22,28 @@ import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
 
-Most systems begin as one server. It works, until the day it does not, and then it fails
-completely — because there is nothing else to take over and no way to grow except by buying a
-bigger one.
+## "Just buy a bigger server"
 
-Fixing that is not one change. It is four, in a specific order, and each one is meaningless
-without the ones before it. Play it through.
+Two weeks after the television Tuesday, Kettle & Fox got a quote for a bigger server. Twice the
+cores, twice the memory, £11,000, six weeks' lead time. It would have survived that Tuesday
+with room to spare.
+
+It would also have been **one server**. One power supply, one disk controller, one building. A
+bigger thing to lose, in the same single room, still six weeks away from every decision.
+
+They asked a contractor what the alternative looked like. Her answer was not "a bigger server"
+and it was not one change — it was four, in a strict order, and she was blunt that doing them
+out of order buys you nothing:
+
+> Two of something. Something in front deciding where traffic goes. Something that adds and
+> removes copies on its own. And — the one everybody skips — nothing important living inside
+> any single copy.
+
+Most systems begin exactly where Kettle & Fox began: one server. It works, until the day it
+does not, and then it fails completely — because there is nothing else to take over and no way
+to grow except by buying a bigger one.
+
+Here are the four changes. Play it through, then read the section for each.
 
 <Diagram
   title="From one fragile server to something that survives a bad day"
@@ -90,7 +106,8 @@ without the ones before it. Play it through.
 
 **Scaling up** (vertical) means replacing the instance with a bigger one. It is simple, it
 requires no application changes, and it has two hard limits: there is a largest instance type,
-and you still have exactly one of them. Rebooting into a new size means downtime.
+and you still have exactly one of them. Rebooting into a new size means downtime. *This is the
+£11,000 quote. It solves the Tuesday and none of the other days.*
 
 **Scaling out** (horizontal) means running more instances. There is no ceiling worth worrying
 about, a failure removes a fraction of capacity rather than all of it, and you can add and
@@ -177,6 +194,14 @@ Where state actually goes:
 Load balancers do offer **sticky sessions**, which pin a user to one instance. Treat it as a
 crutch for applications you cannot change: it unbalances the fleet, and when that instance
 dies the user loses their session anyway.
+
+<Callout type="gotcha" title="The step Kettle & Fox nearly skipped">
+Their shop kept baskets in the web server's memory, which was invisible while there was only
+one web server. Switch on Auto Scaling before fixing that and you get a *worse* Tuesday, not a
+better one: shoppers get bounced between instances, baskets empty themselves halfway through
+checkout, and every scale-in event throws away somebody's order. **Statelessness is not the
+fourth step you do eventually — it is the permission slip for the other three.**
+</Callout>
 
 ## Decoupling: stop things failing together
 
@@ -301,3 +326,13 @@ stateless, then make it elastic, then decouple what is slow.</strong>
     '<strong>SQS</strong> to decouple one producer from one consumer group · <strong>SNS</strong> to fan one message out to many · <strong>EventBridge</strong> to route events by rule.',
   ]}
 />
+
+---
+
+Kettle & Fox run two small instances across two Availability Zones, a load balancer in front,
+baskets in DynamoDB, and a group allowed to grow to twenty. It costs less per month than the
+maintenance contract on the old server did.
+
+They have been on television twice since. Neither time did anyone notice, which is the entire
+point: **high availability is the discipline of making your best day and your worst day look
+identical from the outside.**

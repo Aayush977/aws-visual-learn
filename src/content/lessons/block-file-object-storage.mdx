@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 3 — Design High-Performing Architectures'
 minutes: 11
-hook: A hard drive, a shared network folder, and a warehouse you address by name. Everything else follows from that.
-updated: 2026-08-08
+hook: Six weeks of work, four people, and a shared folder that could not be shared. They had picked the right storage service for a problem they did not have.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -23,8 +23,33 @@ import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
 
+## The disk that could only be in one place
+
+A four-person team at Meridian spent six weeks building a rendering pipeline. Four machines,
+each doing a slice of the work, all reading from and writing to a shared folder of source files.
+
+They put the shared folder on an EBS volume, because EBS is the AWS disk and this was a disk.
+It worked beautifully — on the first machine.
+
+The second machine could not attach to it. Nor the third. They spent two days assuming they had
+misconfigured something, because the error message is not especially forthcoming and because
+the idea seems absurd once you have said it out loud: *why can only one computer use the disk?*
+
+Then somebody read the sentence that ends the argument. **An EBS volume is a virtual hard
+drive, and it attaches to one instance at a time — in one Availability Zone.** It is not a
+shared folder and was never trying to be. They had picked a service that does its job perfectly
+for a problem that was not its job.
+
+The fix took an afternoon: the shared working files went onto EFS, which mounts on all four
+machines at once; the finished renders went to S3, which is not a filesystem at all. Three
+services, three completely different shapes, and choosing between them is nothing to do with
+speed or price.
+
+## The question that picks the service
+
 Beginners usually meet AWS storage as a list of acronyms and try to memorise which is
-"faster" or "cheaper". That is the wrong axis, and it produces wrong answers.
+"faster" or "cheaper". That is the wrong axis, and it produces wrong answers — including the
+one above, which cost two days.
 
 The real question is **how many machines need to reach this data at the same time, and do
 they need it to look like a filesystem?** Answer that and the service picks itself.
@@ -312,3 +337,15 @@ you to *choose* rather than to rank.
     'gp3 lets you buy <strong>IOPS and throughput separately from capacity</strong> — a slow volume no longer means a bigger one.',
   ]}
 />
+
+---
+
+The two days Meridian lost were not lost to a hard problem. They were lost to asking "which
+storage is best?" — a question with no answer — instead of the one that does have an answer:
+
+> **How many machines need this at once, and does it have to look like a filesystem?**
+
+One machine, needs a filesystem → **EBS**. Many machines, needs a filesystem → **EFS**. Reached
+over HTTPS by anything, from anywhere, filesystem irrelevant → **S3**.
+
+Ask it in that order and you will never attach a volume to the wrong number of computers again.

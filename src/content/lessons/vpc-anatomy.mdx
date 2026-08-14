@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 1 — Design Secure Architectures'
 minutes: 13
-hook: There is no "public subnet" setting. A subnet is public because its route table points at an internet gateway. That is the whole secret.
-updated: 2026-08-08
+hook: The database was in a subnet named "private-db-subnet-1a". It was reachable from Belarus. Nobody had lied — the name simply was not the thing doing the work.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -21,6 +21,35 @@ import Mnemonic from '../../components/Mnemonic.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## The subnet called "private"
+
+During a penetration test, Aldgate Health's security team was handed a finding they refused to
+believe: the patient database was reachable from the public internet.
+
+It could not be. They pulled up the console to prove it. The database sat in a subnet named
+`private-db-subnet-1a`. It was in the group of subnets everyone called "the private tier". It
+was drawn on the architecture diagram, in the box labelled *Private*, in a different colour from
+the public one.
+
+All of that was true, and none of it was doing anything.
+
+Somebody, months earlier, debugging a connectivity problem at the end of a long day, had
+associated that subnet with the main route table — the one carrying `0.0.0.0/0 → igw-…`. One
+row, in a table nobody looks at, in a screen nobody had reason to open. The database had a
+public IP address because the subnet was, in the only sense that matters to a packet, public.
+
+Here is the sentence that finding cost them a week to learn:
+
+> **There is no "private subnet" setting.** A subnet is public if — and only if — its route
+> table sends `0.0.0.0/0` to an internet gateway. The name is a comment. The route table is the
+> code.
+
+A VPC rewards people who know which of its settings actually do something, and quietly punishes
+people who trust the labels. So it is worth building one slowly, once, and noticing where the
+real decisions live.
+
+## Building one, one decision at a time
 
 A **VPC** — Virtual Private Cloud — is your own isolated network inside an AWS Region. Nothing
 in it can talk to the internet, or to anything else, until you say so. That default isolation
@@ -115,6 +144,11 @@ This is the concept most beginners get wrong, and it is worth being very precise
 A subnet is **public** if its route table contains a route sending `0.0.0.0/0` to an **internet
 gateway**. That is the entire definition. There is no checkbox called "public", and calling a
 subnet "public" in the console is a naming convention, not a setting.
+
+This is the whole of Aldgate's finding, and it is why the audit took a week: nobody could find
+the mistake, because everybody kept looking at the names. **When you want to know whether
+something is exposed, read the route table associated with its subnet — never the subnet's
+name, never the diagram, never what the team calls it in stand-up.**
 
 Every subnet is associated with exactly one **route table**, and a route table is a list that
 says "traffic for *this* destination goes to *that* target":
@@ -307,3 +341,19 @@ usual shape of an SAA networking question — read the constraints, and place ea
     'Connectivity vocabulary: <strong>peering</strong> is one-to-one and not transitive · <strong>Transit Gateway</strong> is the hub · <strong>VPN</strong> is quick over the internet · <strong>Direct Connect</strong> is a dedicated circuit with consistent latency.',
   ]}
 />
+
+---
+
+Aldgate's fix was one line: they associated the subnet with the correct route table and removed
+the public IP addresses. Thirty seconds of work, after a week of arguing with a finding nobody
+believed.
+
+They also added a Config rule that flags any subnet routing `0.0.0.0/0` to an internet gateway
+while holding a database — because the real failure was never the misconfiguration. It was that
+**a wrong route table looked exactly like a right one from every screen anybody actually
+opened.**
+
+Networking on AWS is unusually honest in this way. Almost nothing is implied, almost nothing is
+inferred from a name, and every path a packet can take is written down somewhere you can go and
+read. The skill is knowing which four places to read: the **route table**, the **security
+group**, the **NACL**, and whether the thing has a **public IP** at all.

@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 1 — Cloud Concepts'
   SAA: 'Domain 2 — Design Resilient Architectures'
 minutes: 11
-hook: Six questions. If a design has a good answer to all six, it is well architected. If a question stresses one of them, that pillar names the answer.
-updated: 2026-08-09
+hook: They had backups. Everyone agreed they were covered. Then somebody timed an actual restore — eleven hours, in the week they pay 40,000 people.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -19,6 +19,30 @@ import Mnemonic from '../../components/Mnemonic.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## The sentence that was doing all the work
+
+A payroll bureau pays 40,000 people on the last Thursday of every month. Their disaster-recovery
+plan was one sentence, and everyone in the company had heard it: *we take a nightly backup and
+copy it to another Region.*
+
+It was true. The backups ran, they were copied, the job had not failed in two years.
+
+Then, at somebody's insistence, they ran a tabletop exercise — no outage, no drama, just four
+people in a room with a stopwatch walking through what they would actually do. Restoring the
+database and bringing the application up in the second Region came to **about eleven hours**.
+And because the backup was nightly, a failure on payroll Wednesday would lose a day of entered
+timesheets, which meant thousands of people re-keying data they had already keyed.
+
+Nobody had been careless. They had a real control, tested by nobody, described by a sentence
+that quietly answered a different question than the one that mattered. "Do we have backups?"
+was answered. "How long can we be down, and how much can we lose?" had never been asked out
+loud, and so had never been costed, argued about or signed off.
+
+The Well-Architected Framework exists to make somebody ask it — along with five other questions
+of the same uncomfortable kind, before the day you need the answer.
+
+## Six questions about a design
 
 The **AWS Well-Architected Framework** is AWS's written-down answer to "what does good look
 like?". It is a set of six pillars, each of which is really a question you ask about a design.
@@ -122,6 +146,12 @@ time, and confusing them is a standard trap.
 A nightly backup gives you an RPO of up to 24 hours — everything since last night's backup is
 gone. If restoring that backup takes three hours, your RTO is three hours. They are independent:
 you can have an excellent RPO and a dreadful RTO, and often do.
+
+The payroll bureau's real numbers were an **RTO of 11 hours** and an **RPO of up to 24**. What
+the business could actually tolerate, once someone made them write it down, was one hour and
+five minutes respectively. Those two pairs of numbers are the entire disaster-recovery
+conversation: the moment both are on the same slide, the strategy chooses itself and the
+argument about money takes one meeting instead of a year.
 
 <Callout type="analogy">
 <strong>RPO</strong> is “when did I last save my document?” — it decides how much work you lose.
@@ -254,3 +284,16 @@ in the scenario are what select the answer.
     'Recurring principles: stop guessing capacity, automate everything, test at production scale, and <strong>design for failure</strong>.',
   ]}
 />
+
+---
+
+The payroll bureau now fails over in about six minutes and loses under a minute of data. It cost
+them roughly 30% more, approved in a single meeting — because by then the choice was not
+"spend more on resilience" but "spend this, or re-key 40,000 timesheets".
+
+That is what the framework is for, and why it is six *questions* rather than six answers. Not
+one of those six will tell you what to build. What they do is force somebody to say a number out
+loud — how long down, how much lost, how much per month, who gets paged — while it is still
+cheap to change the answer.
+
+Every pillar is a question that is uncomfortable early and unaffordable late.

@@ -7,8 +7,8 @@ order: 30
 domains:
   CCP: 'Domain 1 — Cloud Concepts'
 minutes: 11
-hook: Most of migration is not technical. The Cloud Adoption Framework exists because the people and the process fail more often than the network does.
-updated: 2026-08-11
+hook: 240 applications, a data-centre lease with 14 months left, and a first estimate of four years. Nothing about the arithmetic worked until they stopped trying to move everything.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -22,9 +22,37 @@ import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
 
+## The four-year estimate and the fourteen-month lease
+
+Brightwell's data-centre lease had fourteen months left on it, and the landlord was not renewing.
+Inside were 240 applications, some of which nobody could name an owner for.
+
+The first plan was the one everybody writes. Modernise as we go: containers, managed databases,
+a proper CI pipeline, do it *right* while we are moving anyway. The estimate came back at four
+years, which is a polite way of saying no.
+
+Then somebody spotted the second problem. 80 TB of scanned claim documents had to move, and over
+their existing connection that was **about seven months of continuous transfer** — assuming
+nothing failed, which over seven months it certainly would.
+
+So the programme began, as most real ones do, not by choosing technology but by admitting
+something: they were not going to move everything, and they were not going to improve most of
+what they did move.
+
+The portfolio review found 41 applications that nobody had used in a year — retired outright.
+Twelve had licences that made moving them absurd — left where they were. Of the 187 that
+remained, the vast majority were lifted across as they were, running on EC2 exactly as badly as
+they had run on the old hardware. Nineteen got their databases swapped for RDS on the way. **Two
+were genuinely rebuilt**, and those two delivered most of the business benefit anybody could
+later measure.
+
+The lease ended with six weeks to spare, and the 80 TB travelled by lorry.
+
+## One decision per application
+
 Every other lesson on this site assumes you are building something new. Most real companies are
-not — they have two hundred applications in a data centre with a lease expiring in eighteen
-months, and the question is what to do with each one.
+not — they have two hundred applications in a data centre with a lease expiring, and the
+question is what to do with each one.
 
 This was added to the Cloud Practitioner blueprint deliberately, and it is examined in two
 halves: the **strategies** for moving an application, and the **framework** for organising the
@@ -364,3 +392,18 @@ business case is real</strong>. Optimisation comes after the lease expires, not 
     '<strong>Snowball</strong> when the network would take too long; <strong>DataSync</strong> when the link is fine and the transfer is ongoing.',
   ]}
 />
+
+---
+
+Notice what actually saved Brightwell's programme, because it is the opposite of what an
+engineer's instinct suggests.
+
+They did not move faster. They moved **less**: a fifth of the estate never went at all, and most
+of what did go was rehosted unimproved — the option that feels like cheating, and is the correct
+answer roughly two-thirds of the time under a real deadline.
+
+This is why the exam gives you seven R's rather than one migration process. The technical work
+of moving a server has been a solved, largely automated problem for years. **The hard part is
+deciding, application by application, which ones deserve the effort** — and that decision is
+made by people arguing about business value in a room, which is exactly why the Cloud Adoption
+Framework spends four of its six perspectives on human beings rather than machines.

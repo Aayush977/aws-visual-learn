@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 3 — Design High-Performing Architectures'
 minutes: 13
-hook: Do not ask "which database is best". Ask "what question does my application keep asking?" — the answer names the service.
-updated: 2026-08-08
+hook: Every Friday at 7pm the database hit 100% and orders started failing. The fix was not a bigger database. It was noticing that one database was answering five completely different questions.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -21,6 +21,35 @@ import DecisionTree from '../../components/DecisionTree.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## Friday, 7pm
+
+A food delivery company had one database. A large, well-tuned PostgreSQL instance, looked after
+by people who knew what they were doing.
+
+Every Friday evening it fell over.
+
+The pattern was always the same. Around seven, CPU pinned at 100% and orders began timing out —
+during the two hours that generate a third of the week's revenue. They tried the obvious things,
+in the obvious order: a bigger instance, then a much bigger instance, then indexes, then reading
+the slow query log until their eyes hurt. Each fix bought a few weeks and then Friday came back.
+
+What they eventually noticed was not a performance problem at all. It was that **one database
+was being asked five completely unrelated questions**, and they were fighting each other:
+
+- *"What is on this restaurant's menu?"* — asked thousands of times a second, the same few
+  answers over and over.
+- *"Take £24.60 from this card and create this order."* — rare by comparison, but it must be
+  exactly right, and it must be all-or-nothing.
+- *"What is in this user's session?"* — asked on every single page load, tiny, disposable.
+- *"What was our revenue by city last month?"* — asked once a night, and it read the whole table
+  and locked it for twenty minutes.
+- *"Which drivers are near this postcode right now?"* — a shape a relational table is simply
+  bad at.
+
+No single engine is good at all five. Their Friday was five workloads in a trench coat.
+
+## Stop asking which database is best
 
 For thirty years "the database" meant one thing: a relational database, and you bent your
 problem until it fitted. AWS takes the opposite position — **purpose-built databases** — and
@@ -390,3 +419,18 @@ front, analytics off to the side — is one of the most common real architecture
     'Purpose-built giveaways: <strong>Neptune</strong> = graphs · <strong>OpenSearch</strong> = full-text and logs · <strong>Timestream</strong> = time-series · <strong>QLDB</strong> = immutable ledger.',
   ]}
 />
+
+---
+
+The delivery company's Friday problem was solved by making their database *smaller*, not bigger.
+Once menus went to DynamoDB, sessions to Redis, and the analysts to Athena over S3, what was
+left in PostgreSQL was the one thing PostgreSQL is unbeatable at — money changing hands, all or
+nothing — and it turned out to need a fraction of the hardware.
+
+That is the move worth stealing, and it is what makes database questions answerable:
+
+> **Do not ask what your data looks like. Ask what question you will run ten thousand times a
+> second — and then ask whether it is really only one question.**
+
+When an exam scenario lists several different access patterns in one paragraph, that is not
+padding. It is the answer, telling you the design has more than one database in it.

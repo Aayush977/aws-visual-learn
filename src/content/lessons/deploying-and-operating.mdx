@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 2 — Design Resilient Architectures'
 minutes: 11
-hook: Clicking in the console does not scale and cannot be reviewed. Everything past your first week is about describing infrastructure in a file.
-updated: 2026-08-11
+hook: It passed in staging and broke in production, about one release in four. Both environments had been built by clicking, eighteen months apart, by two people who had since left.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -21,6 +21,31 @@ import Mnemonic from '../../components/Mnemonic.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## "It worked in staging"
+
+One release in four failed in production after passing in staging. Not dramatically — a timeout
+here, a permissions error there — but reliably enough that deployments had become a two-person
+job with a rollback plan.
+
+Every investigation started the same way: two engineers, two browser windows side by side,
+comparing screenshots of console pages to find out how the environments differed this time.
+
+They always did differ. Staging ran a smaller instance type, which nobody had written down.
+There was a security group rule that everyone was afraid to remove because nobody could explain
+why it existed. Production volumes were encrypted and staging's were not. None of this was
+incompetence — both environments had been built by hand, eighteen months apart, by two people
+who had since left the company, and there was no record of either build beyond what the console
+was currently showing.
+
+The bug was never in the release. **The bug was that "the environment" existed only as the
+current state of some resources**, with no description of it anywhere that a person could read,
+diff or review.
+
+That is the problem this lesson is about, and its solution is unglamorous: describe
+infrastructure in a file, and build both environments from the same file.
+
+## One API underneath everything
 
 Every lesson so far has described *what* AWS offers. This one is about *how you actually talk to
 it* — which sounds like plumbing, and is in fact an entire exam task statement, because the
@@ -271,3 +296,15 @@ Excellence pillar in one story.
     'Outside Regions: <strong>Outposts</strong> in your data centre · <strong>Local Zones</strong> near a city · <strong>Wavelength</strong> inside 5G networks.',
   ]}
 />
+
+---
+
+After the rewrite, staging and production differed by exactly one thing: the parameters passed
+to the same template. The one-in-four failures stopped, and not because anybody fixed a bug.
+
+The console is not the enemy here — it is the best place in the world to *learn* what a service
+does, and every engineer should click around in it freely. What it cannot do is answer the
+question that matters six months later: **what is this environment supposed to look like?**
+
+A file answers that. It can be diffed, reviewed, rolled back, and handed to the person who
+replaces you — which, in the story above, was the single thing missing.

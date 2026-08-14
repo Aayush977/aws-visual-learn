@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 4 — Billing, Pricing, and Support'
   SAA: 'Domain 4 — Design Cost-Optimized Architectures'
 minutes: 10
-hook: Every discount on EC2 is bought with the same currency — certainty. Commit to time, or accept interruption.
-updated: 2026-08-08
+hook: Two teams, identical instances, identical workloads. One paid four times what the other did, and the difference was not technical — it was how much certainty each was willing to sign for.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -21,9 +21,34 @@ import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
 
+## The same machine, at four different prices
+
+Brightwell, an insurance company two years into moving off its own hardware, ran an internal
+review of its EC2 spend. It found four teams running effectively the same `m5.large` instances,
+around the clock, doing unremarkable work.
+
+- The **claims** team paid full On-Demand price, because that is the price you get by default
+  and nobody had revisited it since launch day.
+- The **policy** team had a three-year Savings Plan, all up front. They paid roughly **40% less**
+  for a byte-for-byte identical machine.
+- The **data science** team ran their nightly model training on Spot. They paid about **a tenth**
+  — and lost an instance most weeks, which cost them nothing at all, because a lost job was
+  simply run again.
+- The **actuarial** team paid *more* than On-Demand, on Dedicated Hosts, and were completely
+  right to. Their licence was sold per physical CPU socket, and it was cheaper to over-pay AWS
+  than to re-license the software.
+
+Four teams. One instance type. A four-fold spread, and not one of them was doing anything
+clever or stupid.
+
+The lesson has nothing to do with tuning machines. **The instance is identical in every case —
+same CPU, same memory, same performance.** What differs is what each team was willing to
+promise in exchange for the discount.
+
+## The two currencies
+
 An `m5.large` in London is one machine, but AWS will sell it to you at roughly five different
-prices. The instance is identical in every case — same CPU, same memory, same performance.
-What differs is **what you promised in exchange for the discount**.
+prices, and every one of them is a trade.
 
 There are only two currencies you can pay with:
 
@@ -327,3 +352,16 @@ lost, can it simply be done again?
     '<strong>Dedicated Hosts</strong> — most expensive, chosen for <strong>per-socket licensing and compliance</strong>, never for cost or speed.',
   ]}
 />
+
+---
+
+Brightwell's review ended with one instruction, and it was not "everybody move to Spot".
+
+The claims team went onto a Savings Plan, because their load genuinely is flat and predictable
+and they were paying a premium for a flexibility they had never once used. The actuarial team
+stayed exactly where they were. Nobody touched data science.
+
+That is the right shape of answer here, and the exam tests it the same way: **the cheapest
+option is frequently the wrong one, and the most expensive option is sometimes correct.** Read
+what the workload can actually promise — can it commit to a year, can it survive being
+interrupted, is it carrying a licence — and the price follows from that. Never the reverse.

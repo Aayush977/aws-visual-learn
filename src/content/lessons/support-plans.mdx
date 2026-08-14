@@ -7,8 +7,8 @@ order: 20
 domains:
   CCP: 'Domain 4 — Billing, Pricing, and Support'
 minutes: 8
-hook: Business is the rung where you may phone about your own application. Enterprise is the rung where someone already knows who you are.
-updated: 2026-08-09
+hook: The shop went down at 2am on a Saturday. Their support plan let them send an email. The reply came on Monday, by which point the weekend had already happened.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -18,6 +18,28 @@ import Mnemonic from '../../components/Mnemonic.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## 2am on a Saturday
+
+Kettle & Fox went down at two in the morning on the first Saturday in December — the best
+trading weekend of their year.
+
+They were on the **Developer** support plan, which had been chosen the way most support plans
+are chosen: it was the cheapest one that was not free, and nobody expected to need it. What
+Developer entitles you to is email, during business hours, from one nominated contact.
+
+So at 2am they sent an email. The reply arrived on Monday morning, courteous and helpful, by
+which point the weekend had happened without them.
+
+The second half of the story is the one people miss. They also had a televised advertising slot
+booked for January — twenty times normal traffic, arriving inside ten minutes — and no way to
+have anyone at AWS look at the plan beforehand, raise their service quotas in advance, or stand
+by while it went out.
+
+Both problems were the same problem, and it was not technical: **they had bought the wrong rung
+of a ladder, months earlier, on a day when nothing was wrong.**
+
+## The ladder
 
 This is one of the few genuinely list-shaped topics on the Cloud Practitioner exam, and there
 is no clever framing that removes the need to know it. The good news is that the plans form a
@@ -235,3 +257,17 @@ the honest answer is no, and Business plus IEM for the one big day is the propor
     'The <strong>AWS Health Dashboard</strong> — your account health (events affecting <em>your</em> resources) is on every plan, including Basic.',
   ]}
 />
+
+---
+
+Kettle & Fox moved to **Business** on the Monday. The next incident was answered in eleven
+minutes, and the January campaign ran with an AWS engineer already briefed, quotas already
+raised, and somebody on the call who knew what was about to happen.
+
+The rungs are worth memorising, but the useful idea underneath them is smaller than the table:
+**a support plan is the only thing on your bill that you buy entirely for a day that has not
+happened yet.** Every other line item does something for you this afternoon. This one does
+nothing at all until two in the morning, and by then you cannot buy it retrospectively.
+
+That is also why the exam questions read the way they do. When a scenario mentions the hour, the
+day of the week, or a launch date, it is not scene-setting — it is telling you which rung.

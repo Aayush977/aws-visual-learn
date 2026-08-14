@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 2 — Security and Compliance'
   SAA: 'Domain 1 — Design Secure Architectures'
 minutes: 8
-hook: AWS locks the building. You are still the one who has to lock your own office door.
-updated: 2026-08-07
+hook: 106 million people's records walked out of a bank that had done nothing wrong at the AWS layer. The breach lived entirely on the customer's side of a line most people have never read.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -22,10 +22,35 @@ import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
 
-Almost every AWS security breach you read about is not AWS being broken into. It is a
-customer leaving a bucket public, or an access key in a public repository, or a
-database open to the whole internet. The Shared Responsibility Model is AWS writing
-down, in advance, exactly whose fault each of those is.
+## "So was AWS hacked?"
+
+In 2019 a large American bank disclosed that the personal data of roughly 106 million credit
+card customers and applicants had been taken. Names, addresses, credit scores, and some
+hundreds of thousands of national insurance numbers.
+
+The obvious question, asked in a lot of board meetings that month, was whether AWS had been
+broken into.
+
+It had not. Every AWS control worked exactly as designed. The attacker did not touch a
+datacentre, a hypervisor or a disk. What actually happened, in outline: a misconfigured web
+application firewall let an attacker make the bank's own server fetch a URL on its behalf; that
+URL was the instance metadata service, which handed over the credentials of the role attached
+to the instance; and that role was permitted to list and read the buckets holding the data.
+
+Read that chain again and count the AWS failures. **There are none.** A firewall rule, a role's
+permissions, a bucket's contents — every link belonged to the customer, and every link sat on
+the customer's side of a line that was published, in advance, in plain English, and that
+almost nobody in that story had sat down and read.
+
+That line is this lesson.
+
+## Whose fault is what
+
+Almost every AWS security breach you read about follows the same shape. It is not AWS being
+broken into. It is a customer leaving a bucket public, an access key in a public repository, a
+database open to the whole internet, or a role that could read far more than its job required.
+The Shared Responsibility Model is AWS writing down, in advance, exactly whose fault each of
+those is.
 
 The one-line version: **AWS is responsible for security *of* the cloud. You are
 responsible for security *in* the cloud.**
@@ -284,3 +309,14 @@ You cannot audit AWS's datacentres yourself — you download the report of someo
     '<strong>AWS Artifact</strong> is where you download AWS\'s side of the compliance evidence.',
   ]}
 />
+
+---
+
+Go back to the bank. Walk their breach along the line one more time, and notice that the model
+does not merely assign blame after the event — **it tells you where to look before one.**
+
+A firewall rule is yours. A role's permissions are yours. What is in a bucket is yours. Three
+questions, all answerable on a quiet Tuesday, none of which require trusting AWS about anything.
+
+That is what the model is actually for. Not a disclaimer, but a very short list of the things
+nobody else is going to check for you.

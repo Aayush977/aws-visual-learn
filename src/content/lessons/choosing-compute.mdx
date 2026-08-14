@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 2 — Design Resilient Architectures'
 minutes: 12
-hook: The question is never "which is best". It is "how much of this machine do I actually want to be responsible for?"
-updated: 2026-08-08
+hook: Four servers, running all night, doing nothing, waiting for 9am. The bill was for the waiting — and nobody could say which of the dozen ways to run code would have stopped it.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -22,6 +22,26 @@ import DecisionTree from '../../components/DecisionTree.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## The servers that were paid to wait
+
+Brightwell's claims department processes photographs. Nothing arrives overnight; then two
+thousand photos land between nine and eleven in the morning, every weekday, because that is when
+people ring their insurer.
+
+Four EC2 instances handled it. They were sized for eleven o'clock, which meant that for
+twenty-two hours a day they sat there, patched, monitored, healthy, and completely idle. The
+team knew. They had known for a year. Every so often somebody would say "we should really do
+something about that", and then not do something about it, because the alternatives were a wall
+of names — Lambda, Fargate, ECS, EKS, Batch, App Runner, Elastic Beanstalk, Lightsail — and no
+obvious way to tell which of them was even the same *kind* of thing.
+
+So the servers kept waiting, and Brightwell kept paying for the waiting.
+
+The wall of names is the actual problem, and it dissolves the moment you notice they are not a
+list.
+
+## One line, not a list
 
 AWS has dozens of ways to run code, and they intimidate people because they look like dozens
 of unrelated products. They are not. They are **positions on a single line**, and the line
@@ -188,6 +208,11 @@ configuring it. Judge a service by those four properties, not by the marketing w
 </Callout>
 
 ## So which one?
+
+Run Brightwell's claims job down this tree and watch it split in two: the resize and the OCR
+finish in seconds and are triggered by a file arriving, so they fall out at Lambda. The
+40-minute fraud model does not fit in fifteen minutes, so it falls out at Fargate. One
+"workload" was never one workload — it was two, wearing the same four servers.
 
 <DecisionTree
   title="Which compute service should I use?"
@@ -361,3 +386,18 @@ that ceiling is exactly what the corresponding exam question is checking.
     'Serverless means <strong>nothing to patch, nothing to size, nothing billed when idle, scaling you did not configure</strong> — not the absence of servers.',
   ]}
 />
+
+---
+
+Brightwell's overnight compute bill is now zero, because at three in the morning there is
+nothing running to bill.
+
+What is worth taking from that is not "use Lambda". It is that the four idle servers were never
+a cost problem — they were a **position** problem. The team was holding an entire machine,
+around the clock, for a job that needed a machine for two hours a day, because holding the whole
+machine was the only option they could confidently name.
+
+Every compute question, on the exam and at work, is the same question wearing different clothes:
+**how much of this machine do you actually want to be responsible for?** Answer that honestly —
+including about the quiet hours — and the service names stop being a wall and start being a
+line you can point at.

@@ -7,8 +7,8 @@ order: 10
 domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
 minutes: 12
-hook: You are not asked how any of these work. You are asked which one you would point at a problem — so learn them as a sentence each.
-updated: 2026-08-11
+hook: Twelve thousand support calls a month, recorded, archived, and heard by nobody except a supervisor sampling forty of them. The answer to why customers were angry was already in the building.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -21,12 +21,32 @@ import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
 
-This is the part of the blueprint people skip, and it is close to free marks. The Cloud
-Practitioner exam never asks how a model is trained. It describes a task in one sentence —
-"automatically convert customer calls to text", "detect objects in uploaded images" — and asks
-which service does it.
+## Forty calls out of twelve thousand
 
-So learn them as sentences, not as technology.
+A call centre recorded every support call — twelve thousand a month — and kept them, dutifully,
+for three years.
+
+Their entire quality process was one supervisor listening to about forty of them. Three tenths
+of one per cent. When the board asked which products were generating angry calls, the honest
+answer was that nobody knew, and could not find out, because the evidence existed only as
+eleven thousand nine hundred and sixty hours of audio nobody would ever play. A growing
+Spanish-speaking segment was reviewed by no one at all.
+
+None of that required machine learning to fix, in the sense of anybody building a model. It
+required four services, wired together in an afternoon: one that turns audio into text, one
+that translates, one that scores sentiment and picks out product names, and one that lets a
+manager query the result.
+
+The biggest single driver of angry calls turned out to be a delivery partner, which the company
+had never suspected and had been paying for two years.
+
+That is what this category is for, and it is why the exam tests it the way it does. **You are
+never asked how any of these work.** You are asked to recognise a sentence — "convert calls to
+text", "detect objects in images" — and name the one service that does that.
+
+## Learn them as sentences, not as technology
+
+This is the part of the blueprint people skip, and it is close to free marks.
 
 ## The AI services — one job each
 
@@ -247,3 +267,17 @@ canonical exam scenario, so it is worth being able to reconstruct it.
     '<strong>Athena</strong> for occasional queries over S3 · <strong>Redshift</strong> when analysts query all day · <strong>EMR</strong> for Hadoop and Spark · <strong>OpenSearch</strong> for search and logs.',
   ]}
 />
+
+---
+
+Nobody at that call centre trained a model, labelled a dataset or hired a data scientist. They
+pointed four pre-trained services at audio files they already had, and the answer they had been
+guessing at for two years fell out in a week.
+
+Keep that shape in mind when you read an exam question here, because the wrong answer is almost
+always **SageMaker**. SageMaker is for building a model that does not exist yet — genuinely
+necessary, genuinely expensive in people and time. If the task is transcription, translation,
+sentiment, object detection or text extraction, somebody has already built that model and rented
+it to you by the API call.
+
+The skill being tested is recognising when the problem is ordinary.

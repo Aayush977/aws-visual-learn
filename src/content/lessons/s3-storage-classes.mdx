@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 4 — Design Cost-Optimized Architectures'
 minutes: 11
-hook: Every S3 class stores your object just as safely. What you are actually buying is how quickly you can have it back.
-updated: 2026-08-07
+hook: The scan was eleven years old and a barrister wanted it by Friday. It was in the cheapest storage class there is — which is another way of saying somebody had bet, a decade earlier, that nobody would ever ask.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -21,6 +21,27 @@ import DecisionTree from '../../components/DecisionTree.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## Two requests, eleven years apart
+
+A radiographer at Aldgate Health pulls up a chest scan taken this morning. It appears while her
+hand is still on the mouse.
+
+Three floors down, a records clerk is asked for a scan from 2015, because a case has been
+reopened and a barrister wants it by Friday. She submits the request and is told it will be
+ready **in about twelve hours**.
+
+Same hospital. Same bucket. Same eleven-nines durability, the same three Availability Zones,
+the same bytes, byte for byte identical. Neither file is more safe than the other, and neither
+was ever at risk.
+
+The only thing that differs is a decision somebody made years ago about **how long they were
+willing to wait if this particular file was ever wanted again** — and that decision is the
+reason the hospital's storage bill is around a tenth of what it would otherwise be.
+
+That is the whole subject. Not seven products: one dial.
+
+## One product with a dial on it
 
 S3 storage classes look like seven separate products. They are closer to one product
 with a dial on it, and the dial is labelled **how long are you willing to wait?**
@@ -327,3 +348,16 @@ Two rules worth remembering:
     'Storage class is per <strong>object</strong>, and <strong>lifecycle rules</strong> move objects between classes automatically.',
   ]}
 />
+
+---
+
+The clerk got her scan on Thursday, well inside the barrister's deadline, and it cost the trust
+a few pounds to retrieve.
+
+Notice what the hospital actually bought with that twelve-hour wait: **eleven years of storing
+a file that nobody looked at even once.** Had they insisted on millisecond access for every scan
+forever — the safe-feeling choice, the one nobody gets fired for — they would have paid roughly
+ten times as much to be exactly as ready.
+
+That is the trade in one line. The dial does not change how safe your data is. It only changes
+how patient you have agreed to be on the one day in eleven years that somebody asks.

@@ -8,8 +8,8 @@ domains:
   CCP: 'Domain 2 — Security and Compliance'
   SAA: 'Domain 1 — Design Secure Architectures'
 minutes: 11
-hook: Six services, six different questions. Who is behaving oddly? What is unpatched? Where is the personal data? Everything else follows.
-updated: 2026-08-11
+hook: The alert had been sitting in the console for eleven weeks. It named the key, the country and the hour. Nobody had turned anything off — nobody had turned anything on that would tell them to look.
+updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -21,6 +21,30 @@ import Mnemonic from '../../components/Mnemonic.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+
+## The finding nobody read
+
+A retailer failed a penetration test three ways in one afternoon. A public bucket full of
+exported orders, including card details. Two instances running a web framework with a critical,
+published, months-old vulnerability. And an access key being used from a country the company has
+never traded in.
+
+The third one is the interesting one, because **AWS had already spotted it.**
+
+GuardDuty was switched on. It had raised a finding — the key, the country, the hour, all of it —
+eleven weeks before the pen-testers arrived. The finding sat in a console that nobody had a
+reason to open, next to a hundred other findings, because there was no route from that console
+to a human being.
+
+The other two were worse in a quieter way: nothing was watching for them at all. No service was
+looking inside the buckets, and no service was checking what was installed on the instances.
+
+Three findings, three completely different failures, and the lesson is not "buy more security
+products". It is that these services are **not interchangeable and not optional extras of each
+other** — each one answers exactly one question, and a question nobody asked has no answer
+sitting anywhere.
+
+## Six services, six questions
 
 This is the group of services beginners find most interchangeable, because the names all sound
 like security and the marketing all sounds the same. They are not interchangeable at all. Each
@@ -274,3 +298,18 @@ in the toolkit overlaps as much as the names suggest.
     '<strong>Cognito = your application’s users.</strong> <strong>IAM Identity Center = your employees.</strong>',
   ]}
 />
+
+---
+
+The retailer's three findings each map to exactly one service — Macie for the bucket, Inspector
+for the vulnerable instances, GuardDuty for the stolen key — and knowing which is which is what
+the exam is testing.
+
+But the eleven weeks are the part worth carrying into a job. GuardDuty did its entire job
+perfectly and it changed nothing, because **a finding that reaches no human is indistinguishable
+from a service you never enabled.** That is what Security Hub and an EventBridge rule into the
+on-call channel are actually for: not detection, which was already working, but the short walk
+from *detected* to *somebody knows*.
+
+Detection you do not route is a very expensive way of being able to say, afterwards, that you
+had a tool for that.
