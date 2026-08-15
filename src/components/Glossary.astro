@@ -1,0 +1,218 @@
+---
+/**
+ * A filterable glossary.
+ *
+ * Every entry has a plain-English line first and the precise definition second,
+ * because a beginner needs to know roughly what a word means long before they
+ * need to know it exactly. The filter matches the term, the plain line and the
+ * precise one, so searching "cost" finds things that are about money even when
+ * the word "cost" is not in their name.
+ *
+ * Without JavaScript the filter box hides itself and every term is on the page.
+ */
+export interface Term {
+  term: string;
+  /** How you would explain it to somebody in a pub. Supports inline HTML. */
+  plain: string;
+  /** The accurate version, once the plain one has landed. Supports inline HTML. */
+  precise?: string;
+}
+
+export interface Group {
+  name: string;
+  terms: Term[];
+}
+
+interface Props {
+  groups: Group[];
+}
+
+const { groups } = Astro.props;
+const total = groups.reduce((n, g) => n + g.terms.length, 0);
+---
+
+<section class="gl" data-glossary>
+  <div class="gl__search" data-search hidden>
+    <label class="visually-hidden" for="gl-q">Filter terms</label>
+    <svg class="gl__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="7"></circle>
+      <path d="m20 20-3.5-3.5"></path>
+    </svg>
+    <input
+      id="gl-q"
+      type="search"
+      class="gl__input"
+      placeholder={`Filter ${total} terms — try "bucket", "money", "network"…`}
+      autocomplete="off"
+      data-q
+    />
+    <p class="gl__status" role="status" data-status></p>
+  </div>
+
+  {
+    groups.map((g) => (
+      <div class="gl__group" data-group>
+        <h3 class="gl__groupName">{g.name}</h3>
+        <dl class="gl__list">
+          {g.terms.map((t) => (
+            <div
+              class="gl__item"
+              data-term
+              data-haystack={`${t.term} ${t.plain} ${t.precise ?? ''}`.toLowerCase()}
+            >
+              <dt class="gl__dt">{t.term}</dt>
+              <dd class="gl__dd">
+                <span class="gl__plain" set:html={t.plain} />
+                {t.precise && <span class="gl__precise" set:html={t.precise} />}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    ))
+  }
+
+  <p class="gl__empty" data-empty hidden>
+    Nothing matches that. Try a shorter word — the filter searches the definitions too.
+  </p>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-glossary]').forEach((root) => {
+    const input = root.querySelector<HTMLInputElement>('[data-q]')!;
+    const status = root.querySelector<HTMLElement>('[data-status]')!;
+    const empty = root.querySelector<HTMLElement>('[data-empty]')!;
+    const items = Array.from(root.querySelectorAll<HTMLElement>('[data-term]'));
+    const groups = Array.from(root.querySelectorAll<HTMLElement>('[data-group]'));
+
+    root.querySelector<HTMLElement>('[data-search]')!.hidden = false;
+
+    const apply = () => {
+      const q = input.value.trim().toLowerCase();
+      let shown = 0;
+
+      for (const item of items) {
+        const hit = !q || item.dataset.haystack!.includes(q);
+        item.hidden = !hit;
+        if (hit) shown++;
+      }
+
+      // Hide a group heading once everything under it is filtered out.
+      for (const g of groups) {
+        g.hidden = !Array.from(g.querySelectorAll<HTMLElement>('[data-term]')).some(
+          (i) => !i.hidden,
+        );
+      }
+
+      empty.hidden = shown > 0;
+      status.textContent = q ? `${shown} of ${items.length}` : '';
+    };
+
+    input.addEventListener('input', apply);
+    apply();
+  });
+</script>
+
+<style>
+  .gl {
+    margin: var(--sp-5) 0;
+  }
+
+  .gl__search {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-5);
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+  }
+  .gl__icon {
+    flex: none;
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: var(--text-muted);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  .gl__input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: var(--step--1);
+    padding: 0.3rem 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+  }
+  .gl__input:focus {
+    outline: none;
+  }
+  .gl__search:focus-within {
+    border-color: var(--accent);
+  }
+  .gl__status {
+    flex: none;
+    margin: 0;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+
+  .gl__groupName {
+    margin: var(--sp-6) 0 var(--sp-3);
+    padding-bottom: var(--sp-2);
+    border-bottom: 2px solid var(--border);
+    font-size: var(--step-0);
+    letter-spacing: 0.01em;
+  }
+
+  .gl__list {
+    margin: 0;
+    display: grid;
+    gap: var(--sp-3);
+  }
+  .gl__item {
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--border);
+    border-left: 3px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+  }
+  .gl__dt {
+    font-weight: 700;
+    font-size: var(--step-0);
+  }
+  .gl__dd {
+    margin: var(--sp-1) 0 0;
+    display: grid;
+    gap: var(--sp-2);
+  }
+  .gl__plain {
+    font-size: var(--step--1);
+  }
+  .gl__precise {
+    padding-left: var(--sp-3);
+    border-left: 2px solid var(--border);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .gl__precise::before {
+    content: 'More precisely: ';
+    font-weight: 650;
+    color: var(--text-muted);
+  }
+
+  .gl__empty {
+    padding: var(--sp-5);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: var(--step--1);
+  }
+</style>

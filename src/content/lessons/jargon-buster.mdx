@@ -1,0 +1,382 @@
+---
+title: The Jargon Buster
+summary: Sixty words that AWS documentation assumes you already know — server, instance, subnet, ARN, latency, stateless, egress — each explained the way you would explain it to a friend, then the way the exam means it.
+exams: [CCP]
+track: reference
+order: 30
+minutes: 12
+hook: Nobody struggles with AWS because the ideas are hard. They struggle because every explanation of an easy idea contains four words nobody ever defined.
+updated: 2026-08-15
+---
+
+import Glossary from '../../components/Glossary.astro';
+import Callout from '../../components/Callout.astro';
+
+## The real barrier
+
+Here is a sentence from a perfectly ordinary piece of AWS documentation:
+
+> Provision an instance in a private subnet and attach an IAM role so the workload can reach
+> the endpoint without traversing the public internet.
+
+There is nothing difficult in that sentence. Every idea in it is something you could explain to
+a ten-year-old in about a minute. But it contains **eight** words being used in a specific
+technical sense, and if two of them are unfamiliar the whole sentence collapses into noise —
+and the reader concludes that cloud computing is beyond them.
+
+It is not. They were missing eight definitions, and nobody had thought to give them.
+
+So here they are. The plain-English meaning first, because that is what you need to keep
+reading; the precise meaning underneath, because that is what the exam tests.
+
+<Callout type="note" title="How to use this">
+Do not read it end to end — it is a lookup, not a lesson. Bookmark it, and when a lesson uses a
+word that stops you, come here and search for it. The filter box searches the definitions too,
+so typing <code>money</code> or <code>network</code> finds everything about that idea even when
+the word is not in the term's name.
+</Callout>
+
+<Glossary
+  groups={[
+    {
+      name: 'Words about computers',
+      terms: [
+        {
+          term: 'Server',
+          plain: 'A computer whose job is to answer other computers. No screen, no keyboard, sitting in a rack somewhere doing one thing all day.',
+          precise: 'Hardware or software providing a service to clients over a network. The word describes a <em>role</em>, not a size — a laptop can act as a server.',
+        },
+        {
+          term: 'Instance',
+          plain: 'One running computer that AWS rents you. If you have three instances, you have three computers.',
+          precise: 'A virtual machine running on AWS hardware. The word is used almost interchangeably with "server" on AWS, and <strong>EC2 instance</strong> is the common form.',
+        },
+        {
+          term: 'Virtual machine (VM)',
+          plain: 'A pretend computer running inside a real one. One physical machine can hold dozens, each thinking it is alone.',
+          precise: 'A software emulation of a computer, isolated from its neighbours by a <strong>hypervisor</strong>. This is the technology that makes renting a fraction of a server possible.',
+        },
+        {
+          term: 'Operating system (OS)',
+          plain: 'The software that lets everything else run — Windows, Linux, macOS. The layer between the applications and the hardware.',
+          precise: 'On AWS, who patches the OS is the single clearest test of where the shared responsibility line falls. <strong>EC2: you do. RDS and Lambda: AWS does.</strong>',
+        },
+        {
+          term: 'Provision',
+          plain: 'To create something and make it ready to use. "Provision a server" means "get me a server, switched on".',
+          precise: 'Allocating a resource. The word matters because provisioning used to take weeks and now takes minutes, which is most of what "agility" means on the exam.',
+        },
+        {
+          term: 'Deploy',
+          plain: 'To put your code somewhere it can actually run and be used by people.',
+          precise: 'Releasing an application into an environment. "Deployment" also names the act of doing it.',
+        },
+        {
+          term: 'Workload',
+          plain: 'A thing that needs computing done for it. A website, a nightly report, a video encoder.',
+          precise: 'A collection of resources and code delivering business value — the unit the Well-Architected Framework reviews.',
+        },
+        {
+          term: 'On-premises (on-prem)',
+          plain: 'In your own building, on hardware you bought. The opposite of cloud.',
+          precise: 'Infrastructure you own and operate in your own facility. Often shortened to "on-prem"; "prem" is premises, not premium.',
+        },
+        {
+          term: 'Container',
+          plain: 'An application packed up with everything it needs to run, so it behaves the same on any machine. Lighter than a whole virtual machine.',
+          precise: 'An isolated process sharing the host OS kernel. On AWS: <strong>ECS</strong> or <strong>EKS</strong> to run them, <strong>Fargate</strong> to run them without managing servers.',
+        },
+        {
+          term: 'Serverless',
+          plain: 'You give AWS code; AWS worries about what it runs on. There are still servers — you just never meet them.',
+          precise: 'Nothing to provision or patch, nothing billed while idle, and scaling you did not configure. <strong>Lambda</strong>, <strong>Fargate</strong>, <strong>DynamoDB</strong> and <strong>S3</strong> all qualify.',
+        },
+      ],
+    },
+    {
+      name: 'Words about networks',
+      terms: [
+        {
+          term: 'IP address',
+          plain: 'A computer\'s postal address on a network. Something like <code>203.0.113.7</code>.',
+          precise: 'A <strong>public</strong> IP is reachable from the internet; a <strong>private</strong> one only from inside your own network. Which one a machine has is a security decision.',
+        },
+        {
+          term: 'DNS',
+          plain: 'The internet\'s phone book. It turns a name people can remember into the number computers need.',
+          precise: 'Domain Name System. On AWS it is <strong>Route 53</strong> — named after port 53, which DNS runs on.',
+        },
+        {
+          term: 'Latency',
+          plain: 'How long you wait before anything starts happening. Mostly decided by distance.',
+          precise: 'Delay between request and response, in milliseconds. It is why AWS has Regions all over the world and edge locations in hundreds of cities.',
+        },
+        {
+          term: 'Bandwidth and throughput',
+          plain: 'Bandwidth is how wide the pipe is. Throughput is how much actually got through it.',
+          precise: 'Bandwidth is theoretical capacity; throughput is achieved rate. A wide pipe with high latency still feels slow for small requests.',
+        },
+        {
+          term: 'Port',
+          plain: 'A numbered door on a computer. Web traffic knocks on 443, email uses others. Firewalls work by deciding which doors are open.',
+          precise: 'A number identifying which service on a machine traffic is for. Worth knowing: <strong>443</strong> HTTPS, <strong>80</strong> HTTP, <strong>22</strong> SSH, <strong>3389</strong> RDP, <strong>3306</strong> MySQL, <strong>5432</strong> PostgreSQL.',
+        },
+        {
+          term: 'Firewall',
+          plain: 'A doorman deciding which traffic gets in and out.',
+          precise: 'On AWS there are two: a <strong>security group</strong> at the instance (stateful, allow-only) and a <strong>network ACL</strong> at the subnet (stateless, allow and deny).',
+        },
+        {
+          term: 'Subnet',
+          plain: 'A fenced-off section of your private network. You put things in different sections depending on whether the world should reach them.',
+          precise: 'A range of IP addresses within a VPC, living in <strong>one</strong> Availability Zone. It is "public" only because its route table points at an internet gateway.',
+        },
+        {
+          term: 'VPC',
+          plain: 'Your own private network inside AWS. Nothing in it can talk to anything until you say so.',
+          precise: 'Virtual Private Cloud — an isolated network in one Region, into which you carve subnets.',
+        },
+        {
+          term: 'Endpoint',
+          plain: 'The address you send a request to. The front door of a service.',
+          precise: 'A URL or hostname where a service accepts requests. A <strong>VPC endpoint</strong> is different: it lets your private network reach an AWS service without going via the internet.',
+        },
+        {
+          term: 'CDN',
+          plain: 'A network of copies of your content, kept near your users so it arrives quickly.',
+          precise: 'Content Delivery Network. AWS\'s is <strong>CloudFront</strong>, serving from hundreds of edge locations.',
+        },
+        {
+          term: 'Load balancer',
+          plain: 'A receptionist standing in front of several identical servers, sending each visitor to one that is still answering.',
+          precise: 'Distributes incoming traffic across registered targets and <strong>health-checks</strong> them, which is what makes a dead instance invisible to users.',
+        },
+      ],
+    },
+    {
+      name: 'Words about data',
+      terms: [
+        {
+          term: 'Object storage',
+          plain: 'A vast warehouse where you hand over a file, give it a name, and get it back later by that name. No folders in any real sense.',
+          precise: 'Data stored as objects with a key and metadata, reached over HTTPS. This is <strong>S3</strong>. Not mountable as a drive.',
+        },
+        {
+          term: 'Block storage',
+          plain: 'A hard drive for one computer. It plugs into one machine at a time.',
+          precise: '<strong>EBS</strong> — raw volumes attached to a single EC2 instance in a single Availability Zone.',
+        },
+        {
+          term: 'File storage',
+          plain: 'A shared network folder that several computers open at once.',
+          precise: '<strong>EFS</strong> for Linux/NFS, <strong>FSx for Windows File Server</strong> for SMB and Active Directory.',
+        },
+        {
+          term: 'Bucket',
+          plain: 'A named container in S3 where your files live. The name has to be unique across every AWS customer on earth.',
+          precise: 'The top-level S3 container. It lives in one Region, but its name is globally unique.',
+        },
+        {
+          term: 'Durability vs availability',
+          plain: 'Durability is "will my data still exist?". Availability is "can I get at it right now?". They are different promises.',
+          precise: 'S3 is designed for <strong>eleven nines (99.999999999%)</strong> of durability — the data survives. Availability is a separate, lower number about reachability.',
+        },
+        {
+          term: 'Snapshot',
+          plain: 'A photograph of a disk as it was at one moment, kept so you can go back to it.',
+          precise: 'A point-in-time backup of an EBS volume, stored in S3 and <strong>incremental</strong> — only changed blocks are saved after the first one.',
+        },
+        {
+          term: 'Query',
+          plain: 'A question you ask a database. "How many orders were there yesterday?"',
+          precise: 'Usually written in SQL for relational databases. Which queries you run constantly should decide which database you pick.',
+        },
+        {
+          term: 'Encryption at rest / in transit',
+          plain: 'At rest: scrambled while sitting on a disk. In transit: scrambled while travelling down a wire. You want both.',
+          precise: 'At rest is <strong>KMS</strong>; in transit is <strong>TLS</strong>, with certificates from <strong>ACM</strong>. The interesting question is never whether to encrypt but who holds the key.',
+        },
+      ],
+    },
+    {
+      name: 'Words AWS invented (or bent)',
+      terms: [
+        {
+          term: 'Region',
+          plain: 'A part of the world where AWS has data centres. You choose one, and your data stays there.',
+          precise: 'A named geographic area — <code>eu-west-1</code> is Ireland, <code>us-east-1</code> is Northern Virginia — containing several Availability Zones.',
+        },
+        {
+          term: 'Availability Zone (AZ)',
+          plain: 'One or more data centres inside a Region, far enough apart that one flood cannot take out two.',
+          precise: 'The <strong>unit of failure</strong>. Running across two or more AZs is the answer to nearly every "make it highly available" question.',
+        },
+        {
+          term: 'Edge location',
+          plain: 'A small AWS site near a city that keeps copies of popular content close to users.',
+          precise: 'Where CloudFront caches and Route 53 answers. There are far more of them than Regions.',
+        },
+        {
+          term: 'ARN',
+          plain: 'The full official name of any single thing in AWS. Long, ugly, and unambiguous.',
+          precise: 'Amazon Resource Name, shaped like <code>arn:aws:s3:::my-bucket/file.txt</code>. Policies refer to resources by ARN.',
+        },
+        {
+          term: 'IAM',
+          plain: 'The part of AWS that decides who is allowed to do what.',
+          precise: 'Identity and Access Management. Free, global, and applied to every request. Its rule order: explicit Deny → SCP guardrail → explicit Allow → implicit deny.',
+        },
+        {
+          term: 'Policy',
+          plain: 'A written rule saying who can do which things to what.',
+          precise: 'A JSON document with <strong>Effect, Action, Resource, Condition</strong> — plus <strong>Principal</strong> when attached to a resource rather than an identity.',
+        },
+        {
+          term: 'Role',
+          plain: 'A hi-vis jacket hanging by the door. Nobody owns it, anybody approved can put it on, and it stops working when they take it off.',
+          precise: 'An identity with permissions but no password or permanent keys, <strong>assumed</strong> temporarily. How applications should always get access — never access keys.',
+        },
+        {
+          term: 'Principal',
+          plain: 'Whoever is asking. The "who" in "who is allowed to do what".',
+          precise: 'The user, role or service making a request.',
+        },
+        {
+          term: 'Root user',
+          plain: 'The original account owner — the email you signed up with. Can do absolutely anything, including things you cannot undo.',
+          precise: 'Cannot be restricted by any policy. Enable MFA, delete its access keys, and then do not use it.',
+        },
+        {
+          term: 'Console, CLI, SDK, API',
+          plain: 'Four ways to tell AWS to do something: the website, the terminal, from inside your code, or the raw interface underneath all three.',
+          precise: 'Everything ends at the same <strong>API</strong>. The console is a website calling it; the CLI is a program calling it; an SDK is a library for calling it from your language.',
+        },
+        {
+          term: 'Managed service',
+          plain: 'A service where AWS does the boring operational work — patching, backups, failover — and charges more per hour for it.',
+          precise: 'Compare total cost, not the hourly rate. "Reduce operational overhead" in a question means choose the managed option.',
+        },
+        {
+          term: 'Service quota (limit)',
+          plain: 'A cap on how much of something you can have. Most can be raised by asking.',
+          precise: 'Per-account, per-Region caps. Raising them ahead of a known spike is a normal part of planning a launch.',
+        },
+        {
+          term: 'Tag',
+          plain: 'A sticky label you put on a resource, like <code>Team: payments</code>, so you can find it and see what it costs.',
+          precise: 'A key-value pair. <strong>Cost allocation tags</strong> are what turn one invoice into per-team accountability.',
+        },
+      ],
+    },
+    {
+      name: 'Words about keeping things running',
+      terms: [
+        {
+          term: 'Scaling up vs scaling out',
+          plain: 'Up: get a bigger machine. Out: get more machines. Out is nearly always the right answer.',
+          precise: 'Vertical vs horizontal scaling. Scaling up leaves you with one bigger thing to lose; scaling out survives losing one.',
+        },
+        {
+          term: 'Elasticity',
+          plain: 'Growing when busy <em>and shrinking when quiet</em>, without anyone deciding to. The shrinking is where the money is.',
+          precise: 'Distinct from <strong>scalability</strong>, which is merely the ability to grow. Elasticity is automatic and two-directional.',
+        },
+        {
+          term: 'High availability',
+          plain: 'It keeps working when something breaks, and nobody notices.',
+          precise: 'Usually means running across <strong>multiple Availability Zones</strong> with health checks and automatic replacement.',
+        },
+        {
+          term: 'Failover',
+          plain: 'The moment a standby takes over from the thing that just died.',
+          precise: 'Can be automatic (RDS Multi-AZ) or DNS-driven across Regions (Route 53 health checks).',
+        },
+        {
+          term: 'Stateless',
+          plain: 'No machine remembers anything important about you, so any of them can serve you and losing one costs nothing.',
+          precise: 'Session data lives in DynamoDB or ElastiCache, files in S3. <strong>Statelessness is the prerequisite</strong> for auto scaling — do it first.',
+        },
+        {
+          term: 'Decoupling',
+          plain: 'Putting a queue between two parts so a slow one creates a backlog rather than an outage.',
+          precise: 'Typically <strong>SQS</strong> between producer and consumer, or <strong>SNS</strong>/<strong>EventBridge</strong> for events.',
+        },
+        {
+          term: 'RTO and RPO',
+          plain: 'RTO: how long can we be down? RPO: how much data can we afford to lose? Two different questions.',
+          precise: 'Recovery <strong>Time</strong> Objective measures forward from failure to service resuming. Recovery <strong>Point</strong> Objective measures backward to the last good copy.',
+        },
+        {
+          term: 'SLA',
+          plain: 'A written promise about uptime, with money back if it is broken.',
+          precise: 'Service Level Agreement. Distinct from a design target — the SLA is the contractual commitment and its remedy.',
+        },
+        {
+          term: 'Blast radius',
+          plain: 'How much gets damaged when one thing goes wrong. Good design keeps it small.',
+          precise: 'Why least privilege, multiple accounts and multiple AZs all matter — each shrinks what a single failure or compromise can reach.',
+        },
+        {
+          term: 'Patching',
+          plain: 'Installing security updates. Dull, endless, and how most breaches become possible.',
+          precise: 'Who patches decides the service model: <strong>EC2 you do, RDS AWS does, Lambda there is nothing to patch</strong>.',
+        },
+        {
+          term: 'Infrastructure as code',
+          plain: 'Describing your servers and networks in a file instead of clicking to create them, so you can rebuild them identically.',
+          precise: '<strong>CloudFormation</strong> or the <strong>CDK</strong>. It is what makes environments reviewable, repeatable and non-drifting.',
+        },
+      ],
+    },
+    {
+      name: 'Words about money',
+      terms: [
+        {
+          term: 'Pay-as-you-go',
+          plain: 'You pay for what you used, after you used it. Like electricity.',
+          precise: 'The default AWS model — no upfront commitment, billed per second or per hour depending on the service.',
+        },
+        {
+          term: 'CapEx and OpEx',
+          plain: 'CapEx is buying a thing up front. OpEx is paying monthly for what you consumed. The cloud swaps the first for the second.',
+          precise: 'Capital vs operational expenditure. "Avoid up-front investment" in a question always points here.',
+        },
+        {
+          term: 'Egress (data transfer out)',
+          plain: 'Data leaving AWS for the internet. Going in is free; coming out is not, and this is where surprise bills come from.',
+          precise: 'Charged per GB. Cross-AZ traffic is also charged; same-AZ over private IPs is free. CloudFront reduces it.',
+        },
+        {
+          term: 'Right-sizing',
+          plain: 'Noticing your servers are bigger than they need to be, and shrinking them.',
+          precise: 'Usually the largest saving after a migration. <strong>Compute Optimizer</strong> finds candidates. Do it <em>before</em> buying any commitment.',
+        },
+        {
+          term: 'TCO',
+          plain: 'What something really costs once you count the electricity, the floor space and the people — not just the purchase price.',
+          precise: 'Total Cost of Ownership. The only fair basis for comparing owning hardware with renting it.',
+        },
+        {
+          term: 'Reserved / Savings Plan / Spot',
+          plain: 'Three discounts. Two are for promising to stick around; one is for accepting the machine can be taken away.',
+          precise: '<strong>Savings Plans</strong> and <strong>Reserved Instances</strong> trade a 1 or 3-year commitment for up to ~72% off. <strong>Spot</strong> trades interruptibility for up to 90% off.',
+        },
+        {
+          term: 'Free tier',
+          plain: 'What you can use without paying. It is an allowance, not a spending cap — nothing stops you exceeding it.',
+          precise: 'New accounts get credit-based Free plan terms plus 30+ always-free services within monthly limits. Set a budget alarm regardless.',
+        },
+      ],
+    },
+  ]}
+/>
+
+---
+
+If a word stopped you somewhere on this site and it is not in this list, that is a gap worth
+knowing about — the whole point of this page is that nobody should lose an afternoon to an
+undefined noun.
+
+And it is worth saying plainly, because a lot of people quietly assume otherwise: **not knowing
+these words was never a sign that you were not cut out for this.** It was a sign that the
+documentation was written by people who had forgotten what it was like not to know them.

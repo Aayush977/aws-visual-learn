@@ -1,0 +1,297 @@
+---
+title: Cloud Economics, and the Costs Nobody Invoices
+summary: Why "is the cloud cheaper?" is the wrong question, what a real total cost of ownership comparison contains, and the four levers — right-sizing, automation, managed services and licensing — that decide whether a migration saves money or wastes it.
+exams: [CCP]
+track: foundations
+order: 8
+domains:
+  CCP: 'Domain 1 — Cloud Concepts'
+minutes: 12
+hook: IT's spreadsheet said the cloud would cost 40% more. Finance's said it would save a third. Neither side had lied, and only one of them had counted the electricity.
+updated: 2026-08-15
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## Two spreadsheets, one data centre
+
+When Brightwell were deciding whether to close their data centre, two people built a cost model
+and presented them in the same meeting.
+
+The infrastructure manager's model said moving to AWS would cost about **40% more**. He had
+taken the servers in the racks, priced equivalent EC2 instances, added storage, and compared
+that to what the data centre cost the business each year. It was careful work and the
+arithmetic was correct.
+
+The finance director's model said it would **save about a third**. Also careful, also correct.
+
+They had not disagreed about a single number. What they disagreed about was **which numbers
+belonged in the comparison** — and the infrastructure manager's data-centre column contained
+only the things that arrive as invoices. It had the hardware, the maintenance contracts and the
+building. It did not have the electricity, because that was on the facilities budget. It did not
+have the four days a month two engineers spent patching and replacing disks, because that was
+salary and salary is paid anyway. It did not have the 60% of capacity sitting idle to cover a
+peak that happened eleven times a year. It did not have the £600,000 hardware refresh due in
+2028.
+
+None of that was dishonesty. It is simply that **owning infrastructure hides most of its cost
+in budgets nobody adds together**, and the cloud makes every one of those costs arrive as a
+line on a single monthly bill — which feels more expensive precisely because you can finally
+see it.
+
+That is what cloud economics is about, and the exam has a whole task statement on it.
+
+## Fixed cost and variable cost
+
+Start with the distinction everything else hangs off.
+
+- A **fixed cost** is paid before you know whether you needed it. A server bought in March
+  costs the same whether it runs flat out or sits idle all year. In accounting terms this is
+  **capital expenditure (CapEx)** — money spent up front on an asset you own and then
+  depreciate over several years.
+- A **variable cost** is paid because something happened. An instance that ran for nine hours
+  costs nine hours. This is **operational expenditure (OpEx)** — money spent on what you
+  consumed this month.
+
+The cloud's central trade is turning the first into the second. That is genuinely valuable, but
+notice what it is *not*: it is not automatically a discount. **It is the removal of the
+requirement to guess.** You stop paying for capacity you might need and start paying for
+capacity you did need.
+
+<Callout type="exam">
+Exam questions signal this with very consistent wording. <strong>"Avoid large up-front
+investment"</strong>, <strong>"no upfront capital expenditure"</strong>, <strong>"pay only for
+what you consume"</strong> — all of these are pointing at <strong>CapEx becoming OpEx</strong>,
+and never at economies of scale or agility, which are different advantages.
+</Callout>
+
+## What a real comparison contains
+
+Here is the same estate, costed twice — once the way it appears on invoices, and once the way
+it actually consumes money.
+
+<Diagram
+  title="The cost of a server you own, layer by layer"
+  viewBox="0 40 1000 520"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'The part everyone counts',
+      body: 'The purchase price of the hardware, and the support contract that comes with it. This is the number that appears on a quote, and for most people it is the whole of their mental model of what a server costs.',
+    },
+    {
+      title: 'The building it sits in',
+      body: 'Floor space, racks, cooling, <strong>power</strong>, physical security, fire suppression, and the network equipment connecting it all. Usually on a facilities budget, and therefore usually missing from IT’s comparison.',
+    },
+    {
+      title: 'The people who look after it',
+      body: 'Racking, cabling, firmware, patching, replacing failed disks, capacity planning, and the out-of-hours call when something dies. Salary is paid whether or not you migrate — but those hours become available for something else, and that is a real saving.',
+    },
+    {
+      title: 'The capacity you bought and never used',
+      body: 'You size for the <strong>peak</strong>, plus growth, plus a safety margin, plus a spare for failures. Typical utilisation in a private data centre sits well below half. <strong>You paid 100% for it and used 30% of it.</strong>',
+      duration: 1400,
+    },
+    {
+      title: 'And again in three years',
+      body: 'Hardware does not last. Every three to five years the whole cycle repeats — a refresh that has to be budgeted, specified, procured and installed, and which is another guess about a future you cannot see.',
+      duration: 1400,
+    },
+  ]}
+  caption="Only the top box arrives as an invoice with the word 'server' on it. The other four are the reason TCO comparisons and sticker-price comparisons reach opposite conclusions."
+>
+  <Boundary x={310} y={70} w={420} h={470} label="What owning it actually costs" icon="server" tone="red" solid step={1} />
+
+  <Node x={310} y={130} w={330} h={62} label="Hardware + support contract" sub="the invoice everyone counts" icon="server" tone="orange" step={1} />
+  <Node x={310} y={215} w={330} h={62} label="Power · cooling · floor space" sub="usually a facilities budget" icon="zone" tone="red" step={2} />
+  <Node x={310} y={300} w={330} h={62} label="Staff hours" sub="racking · patching · 3am callouts" icon="users" tone="red" step={3} />
+  <Node x={310} y={385} w={330} h={62} label="Idle capacity" sub="sized for peak, used at ~30%" icon="chart" tone="red" step={4} />
+  <Node x={310} y={470} w={330} h={62} label="Refresh every 3–5 years" sub="the whole guess, again" icon="clock" tone="red" step={5} />
+
+  <Boundary x={790} y={70} w={330} h={230} label="What renting it costs" icon="cloud" tone="green" step={1} />
+  <Node x={790} y={140} w={260} h={62} label="Per-hour compute" sub="only while it runs" icon="money" tone="green" step={1} />
+  <Node x={790} y={225} w={260} h={62} label="Per-GB storage" sub="only what you kept" icon="disk" tone="green" step={1} />
+  <Node x={790} y={400} w={280} h={90} label="Everything else" sub="is somebody else’s problem, and is inside the price" icon="cloud" tone="teal" step={3} />
+</Diagram>
+
+**Total cost of ownership (TCO)** is the name for the honest version of this comparison: every
+cost of running the thing over its whole life, not just its purchase price. It is the only
+comparison worth making, and the reason the two Brightwell spreadsheets disagreed.
+
+<Mnemonic
+  title="What hides in the on-premises column"
+  phrase="Proper Sums Include Real Costs"
+  tone="red"
+  items={[
+    { key: 'P', term: 'Power and cooling', note: 'plus floor space, racks and physical security — usually another department’s budget' },
+    { key: 'S', term: 'Staff hours', note: 'racking, patching, disk replacement, capacity planning, out-of-hours callouts' },
+    { key: 'I', term: 'Idle capacity', note: 'you bought the peak and use a fraction of it, every hour of every day' },
+    { key: 'R', term: 'Refresh cycle', note: 'the whole purchase again in three to five years' },
+    { key: 'C', term: 'Cost of being wrong', note: 'outages when you under-guessed; stranded capital when you over-guessed' },
+  ]}
+/>
+
+<Callout type="gotcha">
+The exam will not let you conclude "the cloud is always cheaper", and neither should you. A
+workload that is <strong>completely flat, fully utilised and long-lived</strong> can genuinely
+be cheaper to own — that is why AWS itself sells Savings Plans and Dedicated Hosts. The
+cloud's economic advantage grows with <strong>how much your demand varies</strong> and how
+uncertain your future is. Brightwell's win came from a lumpy, uncertain estate, not from AWS
+being inherently cheap.
+</Callout>
+
+## The four levers that decide whether you actually save
+
+Migrating does not save money by itself. Lifting 187 servers onto identically-sized EC2
+instances usually costs *more* than the data centre did, and this surprises people every year.
+Four things turn it around, and they are exactly what task 1.4 of the blueprint asks about.
+
+### 1 · Right-sizing
+
+The single biggest lever, and the one most often skipped.
+
+On-premises you sized every server for its peak load, plus three years of growth, plus a
+margin — because getting it wrong meant a twelve-week procurement. That logic is now
+obsolete: on AWS you can change an instance type in minutes, so **sizing for today is not
+risky any more**.
+
+Most rehosted servers are two to four times larger than the workload needs. **Compute
+Optimizer** and **Cost Explorer's rightsizing recommendations** watch actual utilisation and
+tell you which ones. Do this once, three months after a migration, and it is frequently the
+largest single saving available.
+
+### 2 · Automation
+
+Anything done by hand costs staff time every time it happens, and staff time is the cost that
+never appears on the AWS bill but always appears in the business.
+
+Instances that start and stop on a schedule cost nothing overnight. Environments built from a
+CloudFormation template cost one afternoon instead of a week, and stop drifting apart.
+Auto Scaling gives capacity back without anyone deciding to. Every one of these converts a
+recurring human cost into a one-off engineering cost.
+
+### 3 · Managed services
+
+Running your own MySQL on EC2 means you patch it, back it up, test the restores, configure
+replication, and get paged when it fails. **Amazon RDS** does all of that for a higher per-hour
+price than the raw instance.
+
+Compare only the per-hour prices and the managed service looks like a bad deal. Compare the
+**total** cost — including the engineer's week and the risk of a restore nobody has tested —
+and it rarely is. This applies the same way to **ECS and EKS** over self-managed clusters, and
+**DynamoDB** over a self-run database.
+
+<Callout type="cost">
+The phrase to listen for is <strong>"reduce operational overhead"</strong>. It appears
+constantly in exam questions, and it almost always means: choose the <strong>managed</strong>
+service, even though its sticker price is higher. Operational overhead is a cost; the exam
+treats it as one.
+</Callout>
+
+### 4 · Licensing
+
+Software licences do not disappear when the hardware does, and they are examinable in two forms:
+
+- **Bring Your Own License (BYOL)** — you already own a licence and want to keep using it.
+  Where a licence is tied to *physical* CPU sockets or cores, you may need **Dedicated Hosts**,
+  which give you visibility of the physical server. It is the most expensive way to buy EC2 and
+  is chosen for exactly this reason.
+- **License-included** — AWS bundles the licence into the hourly price. Windows Server or SQL
+  Server on EC2, or a commercial engine on RDS. No licence to track, no compliance audit to
+  fail, and you stop paying the moment you stop the instance.
+
+**License Manager** exists to track all of this and stop you breaching terms by accident.
+
+## The tools that produce the numbers
+
+| When | Tool | What it answers |
+| --- | --- | --- |
+| Before you build | **AWS Pricing Calculator** | What will this architecture cost per month? |
+| Before you migrate | **Migration Evaluator** | What does our current estate cost, and what would it cost on AWS? |
+| After three months | **Compute Optimizer** · **Cost Explorer rightsizing** | Which of these are bigger than they need to be? |
+| Continuously | **Trusted Advisor** | What is idle, unattached or forgotten? |
+
+<Quiz
+  question="A company is comparing the cost of running a workload in its own data centre against running it on AWS. Which costs should be included in the on-premises side of a total cost of ownership analysis? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'Electricity and cooling for the server room',
+      correct: true,
+      why: 'Power and cooling are a genuine, recurring cost of owning hardware. They are frequently excluded from naive comparisons because they sit on a facilities budget rather than an IT one.',
+    },
+    {
+      text: 'Staff time spent racking hardware and applying patches',
+      correct: true,
+      why: 'Labour is one of the largest hidden costs of self-managed infrastructure. TCO counts it because those hours are consumed by the infrastructure and become available for other work once it is gone.',
+    },
+    {
+      text: 'The cost of AWS Support plans',
+      why: 'This belongs on the AWS side of the comparison, not the on-premises side.',
+    },
+    {
+      text: 'Data transfer out of AWS to the internet',
+      why: 'Also an AWS-side cost. It is a real and frequently underestimated one, but it is not part of what a data centre costs.',
+    },
+  ]}
+  explain="The reliable test: <strong>would this cost exist if the hardware did not?</strong> Power, cooling, floor space, hardware refresh and the hours spent maintaining it all disappear with the servers, so all of them belong in the comparison."
+/>
+
+<Quiz
+  question="A company has finished migrating its servers to EC2 by rehosting them at the same specifications they used on-premises. Three months later the AWS bill is higher than expected. What is the most effective first action?"
+  choose={1}
+  options={[
+    {
+      text: 'Use AWS Compute Optimizer to identify over-provisioned instances and right-size them',
+      correct: true,
+      why: 'Servers sized on-premises were deliberately over-specified to cover peak load and years of growth, because changing them was slow. That logic no longer applies, and right-sizing after migration is usually the single largest saving available.',
+    },
+    {
+      text: 'Purchase three-year Reserved Instances for every server immediately',
+      why: 'This locks in a commitment to the wrong sizes for three years. Right-size first, then commit — doing it in this order is a genuinely expensive mistake.',
+    },
+    {
+      text: 'Move all workloads to Spot Instances',
+      why: 'Spot is for interruptible work. Applying it to steady-state business applications that cannot tolerate a two-minute reclaim notice would cause outages.',
+    },
+    {
+      text: 'Migrate the workloads back to the data centre',
+      why: 'This abandons the migration over a problem with a straightforward fix, and reinstates every hidden cost the move removed.',
+    },
+  ]}
+  explain="Remember the order: <strong>right-size first, commit second.</strong> A Savings Plan bought before right-sizing locks in the waste, and commitments are much harder to undo than instance types."
+/>
+
+<Takeaways
+  items={[
+    '<strong>Fixed cost (CapEx)</strong> is paid before you know if you needed it. <strong>Variable cost (OpEx)</strong> is paid because something happened. The cloud converts the first into the second.',
+    '<strong>Total cost of ownership</strong> counts everything over the whole life — power, cooling, space, staff hours, idle capacity and the refresh cycle — not just the purchase price.',
+    'Owning hardware <strong>hides its costs across several budgets</strong>. The cloud puts them all on one bill, which feels more expensive because it is finally visible.',
+    'Migration alone saves nothing. The four levers are <strong>right-sizing, automation, managed services and licensing</strong>.',
+    '<strong>Right-size before you commit.</strong> A Savings Plan bought over over-sized instances locks in the waste for years.',
+    '"Reduce <strong>operational overhead</strong>" means pick the <strong>managed service</strong>, even at a higher hourly price.',
+    'Licensing: <strong>BYOL</strong> may require <strong>Dedicated Hosts</strong> for per-socket terms · <strong>license-included</strong> bundles it in the hourly rate.',
+    'The cloud is <strong>not automatically cheaper</strong>. Its advantage grows with how much demand varies and how uncertain the future is.',
+  ]}
+/>
+
+---
+
+Brightwell went with the finance director's model, and it turned out to be roughly right — but
+not for the reason anybody argued about in the meeting.
+
+The saving did not come from EC2 being cheaper than their servers, because it was not. It came
+from right-sizing 187 machines that had been specified for a peak in 2019, switching off the
+development estate at night and at weekends, and no longer employing two people to look after
+hardware.
+
+Which is the actual lesson, and it is worth carrying into the exam and the job in the same
+sentence: **the cloud does not save you money. It gives you the ability to stop paying for
+things you are not using — and that ability does nothing at all until somebody uses it.**

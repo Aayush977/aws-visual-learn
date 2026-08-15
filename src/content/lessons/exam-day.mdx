@@ -1,0 +1,193 @@
+---
+title: Exam Day, Demystified
+summary: What the Cloud Practitioner exam actually is — 65 questions, 90 minutes, 700 to pass — how the scoring really works, how to book it, and the reading technique that answers a surprising number of questions before you reach the options.
+exams: [CCP]
+track: reference
+order: 20
+minutes: 10
+hook: You do not need to get 65 questions right. You do not even need to get 50 right. Knowing exactly what the bar is changes how you sit the whole thing.
+updated: 2026-08-15
+---
+
+import Callout from '../../components/Callout.astro';
+import Checklist from '../../components/Checklist.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The thing itself
+
+Most of the anxiety around this exam is not about AWS. It is about not knowing how the exam
+works — what the questions look like, whether a wrong answer costs you, what happens if you run
+out of time. All of that is published, and none of it is frightening once it is written down.
+
+Every figure below comes from AWS's own exam guide for **CLF-C02**, the current version.
+
+| | |
+| --- | --- |
+| **Questions** | 65 |
+| **Time** | 90 minutes |
+| **Scoring** | Scaled score from **100 to 1,000** |
+| **Pass mark** | **700** |
+| **Unscored questions** | **15** of the 65 — you are not told which |
+| **Cost** | 100 USD |
+| **Format** | Multiple choice (one correct of four) and multiple response (two or more correct of five or more) |
+| **Where** | A Pearson VUE test centre, or online with a remote proctor |
+| **Valid for** | 3 years |
+
+## Read the scoring twice, it matters
+
+This is the part that changes how people sit the exam, and almost nobody has it explained to
+them.
+
+**Only 50 of the 65 questions count.** Fifteen are unscored — AWS is trialling them for future
+exams — and they are not marked or identified in any way. You cannot spot them, and a question
+you find bewildering may well be one of them.
+
+**Your score is scaled, not a percentage.** It runs from 100 to 1,000, and 700 is the pass.
+Because it is scaled rather than a raw count, 700 does not correspond to exactly 70% of
+questions — the scaling compensates for slight differences in difficulty between exam versions.
+As a rough working target, aiming to be confident on about **75%** of questions gives you
+comfortable margin.
+
+**There is no penalty for a wrong answer.** An unanswered question and a wrong answer score
+identically: zero. This has one absolute consequence.
+
+<Callout type="exam" title="Never leave a question blank. Ever.">
+A guess has at worst a <strong>25% chance</strong> on a four-option question, and considerably
+better once you have eliminated one or two options. A blank has a <strong>0% chance</strong>.
+There is no situation, on any AWS exam, in which leaving an answer empty is correct — so if the
+clock is nearly out, spend the last thirty seconds putting <em>something</em> in every empty box
+before you do anything else.
+</Callout>
+
+## Where the questions come from
+
+The exam guide publishes exactly how the 50 scored questions are distributed. Weight your
+revision accordingly — this is public information and people still revise evenly across topics.
+
+| Domain | Weight | Lessons here |
+| --- | --- | --- |
+| **1 — Cloud Concepts** | **24%** | What Cloud Computing Actually Is · Cloud Economics · Well-Architected · Migration and the CAF |
+| **2 — Security and Compliance** | **30%** | Shared Responsibility · How IAM Decides · Encryption · Threat Detection · Governance |
+| **3 — Cloud Technology and Services** | **34%** | Global Infrastructure · Compute · Storage · Databases · Networking · AI and Analytics · Services to Recognise |
+| **4 — Billing, Pricing, and Support** | **12%** | Pricing and Cost Management · EC2 Purchase Options · Support Plans |
+
+Two things worth noticing. **Security is 30%** — nearly a third of the exam, and far more than
+most beginners expect from an entry-level certification. And **Domains 2 and 3 together are
+64%**, so if revision time is short, that is where it goes.
+
+## The reading technique
+
+Cloud Practitioner questions are not trying to trick you, but they are written to a formula,
+and knowing the formula is worth marks.
+
+A scenario question has three parts: some **context** you mostly do not need, a **constraint**
+that decides the answer, and a **question** that tells you what kind of answer to give. The
+constraint is usually one clause, often in the middle, and often the shortest part.
+
+<Mnemonic
+  title="How to read a scenario question"
+  phrase="Question First, Constraint Second, Context Last"
+  tone="blue"
+  items={[
+    { key: 'Q', term: 'Read the last line first', note: 'it tells you what is being asked — cheapest? most available? least operational overhead?' },
+    { key: 'C', term: 'Find the constraint', note: 'the clause that eliminates options: "must be retrieved in minutes", "cannot leave the country", "without managing servers"' },
+    { key: 'C', term: 'Then skim the context', note: 'company size, industry and history are usually decoration' },
+    { key: 'E', term: 'Eliminate before choosing', note: 'two options are usually obviously wrong; the mark is decided between the other two' },
+  ]}
+/>
+
+**The qualifier in the question is doing real work.** These words are not filler:
+
+- **"MOST cost-effective"** — several options work; pick the cheapest that still meets the
+  constraint. The very cheapest option is often deliberately ruled out by one clause.
+- **"LEAST operational overhead"** or **"with minimal management"** — choose the managed or
+  serverless option, even if it costs more per hour.
+- **"MOST secure"** — choose the answer with the smallest blast radius: roles over keys,
+  private over public, least privilege over convenience.
+- **"Highly available"** — multiple Availability Zones. A bigger instance is never the answer.
+
+<Callout type="gotcha" title="Choose TWO means exactly two">
+Multiple-response questions state how many answers to select, and they are marked all-or-nothing
+— there are no partial marks for getting one of two right. Select the exact number asked for,
+no more and no less, and re-read the count before moving on. Miscounting is a pure gift of a
+mark to nobody.
+</Callout>
+
+## Booking and sitting it
+
+<Checklist
+  id="examday-booking"
+  title="From deciding to sitting"
+  intro="Progress is saved on this device, so you can tick these off over the weeks you are preparing."
+  steps={[
+    {
+      label: 'Create an <strong>AWS Skill Builder</strong> account and take the official practice question set',
+      detail: 'AWS publishes a free official set. Do this early, badly, and on purpose — a low score now tells you which domains need the time.',
+    },
+    {
+      label: 'Book the exam before you feel ready',
+      detail: 'Through <a href="https://aws.amazon.com/certification/">aws.amazon.com/certification</a>. A booked date is the single most effective study tool there is. You can reschedule free of charge up to 24 hours before.',
+    },
+    {
+      label: 'Choose test centre or online proctored',
+      detail: 'A test centre removes every technical risk and most distractions. Online is convenient but has strict rules: a clear desk, an empty room, nobody entering, and a room scan before you start.',
+    },
+    {
+      label: 'If sitting online, run the system test <em>on the machine you will use</em>',
+      detail: 'Do it days ahead, not on the morning. Webcam, microphone, and a network that will not drop.',
+      critical: true,
+    },
+    {
+      label: 'Take practice tests until you are scoring comfortably above the bar',
+      detail: 'Aim for around 80% consistently before you sit it. Review every wrong answer against the <em>Ten Pairs Everyone Mixes Up</em> page — most mistakes cluster there.',
+    },
+    {
+      label: 'Have photo ID ready that matches your registration name exactly',
+      detail: 'Mismatched names are the most common reason people are turned away. Check it the week before, not the morning of.',
+      critical: true,
+    },
+    {
+      label: 'Flag and move on',
+      detail: 'The interface lets you flag a question and return to it. Ninety minutes for 65 questions is about 83 seconds each — generous, but only if you do not spend six minutes on one item.',
+    },
+    {
+      label: 'Answer every single question before you submit',
+      detail: 'No penalty for wrong answers. A blank is a guaranteed zero.',
+      critical: true,
+    },
+  ]}
+/>
+
+<Callout type="note" title="Afterwards">
+You will normally see a pass or fail result on screen when you finish, with the official score
+report following in your certification account within a few days. That report breaks your
+performance down by domain, which is genuinely useful if you plan to go on to Solutions
+Architect Associate. If it does not go your way, you can retake after <strong>14 days</strong>,
+and there is no limit on attempts — plenty of people pass on the second sitting having lost
+nothing but a fortnight.
+</Callout>
+
+<Takeaways
+  items={[
+    '<strong>65 questions · 90 minutes · scaled 100–1,000 · 700 to pass · 100 USD · valid 3 years.</strong>',
+    '<strong>15 questions are unscored</strong> and unmarked. Only 50 count, so one baffling question means nothing.',
+    '<strong>No penalty for wrong answers.</strong> Never leave a blank — a guess beats an empty box every time.',
+    'Weightings: <strong>Cloud Concepts 24% · Security 30% · Technology and Services 34% · Billing and Support 12%.</strong> Security is far heavier than people expect.',
+    'Read the <strong>last line first</strong>, then find the constraint, then skim the context.',
+    'The qualifier decides it: <strong>"most cost-effective" · "least operational overhead" · "most secure" · "highly available"</strong> each point at a different family of answers.',
+    '<strong>"Choose TWO" is marked all-or-nothing.</strong> Select exactly the number asked for.',
+    'Book the date before you feel ready. Reschedule free up to <strong>24 hours</strong> beforehand; retake after <strong>14 days</strong> if needed.',
+  ]}
+/>
+
+---
+
+One last reframing, because it takes some of the weight off.
+
+You are not being asked to prove you could build anything. Cloud Practitioner is a
+**recognition** exam: it asks whether you know what the services are for, who is responsible for
+what, and roughly what things cost. Every lesson on this site has been pointed at exactly that.
+
+If you have read them and can hold your own on the ten confusable pairs, you are closer than
+the nerves suggest. Book the date.
