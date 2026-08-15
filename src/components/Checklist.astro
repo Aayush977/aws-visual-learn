@@ -1,0 +1,325 @@
+---
+/**
+ * A checklist that survives you leaving the page.
+ *
+ * Hands-on lessons send the reader off to another tab for ten minutes. Without
+ * persistence they come back and have to work out where they were, which is
+ * exactly when people give up. Progress is kept in localStorage, keyed by the
+ * `id` below — so keep that id stable once a lesson is published.
+ *
+ * Works fine without JavaScript: you get a plain, readable, printable list.
+ */
+export interface Step {
+  /** The instruction. Supports inline HTML. */
+  label: string;
+  /** Optional supporting detail underneath. Supports inline HTML. */
+  detail?: string;
+  /** Marks a step you should not skip — rendered with a warning tone. */
+  critical?: boolean;
+}
+
+interface Props {
+  /** Stable storage key. Changing it resets everyone's progress. */
+  id: string;
+  title: string;
+  intro?: string;
+  steps: Step[];
+}
+
+const { id, title, intro, steps } = Astro.props;
+---
+
+<section class="ck" data-checklist={id} aria-labelledby={`${id}-h`}>
+  <header class="ck__head">
+    <div class="ck__headText">
+      <p class="ck__eyebrow">Do this</p>
+      <h4 class="ck__title" id={`${id}-h`}>{title}</h4>
+      {intro && <p class="ck__intro" set:html={intro} />}
+    </div>
+    <p class="ck__count" data-count hidden>
+      <span data-done>0</span> of {steps.length}
+    </p>
+  </header>
+
+  <div class="ck__bar" data-bar hidden aria-hidden="true"><span data-fill></span></div>
+
+  <ol class="ck__steps">
+    {
+      steps.map((s, i) => (
+        <li class:list={['ck__step', s.critical && 'ck__step--critical']}>
+          <label class="ck__row">
+            <input type="checkbox" class="ck__box" data-step={i} />
+            <span class="ck__tick" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="m5 13 4 4L19 7" />
+              </svg>
+            </span>
+            <span class="ck__text">
+              <span class="ck__label" set:html={s.label} />
+              {s.detail && <span class="ck__detail" set:html={s.detail} />}
+              {s.critical && <span class="ck__flag">Do not skip</span>}
+            </span>
+          </label>
+        </li>
+      ))
+    }
+  </ol>
+
+  <div class="ck__foot" data-foot hidden>
+    <button type="button" class="ck__reset" data-reset>Clear progress</button>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-checklist]').forEach((root) => {
+    const key = `awsvl:checklist:${root.dataset.checklist}`;
+    const boxes = Array.from(root.querySelectorAll<HTMLInputElement>('.ck__box'));
+    const done = root.querySelector<HTMLElement>('[data-done]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+
+    // Only reveal the progress affordances once we know JS can drive them.
+    root.querySelectorAll<HTMLElement>('[data-count], [data-bar], [data-foot]').forEach(
+      (el) => (el.hidden = false),
+    );
+
+    const read = (): boolean[] => {
+      try {
+        const raw = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(raw) ? raw : [];
+      } catch {
+        return []; // Corrupt or blocked storage just means starting fresh.
+      }
+    };
+
+    const paint = () => {
+      const n = boxes.filter((b) => b.checked).length;
+      done.textContent = String(n);
+      fill.style.width = `${(n / boxes.length) * 100}%`;
+      root.classList.toggle('is-complete', n === boxes.length);
+      boxes.forEach((b) => b.closest('.ck__step')?.classList.toggle('is-done', b.checked));
+    };
+
+    const saved = read();
+    boxes.forEach((b, i) => (b.checked = Boolean(saved[i])));
+    paint();
+
+    root.addEventListener('change', (e) => {
+      if (!(e.target as HTMLElement).classList.contains('ck__box')) return;
+      try {
+        localStorage.setItem(key, JSON.stringify(boxes.map((b) => b.checked)));
+      } catch {
+        /* Private browsing — the checklist still works, it just will not persist. */
+      }
+      paint();
+    });
+
+    root.querySelector('[data-reset]')?.addEventListener('click', () => {
+      boxes.forEach((b) => (b.checked = false));
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        /* ignore */
+      }
+      paint();
+    });
+  });
+</script>
+
+<style>
+  .ck {
+    margin: var(--sp-6) 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .ck__head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-4);
+    padding: var(--sp-4);
+    background: var(--bg-sunken);
+    border-bottom: 1px solid var(--border);
+  }
+  .ck__headText {
+    flex: 1;
+  }
+  .ck__eyebrow {
+    margin: 0 0 var(--sp-1);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--aws-green);
+  }
+  .ck__title {
+    margin: 0;
+    font-size: var(--step-1);
+  }
+  .ck__intro {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .ck__count {
+    flex: none;
+    margin: 0;
+    padding: 0.2rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-raised);
+    font-size: var(--step--1);
+    font-weight: 650;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .ck.is-complete .ck__count {
+    border-color: color-mix(in srgb, var(--aws-green) 45%, var(--border));
+    background: color-mix(in srgb, var(--aws-green) 12%, var(--bg));
+    color: var(--aws-green);
+  }
+
+  .ck__bar {
+    height: 3px;
+    background: var(--bg-sunken);
+  }
+  .ck__bar span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--aws-green);
+    transition: width 0.25s ease;
+  }
+
+  .ck__steps {
+    list-style: none;
+    margin: 0;
+    padding: var(--sp-2) 0;
+    counter-reset: ck;
+  }
+  .ck__step {
+    border-bottom: 1px solid var(--border);
+  }
+  .ck__step:last-child {
+    border-bottom: 0;
+  }
+
+  .ck__row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    cursor: pointer;
+  }
+  .ck__row:hover {
+    background: var(--accent-soft);
+  }
+
+  .ck__box {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .ck__tick {
+    flex: none;
+    margin-top: 1px;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--bg);
+    display: grid;
+    place-items: center;
+  }
+  .ck__tick svg {
+    width: 13px;
+    height: 13px;
+    fill: none;
+    stroke: var(--text-inverse);
+    stroke-width: 3.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0;
+  }
+  .ck__box:checked + .ck__tick {
+    background: var(--aws-green);
+    border-color: var(--aws-green);
+  }
+  .ck__box:checked + .ck__tick svg {
+    opacity: 1;
+  }
+  .ck__box:focus-visible + .ck__tick {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .ck__text {
+    display: grid;
+    gap: var(--sp-1);
+  }
+  .ck__label {
+    font-size: var(--step-0);
+    font-weight: 550;
+  }
+  .ck__step.is-done .ck__label {
+    color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--text-muted) 45%, transparent);
+  }
+  .ck__detail {
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .ck__detail :global(code) {
+    font-size: 0.85em;
+  }
+
+  .ck__step--critical .ck__label {
+    color: var(--aws-red);
+  }
+  .ck__step.is-done .ck__label {
+    color: var(--text-muted);
+  }
+  .ck__flag {
+    justify-self: start;
+    margin-top: var(--sp-1);
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--aws-red) 14%, var(--bg));
+    color: var(--aws-red);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .ck__foot {
+    padding: var(--sp-3) var(--sp-4);
+    border-top: 1px solid var(--border);
+    background: var(--bg-sunken);
+  }
+  .ck__reset {
+    font: inherit;
+    font-size: var(--step--1);
+    font-weight: 600;
+    padding: 0.3rem 0.65rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .ck__reset:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ck__bar span {
+      transition: none;
+    }
+  }
+</style>

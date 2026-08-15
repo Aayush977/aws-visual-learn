@@ -91,16 +91,35 @@ charge and the internet path. And putting <strong>CloudFront</strong> in front o
 egress cost as well as latency — a rare case where the fast answer is also the cheap one.
 </Callout>
 
-## The Free Tier has three different shapes
+## The Free Tier, which changed in 2025
 
-Beginners conflate these, and questions occasionally test the difference:
+This is worth getting right, because most study material online still describes the old
+arrangement — and so, for now, do some exam questions.
 
-- **Always free** — permanent, for every account. 1 million Lambda requests a month, 25 GB of
-  DynamoDB storage, 10 CloudWatch metrics.
-- **12 months free** — from the day you open the account. 750 hours a month of a `t2.micro` or
-  `t3.micro`, 5 GB of S3 Standard, 750 hours of RDS.
-- **Trials** — short-term, starting when you activate the service. A few months of Amazon
-  Inspector, for instance.
+**What a new account gets today.** Accounts start on a **Free plan**: **$100 in credits
+immediately**, up to **$100 more** for completing getting-started activities, so **up to $200
+over six months**. The plan ends after six months or when the credits are exhausted, whichever
+comes first, and you are not charged unless you choose to move to a Paid plan. Alongside it,
+**over 30 services are always free** within monthly usage limits — permanently, on either plan.
+That always-free allowance includes things like 1 million Lambda requests a month and 25 GB of
+DynamoDB storage.
+
+**What the older material describes.** Accounts opened before the change used a three-part
+structure, and you should still recognise it:
+
+- **Always free** — permanent, for every account. Still true today.
+- **12 months free** — from the day the account was opened. 750 hours a month of a `t2.micro`
+  or `t3.micro`, 5 GB of S3 Standard, 750 hours of RDS.
+- **Trials** — short-term, starting when you activate the service.
+
+<Callout type="exam" title="Which one do I answer with?">
+If a question describes the <strong>12-month free tier</strong> or asks you to distinguish the
+three shapes, answer inside that framing — the exam guide has not been rewritten as quickly as
+the offer changed. What does not change, and is what the question is really testing, is the
+principle in the callout below: <strong>the free tier is an allowance, not a cap</strong>.
+Verify current terms at <a href="https://aws.amazon.com/free/">the AWS Free Tier page</a> before
+opening an account.
+</Callout>
 
 <Callout type="gotcha">
 750 hours per month is <strong>one</strong> instance running continuously — not two. Run two
@@ -308,7 +327,7 @@ next surprise arrives as an alert instead of an invoice.
   items={[
     'Nearly every bill is <strong>compute + storage + data transfer out</strong>. In is free; out is the surprise.',
     'Cross-<strong>AZ</strong> traffic is charged. Same-AZ over <strong>private IPs</strong> is free. Cross-Region costs more still.',
-    'Free tier has three shapes: <strong>always free</strong>, <strong>12 months</strong>, and <strong>short trials</strong>. 750 hours is one instance, and nothing caps your spend.',
+    'New accounts get a <strong>credit-based Free plan</strong> (up to $200 over six months) plus <strong>30+ always-free services</strong>. Older material describes a <strong>12-month free tier</strong> — recognise both. Either way, <strong>nothing caps your spend</strong>.',
     '<strong>Pricing Calculator</strong> before · <strong>Budgets</strong> and <strong>Anomaly Detection</strong> during · <strong>Cost Explorer</strong> and <strong>CUR</strong> after · <strong>Trusted Advisor</strong> and <strong>Compute Optimizer</strong> to fix.',
     '"Notify me before it exceeds" is always <strong>Budgets</strong>. "Show me why last month was high" is <strong>Cost Explorer</strong>.',
     '<strong>Organizations</strong> gives one bill, aggregated volume discounts, and shared Savings Plans across accounts.',
