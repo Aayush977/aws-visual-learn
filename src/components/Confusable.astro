@@ -1,0 +1,215 @@
+---
+/**
+ * Two or three services that everyone mixes up, side by side.
+ *
+ * The shape is deliberate and always the same, because the point is that you
+ * can scan it under exam pressure: what each one IS, when you reach for it,
+ * the wording that gives it away, and one line that separates them for good.
+ *
+ *   <Confusable
+ *     title="SQS vs SNS"
+ *     ask="Something needs to send a message somewhere else."
+ *     options={[
+ *       { name: 'Amazon SQS', tagline: 'A queue…', when: ['…'], giveaway: ['"decouple"'] },
+ *     ]}
+ *     rule="SQS: one consumer takes it. SNS: everyone gets a copy."
+ *   />
+ */
+export interface ConfusableOption {
+  name: string;
+  /** One line: what this thing actually is. */
+  tagline: string;
+  /** Reach for it when… */
+  when: string[];
+  /** Exact wording in a question that points here. */
+  giveaway: string[];
+}
+
+interface Props {
+  title: string;
+  /** The situation in which the confusion arises. */
+  ask: string;
+  options: ConfusableOption[];
+  /** The single sentence that separates them. This is the bit to memorise. */
+  rule: string;
+}
+
+const { title, ask, options, rule } = Astro.props;
+
+// Cycles through the site palette so adjacent cards never share a colour.
+const TONES = ['blue', 'teal', 'purple', 'orange'];
+const uid = 'cf-' + Math.random().toString(36).slice(2, 9);
+---
+
+<section class="cf" aria-labelledby={`${uid}-h`}>
+  <header class="cf__head">
+    <h3 class="cf__title" id={`${uid}-h`}>{title}</h3>
+    <p class="cf__ask">{ask}</p>
+  </header>
+
+  <ol class="cf__grid" data-count={options.length}>
+    {
+      options.map((o, i) => (
+        <li class={`cf__opt cf__opt--${TONES[i % TONES.length]}`}>
+          <h4 class="cf__name">{o.name}</h4>
+          <p class="cf__tagline">{o.tagline}</p>
+
+          <p class="cf__label">Reach for it when</p>
+          <ul class="cf__when">
+            {o.when.map((w) => (
+              <li set:html={w} />
+            ))}
+          </ul>
+
+          <p class="cf__label">Gives it away</p>
+          <ul class="cf__chips">
+            {o.giveaway.map((g) => (
+              <li class="cf__chip">{g}</li>
+            ))}
+          </ul>
+        </li>
+      ))
+    }
+  </ol>
+
+  <p class="cf__rule">
+    <span class="cf__ruleLabel">Remember</span>
+    <span set:html={rule} />
+  </p>
+</section>
+
+<style>
+  .cf {
+    margin: var(--sp-6) 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .cf__head {
+    padding: var(--sp-4);
+    background: var(--bg-sunken);
+    border-bottom: 1px solid var(--border);
+  }
+  .cf__title {
+    margin: 0;
+    font-size: var(--step-1);
+  }
+  .cf__ask {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+
+  .cf__grid {
+    list-style: none;
+    margin: 0;
+    padding: var(--sp-4);
+    display: grid;
+    gap: var(--sp-3);
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  }
+
+  .cf__opt {
+    --t: var(--aws-blue);
+    display: flex;
+    flex-direction: column;
+    padding: var(--sp-4);
+    border: 1px solid color-mix(in srgb, var(--t) 32%, var(--border));
+    border-top: 3px solid var(--t);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--t) 5%, var(--bg));
+  }
+  .cf__opt--teal {
+    --t: var(--aws-teal);
+  }
+  .cf__opt--purple {
+    --t: var(--aws-purple);
+  }
+  .cf__opt--orange {
+    --t: var(--aws-orange);
+  }
+
+  .cf__name {
+    margin: 0;
+    font-size: var(--step-0);
+    font-weight: 700;
+    color: color-mix(in srgb, var(--t) 70%, var(--text));
+  }
+  .cf__tagline {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--step--1);
+    font-weight: 550;
+  }
+
+  .cf__label {
+    margin: var(--sp-4) 0 var(--sp-2);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .cf__when {
+    margin: 0;
+    padding-left: 1.05rem;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .cf__when li + li {
+    margin-top: var(--sp-2);
+  }
+  .cf__when :global(strong) {
+    color: var(--text);
+  }
+
+  .cf__chips {
+    list-style: none;
+    margin: 0 0 var(--sp-1);
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    /* Chips sit at the bottom of every card regardless of list length. */
+    margin-top: auto;
+  }
+  .cf__chip {
+    padding: 0.12rem 0.5rem;
+    border: 1px dashed color-mix(in srgb, var(--t) 45%, var(--border));
+    border-radius: 999px;
+    background: var(--bg-raised);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: color-mix(in srgb, var(--t) 65%, var(--text));
+  }
+
+  .cf__rule {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: var(--sp-4);
+    border-top: 1px solid var(--border);
+    background: var(--bg-sunken);
+    font-size: var(--step--1);
+  }
+  .cf__ruleLabel {
+    flex: none;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+    color: var(--accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+  .cf__rule :global(strong) {
+    color: var(--text);
+  }
+</style>

@@ -16,6 +16,7 @@ export const TRACKS = [
   'services',
   'architecture',
   'billing',
+  'reference',
 ] as const;
 
 export const TRACK_META: Record<
@@ -59,6 +60,11 @@ export const TRACK_META: Record<
   billing: {
     label: 'Billing & Support',
     blurb: 'Pricing models, cost tools, and which support plan answers the phone.',
+  },
+  reference: {
+    label: 'Quick Reference',
+    blurb:
+      'Come back to these. The service pairs everyone mixes up, side by side, with the phrase that gives each one away.',
   },
 };
 
