@@ -1,0 +1,291 @@
+---
+title: Your First 30 Minutes in AWS
+summary: Open an account without risking a bill, put your name on the internet from a real S3 bucket, and take it all down again. The one lesson on this site where you do the thing rather than read about it.
+exams: [CCP]
+track: foundations
+order: 7
+domains:
+  CCP: 'Domain 1 — Cloud Concepts'
+minutes: 30
+hook: Everything else here explains AWS. This one hands you the keys. In half an hour you will have an account, a safety net against surprise bills, and a web page live on the internet that you built.
+updated: 2026-08-15
+---
+
+import Checklist from '../../components/Checklist.astro';
+import Callout from '../../components/Callout.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The gap nobody warns you about
+
+You can read every lesson on this site, pass the Cloud Practitioner exam, and still freeze the
+first time somebody sits you in front of the AWS console. It has hundreds of services, most
+screens assume you already know the vocabulary, and there is a genuine fear underneath it all
+that clicking the wrong thing will cost money.
+
+That fear is reasonable and it is also the thing that keeps people at the reading stage for
+months.
+
+So this lesson is different from every other lesson here. There is almost no theory in it. You
+are going to open a real AWS account, protect it properly, put an actual web page on the
+internet from an actual S3 bucket, and then delete everything you made.
+
+Half an hour. At the end of it, "I have used AWS" becomes a true sentence about you.
+
+<Callout type="gotcha" title="Read this before you start">
+Two honest warnings. <strong>First</strong>, opening an account requires a debit or credit card
+— AWS takes a small temporary authorisation (typically about $1, refunded) to verify it is
+real. That is normal and unavoidable. <strong>Second</strong>, everything in this lesson stays
+inside the always-free limits, but the account is <em>capable</em> of spending money, which is
+why the very first thing you will do is set up a spending alarm. Do not skip that step and do
+not skip the teardown at the end.
+</Callout>
+
+## Step 1 — The account, and the safety net
+
+AWS changed how new accounts work in 2025, and most tutorials you will find online are still
+describing the old system. Here is the current arrangement:
+
+- New accounts start on a **Free plan** with **$100 of credits immediately**, and up to **$100
+  more** as you complete some getting-started activities — up to **$200 over six months**.
+- The Free plan **ends after six months, or when the credits run out**, whichever happens first.
+- **Over 30 services are always free** within monthly limits, on both plans, and that never
+  expires.
+- On the Free plan you are **not charged** unless you deliberately convert to a Paid plan.
+
+<Callout type="exam" title="The exam may still describe the old model">
+Older practice questions and study guides refer to a <strong>12-month free tier</strong> and a
+three-part structure of <em>always free · 12 months free · short trials</em>. That was the
+arrangement for accounts created before the change. If an exam question uses that framing,
+answer within it — but know that what you are about to sign up for works as described above.
+Always check <a href="https://aws.amazon.com/free/">the AWS Free Tier page</a> for the current
+terms, because AWS has changed them before and may again.
+</Callout>
+
+<Checklist
+  id="first30-account"
+  title="Open and secure the account"
+  intro="Roughly 10 minutes, most of it waiting for a verification code. <strong>Tick as you go — your progress is saved on this device</strong>, so you can close the tab and come back."
+  steps={[
+    {
+      label: 'Sign up at <a href="https://portal.aws.amazon.com/billing/signup">portal.aws.amazon.com</a>',
+      detail: 'Use an email address you will still have in five years. You will need a phone number and a card for verification.',
+    },
+    {
+      label: 'Choose the <strong>Basic support</strong> plan when asked',
+      detail: 'It is free. You can move up later — and if you want to know what the paid rungs buy you, that is the <em>Support Plans</em> lesson.',
+    },
+    {
+      label: 'Turn on MFA for the root user',
+      detail: 'Search for <code>IAM</code> in the console, open <strong>My security credentials</strong>, and add a multi-factor device using an authenticator app on your phone. This is the single most valuable five minutes you will ever spend on an AWS account.',
+      critical: true,
+    },
+    {
+      label: 'Set a billing alarm at $5',
+      detail: 'Go to <strong>Billing and Cost Management</strong> → <strong>Budgets</strong> → create a cost budget for $5 a month, with an email alert at 80%. Nothing in this lesson will trigger it. That is exactly the point: if it ever fires, something you did not intend is running.',
+      critical: true,
+    },
+    {
+      label: 'Note which Region you are in',
+      detail: 'Top right of the console. Pick the one nearest you and stay there — resources you create in one Region are invisible from another, and this confuses everybody at least once.',
+    },
+  ]}
+/>
+
+<Callout type="gotcha" title="Why MFA on the root user is the one non-negotiable">
+The root user is the email address you just signed up with, and it can do <em>absolutely
+anything</em> to this account, including running up an enormous bill and locking you out. It
+cannot be restricted by any policy. Automated bots scan for AWS credentials constantly — the
+<em>How IAM Decides</em> lesson tells the true story of a leaked key that was mining
+cryptocurrency in four Regions within nine minutes. An authenticator app makes a stolen
+password useless on its own.
+</Callout>
+
+## Step 2 — Prove who you are, from a terminal
+
+Before building anything, one command — because it makes the whole permissions model concrete
+in a way no diagram can.
+
+**CloudShell** is a terminal that runs inside the console. Nothing to install, nothing to
+configure, no cost. Click the terminal icon `>_` in the top navigation bar and wait about
+twenty seconds for it to start.
+
+Then type:
+
+```bash
+aws sts get-caller-identity
+```
+
+You will get back something like:
+
+```json
+{
+    "UserId": "123456789012",
+    "Account": "123456789012",
+    "Arn": "arn:aws:iam::123456789012:root"
+}
+```
+
+Three facts just arrived. Your **account number**. Who you currently are — and note that it
+says `root`, which is why you set up MFA. And your **ARN**, the Amazon Resource Name, which is
+the addressing format AWS uses for every single thing that exists in it.
+
+<Callout type="note" title="One command worth keeping">
+<code>aws sts get-caller-identity</code> answers "who am I actually right now?", and it solves
+more permission confusion than any other command, because the answer is very often "a different
+identity than you assumed". Professionals run it constantly.
+</Callout>
+
+## Step 3 — Put a page on the internet
+
+Now the part that makes it real. You are going to serve a web page out of **S3** — object
+storage, the service more AWS things touch than any other.
+
+First, make the page. In CloudShell:
+
+```bash
+echo '<!doctype html><meta charset="utf-8">
+<title>I built this</title>
+<h1>This page is served from Amazon S3.</h1>
+<p>I made it on my first day.</p>' > index.html
+```
+
+<Checklist
+  id="first30-s3"
+  title="Host the page"
+  intro="About 10 minutes. Bucket names are globally unique across every AWS customer on earth, so put something random in yours — <code>yourname-first-site-4471</code>."
+  steps={[
+    {
+      label: 'Create a bucket',
+      detail: 'In CloudShell: <code>aws s3 mb s3://your-unique-bucket-name</code>. If it complains the name is taken, that is the global namespace talking — add more digits.',
+    },
+    {
+      label: 'Upload the page',
+      detail: '<code>aws s3 cp index.html s3://your-unique-bucket-name/</code>',
+    },
+    {
+      label: 'Turn on static website hosting',
+      detail: 'Console → S3 → your bucket → <strong>Properties</strong> → scroll to the bottom → <strong>Static website hosting</strong> → Enable, with <code>index.html</code> as the index document.',
+    },
+    {
+      label: 'Allow public reads — deliberately',
+      detail: '<strong>Permissions</strong> tab → turn off <em>Block all public access</em> → then add a bucket policy allowing <code>s3:GetObject</code> on <code>arn:aws:s3:::your-bucket/*</code> to <code>Principal: "*"</code>. AWS will warn you loudly. Read the warning; you are agreeing to it on purpose.',
+      critical: true,
+    },
+    {
+      label: 'Open your website URL',
+      detail: 'Back on <strong>Properties</strong>, at the bottom, is the endpoint. Open it. That page is now visible to anybody on earth.',
+    },
+    {
+      label: 'Send the link to someone',
+      detail: 'Genuinely — do this. It is a different feeling from reading about the cloud, and that feeling is the point of this lesson.',
+    },
+  ]}
+/>
+
+<Callout type="gotcha" title="You just did the thing everyone gets fired for — correctly">
+Public S3 buckets are among the most reported causes of data breaches on AWS, and other lessons
+here will tell you to keep buckets private. Both things are true, and the difference is the
+whole of the <em>Shared Responsibility Model</em> in one decision.
+
+A bucket holding a <strong>public website</strong> should be public. That is what the data is
+for. A bucket holding customer records, exported orders or backups should never be, and the
+disasters happen when somebody makes the second kind public to fix a problem quickly and then
+forgets.
+
+The mechanism is identical. Only the intent differs — and AWS cannot know your intent, which is
+precisely why it is your half of the responsibility and it made you click through a warning.
+</Callout>
+
+## Step 4 — Take it down
+
+The most important professional habit on this entire site, and the one tutorials skip.
+
+Anything you leave running keeps costing money for as long as it exists. A forgotten resource
+does not remind you it is there; it just quietly appears on a bill in five weeks. Getting into
+the habit of destroying what you built — every time, immediately — is what separates people who
+experiment freely from people who are afraid to touch anything.
+
+<Checklist
+  id="first30-teardown"
+  title="Destroy everything you just made"
+  intro="Two minutes. Do it now rather than later — <strong>later is how surprise bills happen</strong>."
+  steps={[
+    {
+      label: 'Empty and delete the bucket',
+      detail: '<code>aws s3 rb s3://your-unique-bucket-name --force</code>. The <code>--force</code> flag empties it first; a bucket must be empty before it can be deleted.',
+      critical: true,
+    },
+    {
+      label: 'Confirm nothing is left',
+      detail: '<code>aws s3 ls</code> should return nothing at all.',
+    },
+    {
+      label: 'Check the Billing dashboard',
+      detail: 'Billing and Cost Management → your month-to-date spend should be $0.00 or a few pennies. Look at this screen once a week for your first month — the habit is worth more than the number.',
+    },
+    {
+      label: 'Leave the billing alarm switched on',
+      detail: 'This is the one thing you do <em>not</em> tear down. It costs nothing and it is your smoke detector.',
+    },
+  ]}
+/>
+
+<Callout type="cost" title="The habit, stated once">
+Build it, look at it, delete it. Every experiment, every time, in the same sitting.
+
+Almost every "AWS charged me hundreds of pounds" story on the internet is the same story: a
+thing was created to try something out, it worked, and nobody deleted it. There is no cleanup
+fairy — the meter runs until you turn the resource off, and the invoice arrives weeks later.
+</Callout>
+
+## What you now know that you cannot get from reading
+
+You have an account, protected by MFA, watched by a budget alarm. You have run a command
+against the AWS API and seen your own ARN come back. You have created a bucket in the global
+namespace, made a deliberate decision about public access, served a page to the internet, and
+destroyed it cleanly.
+
+That is a real, if small, piece of cloud work — and it maps onto four things the exam tests:
+
+| What you did | What it is called |
+| --- | --- |
+| Signed up, chose Basic support, set a budget | **Billing, pricing and support** — Domain 4 |
+| Enabled MFA on the root user | **Access management** — Domain 2 |
+| Decided a bucket should be public | **Shared responsibility model** — Domain 2 |
+| Created and deleted an S3 bucket | **Storage services** — Domain 3 |
+
+Every remaining lesson on this site will make more sense now, because you have somewhere to put
+what you read. When a lesson mentions a bucket, a Region, an ARN or the root user, you have
+touched all four.
+
+<Callout type="note" title="What to try next, when you are ready">
+Nothing here is required, and all of it stays within always-free limits if you tear down
+afterwards. In rough order of how much they teach:
+<br />· Create an <strong>IAM user</strong> for yourself with <code>AdministratorAccess</code>,
+and stop using the root user entirely. This is what every professional does on day one.
+<br />· Write a two-line <strong>Lambda</strong> function in the console and run it. Serverless
+compute, no server anywhere in sight.
+<br />· Launch a <code>t3.micro</code> <strong>EC2 instance</strong>, connect with Session
+Manager rather than SSH keys, and terminate it within the hour.
+</Callout>
+
+<Takeaways
+  items={[
+    'A new AWS account is on the <strong>Free plan</strong>: $100 credits immediately, up to $200 over <strong>six months</strong>, then it ends. <strong>30+ services are always free</strong> within monthly limits, permanently.',
+    '<strong>MFA on the root user</strong> is the first thing you do on any new account, before anything else. The root user cannot be restricted by policy.',
+    'A <strong>budget alarm</strong> is not optional. Nothing caps AWS spending by default — the alarm is the only thing that will tell you.',
+    '<code>aws sts get-caller-identity</code> answers "who am I right now?" and solves an unreasonable share of permission problems.',
+    'Resources live in <strong>one Region</strong>. Something you cannot find is very often in the Region you are not looking at.',
+    'Public buckets are correct for websites and catastrophic for data. <strong>The mechanism is the same; only your intent differs</strong> — which is why it is your responsibility, not AWS\'s.',
+    '<strong>Build it, look at it, delete it.</strong> Every experiment, same sitting. The meter runs until you turn it off.',
+  ]}
+/>
+
+---
+
+There is a moment, somewhere around the point the website URL loads, where the cloud stops
+being an abstraction. It is a genuinely small thing — one HTML file in a bucket — and it does
+not matter at all that it is small.
+
+What matters is that the console is no longer a place you are frightened of clicking in. Every
+lesson from here reads differently once you have somewhere to try it.
