@@ -1,0 +1,525 @@
+---
+title: The Ten Pairs Everyone Mixes Up
+summary: The service comparisons that decide more exam marks than any single lesson — SQS vs SNS, EBS vs EFS vs S3, security groups vs NACLs and seven more, each with the wording that gives it away.
+exams: [CCP, SAA]
+track: reference
+order: 10
+minutes: 16
+hook: You will not fail this exam because you have never heard of a service. You will fail it because two services sound identical and you picked the wrong one under time pressure.
+updated: 2026-08-15
+---
+
+import Confusable from '../../components/Confusable.astro';
+import Callout from '../../components/Callout.astro';
+import Quiz from '../../components/Quiz.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## Where the marks actually go
+
+Watch someone revise for this exam and you will see them making lists of services. Sixty
+names, one line each, read until the lines blur.
+
+Then watch them sit a practice test. They rarely meet a service they have never heard of.
+What happens instead is that a question describes a situation, **two of the four answers are
+both plausible**, and thirty seconds evaporate while they try to remember which one was for
+which. They pick the wrong one, or the right one for the wrong reason, and either way they
+have learned nothing they can reuse on the next question.
+
+The exam is built this way on purpose. A question with three obviously wrong answers tests
+nothing. Almost every real item is a **discrimination test between two services that overlap**,
+and the discriminating detail is usually one clause in the middle of the paragraph.
+
+So this page is not another list. It is the ten pairs that do the damage, each one laid out
+the same way: what each service actually is, when you reach for it, and — the part worth more
+than everything else — **the exact wording in a question that points at it**.
+
+<Callout type="exam" title="How to use this page">
+Read it once now. Then come back to it after every practice test you take, and only look at
+the pairs you actually got wrong. Ten minutes here, spent on the two pairs you keep confusing,
+is worth an hour of re-reading lessons you already know.
+</Callout>
+
+## 1 · Messaging
+
+<Confusable
+  title="SQS vs SNS vs EventBridge"
+  ask="One part of your system needs to tell another part that something happened. Three services do that, and they are not interchangeable."
+  options={[
+    {
+      name: 'Amazon SQS',
+      tagline: 'A queue. One message is taken by one consumer, and it waits until somebody collects it.',
+      when: [
+        'You want to <strong>buffer work</strong> so a spike becomes a backlog rather than an outage',
+        'The web tier should hand a job to a worker and return immediately',
+        'A message must <strong>not be lost</strong> if the worker crashes mid-job',
+        'You want to scale workers on <strong>queue depth</strong> rather than CPU',
+      ],
+      giveaway: ['"decouple"', '"must not be lost"', '"process later"', '"scale independently"'],
+    },
+    {
+      name: 'Amazon SNS',
+      tagline: 'Publish/subscribe. One message is pushed immediately to every subscriber at once.',
+      when: [
+        '<strong>Several different systems</strong> each need their own copy of the same event',
+        'You are sending an alert to a human — email, SMS, a mobile push',
+        'Fan-out: publish once to a topic with several SQS queues subscribed',
+      ],
+      giveaway: ['"notify multiple"', '"fan-out"', '"send an alert"', '"each subscriber"'],
+    },
+    {
+      name: 'Amazon EventBridge',
+      tagline: 'An event bus that routes by rules, including events AWS services emit on their own.',
+      when: [
+        'You want to react to something <strong>AWS itself</strong> did — an instance state change, a deploy',
+        'Routing should depend on the <strong>content</strong> of the event',
+        'The source is a <strong>third-party SaaS</strong> product',
+        'You need something to run on a schedule',
+      ],
+      giveaway: ['"event-driven"', '"based on the content"', '"third-party SaaS"', '"scheduled"'],
+    },
+  ]}
+  rule="<strong>SQS</strong>: one consumer takes it, when it is ready. <strong>SNS</strong>: everyone gets a copy, right now. <strong>EventBridge</strong>: a rule decides where it goes."
+/>
+
+## 2 · Storage
+
+<Confusable
+  title="EBS vs EFS vs S3"
+  ask="You need somewhere to put data. The wrong answer here is the single most common beginner mistake on AWS."
+  options={[
+    {
+      name: 'Amazon EBS',
+      tagline: 'A virtual hard drive, attached to one instance, in one Availability Zone.',
+      when: [
+        'It is the <strong>boot volume</strong>, or a database\'s data files',
+        'You need consistent low-latency block storage with specific IOPS',
+        'Exactly <strong>one machine</strong> needs it',
+      ],
+      giveaway: ['"block storage"', '"boot volume"', '"IOPS"', '"attached to the instance"'],
+    },
+    {
+      name: 'Amazon EFS',
+      tagline: 'A shared filesystem that many instances mount at once, across Availability Zones.',
+      when: [
+        '<strong>Several instances</strong> must read and write the same files simultaneously',
+        'The application expects a real filesystem path and cannot be changed',
+        'Content for a fleet of web servers, or a shared home directory',
+      ],
+      giveaway: ['"shared file system"', '"multiple instances"', '"concurrently"', '"NFS"'],
+    },
+    {
+      name: 'Amazon S3',
+      tagline: 'Object storage over HTTPS. Nothing mounts it; anything can reach it, from anywhere.',
+      when: [
+        'Uploads, backups, logs, static website files, a data lake',
+        'You want <strong>eleven nines of durability</strong> and effectively unlimited capacity',
+        'The thing reading it is not necessarily an EC2 instance at all',
+      ],
+      giveaway: ['"objects"', '"static content"', '"backup"', '"unlimited"', '"from anywhere"'],
+    },
+  ]}
+  rule="Ask two questions, in this order: <strong>how many machines need it at once</strong>, and <strong>does it have to look like a filesystem?</strong> One machine → EBS. Many → EFS. Neither → S3."
+/>
+
+<Callout type="gotcha">
+For a <strong>Windows</strong> file share — SMB, Active Directory integration — the answer is
+<strong>FSx for Windows File Server</strong>, not EFS. EFS is NFS and Linux. This substitution
+appears often enough to be worth its own line in your memory.
+</Callout>
+
+## 3 · Network security
+
+<Confusable
+  title="Security group vs Network ACL"
+  ask="Two firewalls, on the same traffic, at different levels. Exam questions here almost always hinge on one word."
+  options={[
+    {
+      name: 'Security group',
+      tagline: 'A firewall on the network interface of an instance. Stateful, and allow-only.',
+      when: [
+        'You are permitting traffic to a specific instance or group of instances',
+        'You want to allow the app tier to reach the database <strong>by naming its security group</strong> rather than an IP range',
+        'Return traffic should be allowed automatically — it is <strong>stateful</strong>',
+      ],
+      giveaway: ['"instance level"', '"allow traffic from the web tier"', '"stateful"'],
+    },
+    {
+      name: 'Network ACL',
+      tagline: 'A firewall on the subnet boundary. Stateless, numbered rules, and it can DENY.',
+      when: [
+        'You must <strong>block a specific IP address or range</strong> — the one thing a security group cannot do',
+        'You want a coarse rule covering every resource in a subnet at once',
+        'Remember it is <strong>stateless</strong>: the return path needs its own rule',
+      ],
+      giveaway: ['"subnet level"', '"deny"', '"block a specific IP"', '"stateless"'],
+    },
+  ]}
+  rule="A security group can only ever say <em>yes</em>. If the question asks you to <strong>block</strong> something specific, it must be a <strong>NACL</strong>."
+/>
+
+## 4 · Watching the account
+
+<Confusable
+  title="CloudTrail vs Config vs CloudWatch"
+  ask="Three services that all record something about your account, endlessly confused because all three sound like monitoring."
+  options={[
+    {
+      name: 'AWS CloudTrail',
+      tagline: 'A log of API calls: who did what, to which resource, from where, and when.',
+      when: [
+        'Someone asks <strong>who changed</strong> the security group last March',
+        'You need an audit trail for a regulator',
+        'Investigating what a compromised credential actually did',
+      ],
+      giveaway: ['"who made the change"', '"audit"', '"API call history"', '"governance"'],
+    },
+    {
+      name: 'AWS Config',
+      tagline: 'A timeline of what each resource looked like, plus rules that flag when it drifts.',
+      when: [
+        'You need the <strong>configuration history</strong> of a resource over time',
+        'You want to be told automatically when a bucket becomes public',
+        'Demonstrating continuous compliance against a standard',
+      ],
+      giveaway: ['"configuration change"', '"compliance"', '"has it ever been"', '"drift"'],
+    },
+    {
+      name: 'Amazon CloudWatch',
+      tagline: 'Metrics, logs and alarms about how things are performing right now.',
+      when: [
+        'CPU, memory, latency, error rate — anything with a <strong>number over time</strong>',
+        'You want an alarm when a threshold is crossed',
+        'Application log files need collecting and searching',
+      ],
+      giveaway: ['"performance"', '"metric"', '"alarm"', '"utilisation"', '"logs"'],
+    },
+  ]}
+  rule="<strong>CloudTrail</strong> = who did it. <strong>Config</strong> = what it looks like. <strong>CloudWatch</strong> = how it is behaving."
+/>
+
+## 5 · Database resilience
+
+<Confusable
+  title="Multi-AZ vs read replica vs Multi-Region"
+  ask="Three ways to have more than one copy of a database, solving three completely different problems."
+  options={[
+    {
+      name: 'Multi-AZ deployment',
+      tagline: 'A synchronous standby in another Availability Zone, with automatic failover.',
+      when: [
+        'The requirement is <strong>high availability</strong> or surviving a zone failure',
+        'You want failover to happen without anybody being paged',
+        'Note the standby serves <strong>no traffic</strong> — it is not a performance feature',
+      ],
+      giveaway: ['"high availability"', '"automatic failover"', '"minimise downtime"'],
+    },
+    {
+      name: 'Read replica',
+      tagline: 'An asynchronous copy that serves read queries, taking load off the primary.',
+      when: [
+        'Reads are overwhelming the database and the requirement is <strong>performance</strong>',
+        'Reporting or analytics queries are hurting production',
+        'It can live in another Region, which makes distant reads fast',
+      ],
+      giveaway: ['"read-heavy"', '"improve performance"', '"offload reporting"'],
+    },
+    {
+      name: 'Multi-Region',
+      tagline: 'A copy in an entirely different Region, for disaster recovery or global users.',
+      when: [
+        'The requirement is surviving the loss of a <strong>whole Region</strong>',
+        'There is an RTO/RPO target that a single Region cannot meet',
+        'Users on another continent need low latency writes',
+      ],
+      giveaway: ['"disaster recovery"', '"entire Region"', '"RTO"', '"RPO"'],
+    },
+  ]}
+  rule="<strong>Multi-AZ = availability. Read replica = performance. Multi-Region = disaster recovery.</strong> Say it until it is automatic — it is worth several marks on its own."
+/>
+
+## 6 · Threat detection
+
+<Confusable
+  title="GuardDuty vs Inspector vs Macie"
+  ask="Three security services with near-identical marketing. Each answers exactly one question."
+  options={[
+    {
+      name: 'Amazon GuardDuty',
+      tagline: 'Watches logs for behaviour that looks like an attack in progress.',
+      when: [
+        'Credentials being used from an <strong>unusual location</strong>',
+        'An instance talking to a known crypto-mining or malware domain',
+        'Reconnaissance, unusual API patterns, compromised keys',
+      ],
+      giveaway: ['"unusual behaviour"', '"malicious activity"', '"compromised"', '"threat"'],
+    },
+    {
+      name: 'Amazon Inspector',
+      tagline: 'Scans your compute for known software vulnerabilities and unintended exposure.',
+      when: [
+        'You need a ranked list of <strong>CVEs</strong> on EC2 instances, container images or Lambda',
+        'Something unpatched is running in production and nobody knows what',
+        'Checking whether a workload is unintentionally reachable from the internet',
+      ],
+      giveaway: ['"vulnerabilities"', '"unpatched"', '"CVE"', '"software patches"'],
+    },
+    {
+      name: 'Amazon Macie',
+      tagline: 'Finds and classifies sensitive data sitting in S3.',
+      when: [
+        'You need to know <strong>where the personal data is</strong> across hundreds of buckets',
+        'Card numbers, national insurance numbers or health records may be somewhere they should not be',
+        'A privacy or GDPR-style requirement to locate PII',
+      ],
+      giveaway: ['"sensitive data"', '"PII"', '"personally identifiable"', '"in S3"'],
+    },
+  ]}
+  rule="<strong>Who is behaving oddly?</strong> GuardDuty. <strong>What is unpatched?</strong> Inspector. <strong>Where is the personal data?</strong> Macie."
+/>
+
+## 7 · Analytics
+
+<Confusable
+  title="Athena vs Redshift vs EMR"
+  ask="You have a lot of data and somebody wants answers out of it. How often they will ask decides the service."
+  options={[
+    {
+      name: 'Amazon Athena',
+      tagline: 'Serverless SQL run directly against files in S3. Pay per terabyte scanned.',
+      when: [
+        'Queries are <strong>occasional or ad-hoc</strong> — a few times a day, not all day',
+        'You do not want to run, size or pay for a cluster',
+        'The data is already sitting in S3 and you would rather not move it',
+      ],
+      giveaway: ['"ad-hoc"', '"directly in S3"', '"serverless"', '"no infrastructure"'],
+    },
+    {
+      name: 'Amazon Redshift',
+      tagline: 'A data warehouse on provisioned compute, built for heavy, repeated, complex SQL.',
+      when: [
+        'Analysts are querying <strong>all day, every day</strong>',
+        'Complex joins across billions of rows, feeding dashboards',
+        'You want consistent fast performance and will pay for a cluster to get it',
+      ],
+      giveaway: ['"data warehouse"', '"business intelligence"', '"complex queries"', '"petabyte"'],
+    },
+    {
+      name: 'Amazon EMR',
+      tagline: 'Managed Hadoop, Spark, Hive and friends — for processing, not just querying.',
+      when: [
+        'The work is <strong>not SQL</strong>: custom transformation, machine learning pipelines',
+        'The team already has Spark or Hadoop jobs to run',
+        'Enormous ETL that needs a real cluster framework',
+      ],
+      giveaway: ['"Hadoop"', '"Spark"', '"big data framework"', '"ETL at scale"'],
+    },
+  ]}
+  rule="<strong>How often will you ask?</strong> Occasionally → Athena. Constantly → Redshift. <strong>And is it even SQL?</strong> If not → EMR."
+/>
+
+## 8 · Identity
+
+<Confusable
+  title="Cognito vs IAM Identity Center"
+  ask="Both handle sign-in. They handle completely different people, and mixing them up is a classic trap."
+  options={[
+    {
+      name: 'Amazon Cognito',
+      tagline: 'Sign-up and sign-in for the users of your application. Your customers.',
+      when: [
+        'A mobile or web app needs accounts, passwords, social login',
+        'Those users need <strong>temporary AWS credentials</strong> — to upload to a bucket, say',
+        'You are counting users in thousands or millions, and they are not employees',
+      ],
+      giveaway: ['"application users"', '"mobile app"', '"sign up"', '"customers"'],
+    },
+    {
+      name: 'IAM Identity Center',
+      tagline: 'Single sign-on for your staff, across your AWS accounts. Your colleagues.',
+      when: [
+        'Employees need console access to <strong>several AWS accounts</strong>',
+        'You want to federate an existing corporate directory rather than create IAM users',
+        'Access should be granted by job role and removed when someone leaves',
+      ],
+      giveaway: ['"employees"', '"workforce"', '"single sign-on"', '"multiple accounts"'],
+    },
+  ]}
+  rule="<strong>Customers use Cognito. Colleagues use Identity Center.</strong> If the people in the question buy something from you, it is Cognito."
+/>
+
+## 9 · Connecting to your own data centre
+
+<Confusable
+  title="Site-to-Site VPN vs Direct Connect"
+  ask="You have servers in your own building that need to reach your VPC. Two options, and the deciding word is usually about consistency or time."
+  options={[
+    {
+      name: 'Site-to-Site VPN',
+      tagline: 'An encrypted tunnel across the ordinary public internet.',
+      when: [
+        'You need it working <strong>today or this week</strong>',
+        'Budget matters more than perfectly predictable performance',
+        'It is a backup path for a Direct Connect link',
+      ],
+      giveaway: ['"quickly"', '"cost-effective"', '"over the internet"', '"encrypted tunnel"'],
+    },
+    {
+      name: 'AWS Direct Connect',
+      tagline: 'A dedicated physical circuit from your building into AWS, bypassing the internet.',
+      when: [
+        'The requirement mentions <strong>consistent or predictable latency</strong>',
+        'You are moving large volumes continuously and bandwidth costs matter',
+        'A regulator or policy says the traffic must not traverse the public internet',
+      ],
+      giveaway: ['"consistent latency"', '"dedicated connection"', '"not over the internet"'],
+    },
+  ]}
+  rule="<strong>Direct Connect takes weeks to install</strong> — so if a question stresses urgency, it is VPN. If it stresses <em>consistency</em>, it is Direct Connect."
+/>
+
+## 10 · Moving data in
+
+<Confusable
+  title="Snow Family vs DataSync vs Storage Gateway"
+  ask="Data needs to get from your data centre into AWS. Work out how long the network would take before you answer."
+  options={[
+    {
+      name: 'AWS Snow Family',
+      tagline: 'A physical device AWS ships to you. You fill it and post it back.',
+      when: [
+        'Transferring over the network would take <strong>weeks or months</strong>',
+        'The site has poor connectivity, or none — a ship, a mine, a remote facility',
+        'A one-off bulk move: tens or hundreds of terabytes',
+      ],
+      giveaway: ['"limited bandwidth"', '"would take months"', '"petabytes"', '"remote location"'],
+    },
+    {
+      name: 'AWS DataSync',
+      tagline: 'Fast, automated transfer over the network you already have.',
+      when: [
+        'The link is adequate and the transfer is <strong>ongoing or repeated</strong>',
+        'Migrating file shares or NFS/SMB data with verification',
+        'You want a scheduled sync rather than a one-off',
+      ],
+      giveaway: ['"ongoing"', '"scheduled transfer"', '"existing network"', '"sync"'],
+    },
+    {
+      name: 'AWS Storage Gateway',
+      tagline: 'A hybrid appliance: on-premises applications keep local access to cloud-backed storage.',
+      when: [
+        'Applications must <strong>stay</strong> on-premises but store in AWS',
+        'Replacing physical tape backup with virtual tapes',
+        'The point is not migration — the point is a permanent hybrid setup',
+      ],
+      giveaway: ['"hybrid"', '"on-premises applications"', '"virtual tape"', '"local cache"'],
+    },
+  ]}
+  rule="Snow = <strong>ship a box</strong> because the wire is too slow. DataSync = <strong>use the wire</strong>, repeatedly. Storage Gateway = <strong>stay hybrid</strong> on purpose."
+/>
+
+## Now test the ones that catch people
+
+Reading a comparison and recognising it under pressure are different skills. These three are
+where the marks are actually lost.
+
+<Quiz
+  question="A company needs to block traffic from a specific range of IP addresses that has been attacking their web application. The block must apply to every instance in a subnet. What should they use?"
+  choose={1}
+  options={[
+    {
+      text: 'A network ACL rule denying the IP range',
+      correct: true,
+      why: 'Network ACLs operate at the subnet boundary and are the only one of the two that supports explicit deny rules. Blocking a specific source is therefore always a NACL answer.',
+    },
+    {
+      text: 'A security group rule denying the IP range',
+      why: 'Security groups have no deny rules at all — they can only allow. There is no way to express "block this address" in a security group, which is exactly what this question is testing.',
+    },
+    {
+      text: 'A route table entry discarding traffic from the IP range',
+      why: 'Route tables decide where traffic goes based on destination, not source, and they are not a filtering mechanism.',
+    },
+    {
+      text: 'An IAM policy denying the IP range',
+      why: 'IAM controls who can call AWS APIs. It has nothing to do with network traffic reaching an application running on an instance.',
+    },
+  ]}
+  explain="The reliable shortcut: <strong>a security group can only say yes.</strong> Any question containing the word <em>block</em>, <em>deny</em> or <em>prevent</em> at the network level is pointing at a NACL."
+/>
+
+<Quiz
+  question="An application's database is struggling because a reporting team runs large queries against it during business hours, slowing down customer transactions. Availability is not currently a concern. What is the most appropriate change?"
+  choose={1}
+  options={[
+    {
+      text: 'Add a read replica and point the reporting queries at it',
+      correct: true,
+      why: 'Read replicas exist to serve read traffic away from the primary. The problem described is purely one of read load hurting performance, which is exactly what a replica solves.',
+    },
+    {
+      text: 'Enable Multi-AZ deployment',
+      why: 'The Multi-AZ standby serves no traffic at all — it exists solely to take over if the primary fails. It would not remove a single query from the primary. This is the most common wrong answer on this exam.',
+    },
+    {
+      text: 'Take more frequent automated backups',
+      why: 'Backups address recovery after data loss. They do nothing about query load, and taking them more often would add load rather than remove it.',
+    },
+    {
+      text: 'Deploy the database into a second Region',
+      why: 'A second Region addresses disaster recovery or global latency. It is a large, expensive change that does not target the described problem.',
+    },
+  ]}
+  explain="The trap is that Multi-AZ <em>sounds</em> like it must help — there are two databases, so surely the work is shared? It is not. <strong>Multi-AZ is availability. Read replicas are performance.</strong>"
+/>
+
+<Quiz
+  question="An order service must send each completed order to three separate downstream systems — fulfilment, analytics and email receipts — and each system must receive its own copy. Which design fits best?"
+  choose={1}
+  options={[
+    {
+      text: 'Publish to an SNS topic with three SQS queues subscribed, one per system',
+      correct: true,
+      why: 'This is the standard fan-out pattern. SNS delivers a copy of every message to each subscriber, and putting a queue in front of each consumer means a slow or failed system builds a backlog rather than losing orders.',
+    },
+    {
+      text: 'Write to a single SQS queue that all three systems read from',
+      why: 'In a queue each message is taken by exactly one consumer. The three systems would divide the orders between them rather than each receiving all of them.',
+    },
+    {
+      text: 'Have the order service call each system directly over HTTP',
+      why: 'This is tight coupling. If the email service is down, order processing fails — the exact failure mode these services exist to prevent.',
+    },
+    {
+      text: 'Write the orders to an S3 bucket and have each system poll it',
+      why: 'This works after a fashion but reinvents a message bus badly, with polling delays and no delivery guarantees or retry semantics.',
+    },
+  ]}
+  explain="<strong>SNS fanning out to SQS queues</strong> is one of the most frequently examined patterns on AWS, because it combines both properties: everyone gets a copy (SNS), and nobody loses their copy if they are having a bad day (SQS)."
+/>
+
+<Takeaways
+  items={[
+    '<strong>SQS</strong> one consumer takes it · <strong>SNS</strong> everyone gets a copy · <strong>EventBridge</strong> a rule decides where it goes.',
+    'Storage: <strong>how many machines at once, and does it need to be a filesystem?</strong> One → EBS · many → EFS · neither → S3 · Windows share → FSx.',
+    'A <strong>security group can only allow</strong>. Anything about blocking a specific address is a <strong>NACL</strong>.',
+    '<strong>CloudTrail</strong> who did it · <strong>Config</strong> what it looks like · <strong>CloudWatch</strong> how it is behaving.',
+    '<strong>Multi-AZ = availability · read replica = performance · Multi-Region = disaster recovery.</strong>',
+    '<strong>GuardDuty</strong> odd behaviour · <strong>Inspector</strong> unpatched software · <strong>Macie</strong> sensitive data in S3.',
+    '<strong>Athena</strong> occasional SQL on S3 · <strong>Redshift</strong> analysts all day · <strong>EMR</strong> when it is not SQL.',
+    '<strong>Cognito</strong> is your customers · <strong>IAM Identity Center</strong> is your colleagues.',
+    '<strong>VPN</strong> is fast to set up · <strong>Direct Connect</strong> is consistent, and takes weeks to install.',
+    '<strong>Snow</strong> when the wire is too slow · <strong>DataSync</strong> over the wire, repeatedly · <strong>Storage Gateway</strong> to stay hybrid.',
+  ]}
+/>
+
+---
+
+One last thing about how to use this, because it changes how much it is worth.
+
+Do not read this page again from the top. After your next practice test, open it and look
+only at the pairs you got wrong — and read the **giveaway phrases** rather than the
+descriptions. Those phrases are not decoration; exam writers reach for the same vocabulary
+repeatedly, because they have to describe a situation without naming the service.
+
+Learn the vocabulary and a surprising number of questions start answering themselves before
+you have finished reading them.
