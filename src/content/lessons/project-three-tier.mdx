@@ -193,6 +193,22 @@ money within days. If you build it, build it in one sitting and <strong>tear it 
 day</strong> — and set the budget alarm from the <em>First 30 Minutes</em> lesson first.
 </Callout>
 
+<Callout type="note" title="Two variations worth knowing at Associate level">
+<strong>Aurora Serverless v2</strong> replaces the fixed RDS instance with capacity that scales
+in fine-grained increments and can drop very low when idle. For a claims system that is busy on
+Monday and quiet on Sunday it removes the "size it for the peak, pay for it always" trade — and
+unlike v1 it scales without dropping connections. The Query Editor in the console also means
+you can run SQL against it without a bastion or a client.
+<br /><br />
+<strong>Sizing the VPC.</strong> The CIDR block you choose is effectively permanent, and a
+<code>/24</code> that felt generous becomes a problem the moment a container platform wants an IP
+address per task. Plan for far more addresses than you think you need, and remember AWS reserves
+five per subnet.
+<br /><br />
+Both appear as labs in the repository linked below — see <code>14-Amazon-RDS/02-associate</code>
+and <code>07-CloudFormation/02-associate/01-creating-a-large-sized-aws-vpc-for-an-amazon-ecs-cluster</code>.
+</Callout>
+
 <Takeaways
   items={[
     'The shape: <strong>ALB in public subnets · app tier in private subnets across two AZs · database private and Multi-AZ.</strong>',

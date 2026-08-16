@@ -1,0 +1,226 @@
+---
+title: 'Project 8 — Getting Into a Private Server Without a Key'
+summary: Session Manager replaces the bastion host, the open port 22 and the shared SSH key with an IAM permission and a CloudTrail record. How it works, why the agent connects outward, and the three endpoints it needs in a private subnet.
+exams: [SAA]
+track: projects
+order: 80
+domains:
+  SAA: 'Domain 1 — Design Secure Architectures'
+minutes: 11
+hook: The bastion host has an open port, an SSH key three people have copied, and an operating system somebody has to patch. All three exist to solve a problem that no longer requires any of them.
+updated: 2026-08-16
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import Callout from '../../components/Callout.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The problem
+
+Brightwell's application instances sit in private subnets, exactly as Project 3 laid out. Which
+raises an awkward operational question: when something breaks at 2am, how does an engineer
+actually get a shell on one?
+
+The traditional answer is a **bastion host** — sometimes called a jump box. A small EC2 instance
+in a public subnet, with port 22 open to the internet (or, if somebody is being careful, to the
+office IP range). You SSH into that, then SSH onward to the private instance.
+
+It works. It has also quietly created four separate problems:
+
+- **An open inbound port on the internet.** Even restricted to an IP range, it is a permanent
+  door, and it is scanned continuously.
+- **An SSH key.** Which means a private key file, which means it is on somebody's laptop, and
+  probably on three laptops, and quite possibly in a password manager shared with a contractor
+  who left in March.
+- **Another server to look after.** The bastion is an EC2 instance: it needs patching,
+  monitoring and paying for, and it does no useful work.
+- **No audit trail worth the name.** You can see that *someone* connected from an IP address.
+  Which human being that was, and what they typed, is not recorded anywhere useful.
+
+**Session Manager** removes all four, and the mechanism is worth understanding rather than
+memorising.
+
+<Diagram
+  title="Two ways into a private instance"
+  viewBox="0 30 1020 560"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'The old way: a door you left open',
+      body: 'The engineer comes in from the internet to a <strong>bastion host</strong> in a public subnet, then hops onward. Port 22 is open, an SSH key unlocks it, and the bastion is a server somebody has to patch forever.',
+      flow: ['w-old1', 'w-old2', 'w-old3'],
+      duration: 1500,
+    },
+    {
+      title: 'The new way starts with IAM, not a key',
+      body: 'With <strong>Session Manager</strong> there is no key. The engineer’s permission to connect is an <strong>IAM policy</strong>, so access is granted and revoked the same way as everything else — and disappears the moment they leave the company.',
+      flow: 'w-new1',
+    },
+    {
+      title: 'The agent connects outward',
+      body: 'This is the part that makes it work. The <strong>SSM Agent</strong> on the instance opens an <em>outbound</em> connection to Systems Manager and waits. Nothing ever connects <em>in</em>, so <strong>the instance needs no inbound rule at all</strong> — port 22 can be closed completely.',
+      flow: 'w-new2',
+      duration: 1400,
+    },
+    {
+      title: 'In a private subnet, that needs three endpoints',
+      body: 'Outbound still has to reach Systems Manager somehow. With no NAT gateway, that means <strong>three interface endpoints</strong>: <code>ssm</code>, <code>ssmmessages</code> and <code>ec2messages</code>. Miss one and the instance simply never appears in the console, with no error to tell you why.',
+      flow: 'w-new3',
+      duration: 1400,
+    },
+    {
+      title: 'And every session is recorded',
+      body: 'CloudTrail records who started a session and when. Session output can be streamed to <strong>S3 or CloudWatch Logs</strong>, so what was actually typed is recorded too. This is the part auditors care about and SSH never gave you.',
+      duration: 1300,
+    },
+  ]}
+  caption="Same destination. One path needs an open port, a shared key and a server to patch; the other needs an IAM policy."
+>
+  <Boundary x={400} y={95} w={580} h={440} label="Your VPC" icon="cloud" tone="navy" step={1} />
+  <Boundary x={420} y={110} w={210} h={100} label="Public subnet" icon="globe" tone="red" step={1} />
+  <Boundary x={730} y={250} w={230} h={125} label="Private subnet" icon="lock" tone="teal" step={1} />
+
+  <Node x={85} y={330} w={140} h={76} label="Engineer" sub="2am" icon="user" tone="muted" step={1} />
+
+  <Node x={300} y={150} w={130} h={58} label="Internet" icon="globe" tone="red" step={1} />
+  <Node x={520} y={150} w={170} h={66} label="Bastion host" sub="port 22 open · SSH key" icon="server" tone="red" step={1} />
+
+  <Node x={300} y={470} w={180} h={66} label="Systems Manager" sub="IAM decides" icon="shield" tone="purple" step={2} />
+  <Node x={545} y={470} w={190} h={70} label="3 interface endpoints" sub="ssm · ssmmessages · ec2messages" icon="firewall" tone="teal" step={4} />
+
+  <Node x={840} y={310} w={180} h={84} label="Private instance" sub="SSM Agent · no inbound" icon="server" tone="green" step={3} />
+
+  <Wire id="w-old1" from={[155, 310]} to={[235, 150]} shape="elbow-h" mid={200} tone="red" step={1} />
+  <Wire id="w-old2" from={[365, 150]} to={[435, 150]} tone="red" step={1} />
+  <Wire id="w-old3" from={[605, 165]} to={[750, 285]} shape="elbow-h" mid={690} tone="red" step={1} label="ssh" labelDy={-10} />
+
+  <Wire id="w-new1" from={[155, 350]} to={[210, 470]} shape="elbow-h" mid={185} tone="purple" step={2} />
+  <Wire id="w-new2" from={[390, 470]} to={[450, 470]} tone="purple" step={3} />
+  <Wire id="w-new3" from={[640, 455]} to={[750, 335]} shape="elbow-h" mid={700} tone="teal" step={4} label="outbound only" labelDy={18} />
+</Diagram>
+
+## Why the direction of the connection is the whole idea
+
+Almost everything good about Session Manager follows from one fact: **the agent connects
+outward, and the session is relayed back down that connection.**
+
+Nothing ever initiates a connection *to* your instance. So there is no inbound rule to write, no
+port to leave open, and nothing for an internet-wide scanner to find. The instance can sit in a
+private subnet with a security group that permits **no inbound traffic whatsoever** and still be
+administrable from a browser.
+
+Compare that to the bastion, where security depends on an open port being defended well. Removing
+the port entirely is a stronger guarantee than defending it carefully.
+
+<Confusable
+  title="Bastion host vs Session Manager"
+  ask="Both give an engineer a shell on a private instance. One of them was the only option in 2015."
+  options={[
+    {
+      name: 'Bastion host',
+      tagline: 'A jump server in a public subnet that you SSH into first.',
+      when: [
+        'You need protocols Session Manager cannot carry, or tooling that insists on raw SSH',
+        'Accept in exchange: an <strong>open inbound port</strong>, <strong>SSH keys to distribute and rotate</strong>, and <strong>another instance to patch and pay for</strong>',
+        'Auditing tells you an IP connected, not which person',
+      ],
+      giveaway: ['"jump box"', '"bastion"', '"SSH key pair"', '"open port 22"'],
+    },
+    {
+      name: 'Session Manager',
+      tagline: 'Systems Manager relays a shell over a connection the instance itself opened.',
+      when: [
+        '<strong>No inbound ports</strong> and <strong>no SSH keys</strong> anywhere',
+        'Access granted by <strong>IAM policy</strong>, so it is revoked with everything else',
+        'Every session in <strong>CloudTrail</strong>, and keystrokes to S3 or CloudWatch Logs if you want them',
+        'Needs the <strong>SSM Agent</strong>, an <strong>instance role</strong>, and a path to the service',
+      ],
+      giveaway: ['"without opening inbound ports"', '"no bastion"', '"no SSH keys"', '"audit session activity"'],
+    },
+  ]}
+  rule="If a question mentions <strong>removing bastion hosts</strong>, <strong>no inbound ports</strong> or <strong>auditing who connected</strong>, the answer is <strong>Session Manager</strong>. Almost every scenario that used to justify a bastion no longer does."
+/>
+
+## The three things that must be true
+
+The lab is useful here because it is specific about what actually has to be in place. When
+Session Manager does not work, it is essentially always one of these — and the failure is
+usually **silence** rather than an error.
+
+1. **The SSM Agent is running.** Preinstalled on Amazon Linux 2 and 2023, recent Ubuntu and
+   Windows Server AMIs. On anything else you install it yourself.
+2. **The instance has an IAM role** with the `AmazonSSMManagedInstanceCore` managed policy. This
+   is what lets the agent register with Systems Manager. No role, no instance in the list.
+3. **The agent can reach the service.** Via NAT, or — for a genuinely private subnet — via the
+   three interface endpoints. This is Project 7's mechanism doing real work.
+
+<Callout type="gotcha" title="Why three endpoints, and what happens with two">
+<code>ssm</code> is the control channel, <code>ssmmessages</code> carries the actual session
+data, and <code>ec2messages</code> handles instance messaging. They are separate services and
+each needs its own interface endpoint.
+
+Create only the first and the instance registers fine and appears in the console — but starting
+a session hangs, because the data channel has nowhere to go. **A partially-configured setup
+looks more broken than a completely unconfigured one**, which is why this catches people. If
+sessions fail but the instance is visible, check <code>ssmmessages</code> first.
+</Callout>
+
+<Callout type="cost">
+Session Manager itself is <strong>free</strong>, and it deletes a bastion instance from your
+bill. Against that, three interface endpoints are charged per hour per Availability Zone — so in
+a small VPC that already has a NAT gateway, using NAT is cheaper. In a properly private VPC with
+no NAT at all, the endpoints are the only option and the comparison is with the bastion you no
+longer run.
+</Callout>
+
+## What this replaces beyond SSH
+
+Once Systems Manager is set up, several other awkward jobs stop needing a shell at all — worth
+knowing because they show up as exam distractors:
+
+- **Patch Manager** applies operating-system patches on a schedule and reports compliance, so
+  patching stops being something a person does over SSH.
+- **Run Command** executes a command across a fleet at once, with the results recorded, instead
+  of logging into forty machines.
+- **Parameter Store** holds configuration and secrets, so they need not be baked into an AMI or
+  copied onto a disk.
+- **Fleet Manager** gives a file browser and process list in the console — often enough to
+  diagnose a problem without a shell at all.
+
+<SourceRepo
+  repo="MinhHungPhan/aws-hands-on-labs"
+  url="https://github.com/MinhHungPhan/aws-hands-on-labs"
+  licence="MIT"
+  stars="~40"
+  effort="an hour or two"
+  blurb="See 01-Amazon-EC2/02-associate/03-connect-to-ec2-in-a-private-subnet-using-session-manager. It builds the whole path — instance, IAM role, the three VPC endpoints and the security groups — and its architecture notes are precise about which endpoint does what. The sibling lab on regaining access after losing an SSH key is a good companion, and a decent argument for not depending on keys in the first place."
+/>
+
+<Takeaways
+  items={[
+    '<strong>Session Manager needs no inbound port and no SSH key.</strong> The agent connects outward and the session is relayed back.',
+    'Access is an <strong>IAM permission</strong>, so it is granted and revoked like every other permission — and it dies with the leaver.',
+    'It requires three things: the <strong>SSM Agent</strong>, an instance role with <strong>AmazonSSMManagedInstanceCore</strong>, and a network path to the service.',
+    'In a fully private subnet that path is <strong>three interface endpoints</strong>: <code>ssm</code>, <code>ssmmessages</code>, <code>ec2messages</code>. Missing <code>ssmmessages</code> makes sessions hang.',
+    '<strong>CloudTrail records every session</strong>, and session output can stream to S3 or CloudWatch Logs — an audit trail SSH never provided.',
+    'Exam trigger: <strong>"without opening inbound ports"</strong>, <strong>"eliminate bastion hosts"</strong> or <strong>"audit administrative access"</strong>.',
+  ]}
+/>
+
+---
+
+There is a wider habit worth taking from this one.
+
+The bastion host was not a bad design. It was a correct design for a period when the only way to
+reach a machine was to connect to it, so the work went into defending that connection well —
+restricted ranges, key rotation, hardened jump boxes.
+
+Session Manager did not defend the door better. It **removed the requirement for a door**, and
+the entire class of problems went with it. When you meet an architecture that spends a lot of
+effort protecting something, it is always worth asking whether the thing still needs to exist.

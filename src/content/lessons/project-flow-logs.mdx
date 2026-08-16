@@ -1,0 +1,197 @@
+---
+title: 'Project 9 — Proving Where the Money Is Going'
+summary: VPC Flow Logs into S3, an Athena table over the top, and one SQL query that finds every VPC paying a NAT gateway to reach S3 — traffic that a free endpoint would carry instead.
+exams: [SAA]
+track: projects
+order: 90
+domains:
+  SAA: 'Domain 4 — Design Cost-Optimized Architectures'
+minutes: 11
+hook: The NAT gateway line on the bill was four figures and nobody could say what was crossing it. The answer was in a log AWS was already able to write, and one SQL query away.
+updated: 2026-08-16
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import Callout from '../../components/Callout.astro';
+import Quiz from '../../components/Quiz.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The problem
+
+Project 7 ended on a claim: traffic going to S3 through a NAT gateway is money thrown away,
+because a gateway endpoint carries it free.
+
+That is easy to say and surprisingly hard to act on, because of a question nobody in a large
+organisation can usually answer: **which of our forty VPCs is actually doing it?**
+
+Brightwell's NAT gateway charges were four figures a month across the estate. Everyone agreed
+some of it was avoidable. Nobody could point at a specific VPC and say *that one*, because a
+NAT gateway bill is a single number — hours plus gigabytes processed — with no breakdown of
+where the gigabytes were going.
+
+Guessing is expensive in both directions. Add endpoints everywhere and you have created work
+and clutter for VPCs that never needed them; add none and you keep paying.
+
+The information exists. AWS can write down every network flow in the VPC, and once those records
+are in S3 you already know how to query them — Project 5 built exactly that machinery.
+
+<Diagram
+  title="From network flows to a costed answer"
+  viewBox="0 40 1000 420"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Turn on VPC Flow Logs',
+      body: '<strong>Flow Logs</strong> record every accepted and rejected flow: source, destination, port, protocol, packets and <strong>bytes</strong>. They can be enabled on a VPC, a subnet, a single interface or a Transit Gateway attachment.',
+      flow: 'w1',
+    },
+    {
+      title: 'Send them to S3, not CloudWatch',
+      body: 'Flow logs can go to CloudWatch Logs or <strong>S3</strong>. For this job S3 is the right destination: far cheaper at volume, and it is where Athena can reach them.',
+      flow: 'w2',
+    },
+    {
+      title: 'Define a table over the files',
+      body: 'An <strong>Athena</strong> external table describes the flow-log columns and points at the S3 prefix. Nothing is copied or transformed — the table is a <em>description</em> of files that already exist.',
+      flow: 'w3',
+    },
+    {
+      title: 'Ask which traffic is S3-bound',
+      body: 'S3 publishes its address ranges in a public <strong>AWS IP ranges</strong> document. A query filters flows whose destination is an S3 range <em>and</em> whose path went via a NAT gateway, then sums the bytes and groups by VPC.',
+      flow: 'w4',
+      duration: 1400,
+    },
+    {
+      title: 'Now the fix is targeted',
+      body: 'You have a ranked list: this VPC moved 4 TB to S3 through NAT last month, that one moved 12 GB. Add a <strong>gateway endpoint</strong> to the top of the list and the charge stops — <strong>for free</strong>, with no application change.',
+      flow: 'w5',
+      duration: 1400,
+    },
+  ]}
+  caption="Nothing here is exotic. Flow logs are a checkbox, Athena is SQL over files, and the outcome is a ranked list of places to stop paying."
+>
+  <Node x={95} y={250} w={150} h={92} label="Your VPCs" sub="every network flow" icon="cloud" tone="navy" step={1} />
+  <Node x={310} y={250} w={155} h={92} label="VPC Flow Logs" sub="src · dst · bytes" icon="eye" tone="orange" step={1} />
+  <Node x={530} y={250} w={140} h={92} label="S3" sub="cheap at volume" icon="bucket" tone="green" step={2} />
+  <Node x={745} y={250} w={150} h={92} label="Athena" sub="SQL over the files" icon="chart" tone="blue" step={3} />
+  <Node x={745} y={410} w={200} h={70} label="Ranked by wasted GB" sub="per VPC, per account" icon="money" tone="teal" step={5} />
+
+  <Wire id="w1" from={[170, 250]} to={[232, 250]} tone="navy" step={1} />
+  <Wire id="w2" from={[388, 250]} to={[460, 250]} tone="orange" step={2} />
+  <Wire id="w3" from={[600, 250]} to={[670, 250]} tone="green" step={3} />
+  <Wire id="w4" from={[820, 250]} to={[880, 250]} tone="blue" step={4} label="query" labelDy={-12} />
+  <Wire id="w5" from={[745, 296]} to={[745, 375]} tone="teal" step={5} />
+</Diagram>
+
+## What a flow log record actually contains
+
+Worth knowing, because the fields decide what questions you can ask:
+
+| Field | What it gives you |
+| --- | --- |
+| `srcaddr` · `dstaddr` | Who talked to whom — the basis of "was this bound for S3?" |
+| `srcport` · `dstport` | Which service. Port 443 for anything AWS-facing |
+| `bytes` · `packets` | **The volume, which is what you are billed on** |
+| `action` | `ACCEPT` or `REJECT` — rejects are how you debug security groups and NACLs |
+| `interface-id` | Which ENI, so you can trace a flow to an instance or a NAT gateway |
+| `start` · `end` | Time window, for partitioning and trend analysis |
+
+The `bytes` column is the one doing the work here. NAT gateways are billed per gigabyte
+processed, so summing bytes for flows that crossed a NAT and were destined for S3 gives you a
+number you can put next to a line on the invoice.
+
+<Callout type="gotcha" title="Flow logs record IP addresses, not service names">
+There is no `service = S3` column. Flow logs are network records, so S3 appears as a destination
+IP address in one of AWS's published ranges.
+
+That means matching against the <strong>AWS IP ranges JSON</strong> that AWS publishes, filtered
+to the S3 service and your Region. It is the fiddly part of the lab and the reason people
+assume this analysis is harder than it is — it is not conceptually hard, it just needs a join
+against a list.
+</Callout>
+
+## Why Athena rather than CloudWatch Logs Insights
+
+Both can query logs, and the site's *Easily Confused* page draws the general distinction. Here
+the choice is decided by two specifics:
+
+**Volume and cost.** Flow logs across a large estate are enormous. Storing them in CloudWatch
+Logs is considerably more expensive per gigabyte than S3, and this is data you query
+occasionally, not constantly — the exact profile Athena is built for.
+
+**Joins.** The analysis needs to join flow records against the AWS IP range list, and against an
+account-name mapping so the output says "payments-prod" instead of an account number. That is
+ordinary SQL in Athena and awkward in Logs Insights, which is built for filtering and
+aggregating a stream rather than joining datasets.
+
+<Callout type="cost" title="Partition the flow logs, or the analysis costs more than the finding">
+Athena bills roughly <strong>$5 per terabyte scanned</strong>, and flow logs are one of the
+largest datasets most organisations have. An unpartitioned <code>SELECT *</code> across a year
+of them can cost more than the NAT charges you are trying to remove — which would be an
+embarrassing way to end a cost-optimisation exercise.
+
+Partition by date and account, and query one month at a time. This is the same lesson as
+Project 5, and this is where it bites hardest.
+</Callout>
+
+<Quiz
+  question="A company's monthly bill shows significant NAT gateway data processing charges. They suspect some of the traffic is EC2 instances in private subnets reading from and writing to Amazon S3. Which approach identifies the specific VPCs responsible at the lowest cost?"
+  choose={1}
+  options={[
+    {
+      text: 'Enable VPC Flow Logs to S3 and query them with Amazon Athena, filtering for destinations in the published S3 IP ranges',
+      correct: true,
+      why: 'Flow logs contain the byte counts and destination addresses needed to attribute traffic, S3 is the cheap destination for high-volume logs, and Athena queries them in place without provisioning anything.',
+    },
+    {
+      text: 'Enable VPC Flow Logs to CloudWatch Logs and analyse them with Logs Insights',
+      why: 'This works, but CloudWatch Logs ingestion and storage is considerably more expensive than S3 for a dataset this large, and the join against the S3 IP range list is awkward in Logs Insights.',
+    },
+    {
+      text: 'Enable AWS CloudTrail and review the S3 API calls',
+      why: 'CloudTrail records which API calls were made, not which network path carried them. It cannot tell you whether a request crossed a NAT gateway.',
+    },
+    {
+      text: 'Use Cost Explorer to group NAT gateway charges by destination service',
+      why: 'Cost Explorer breaks spend down by service, account, tag and Region — but a NAT gateway charge is not attributed to the destination of the traffic it carried, so the breakdown you want does not exist there.',
+    },
+  ]}
+  explain="The general pattern is worth keeping: <strong>CloudTrail answers who called an API, flow logs answer what crossed the network, and Cost Explorer answers what you were charged.</strong> A question about traffic paths is always flow logs."
+/>
+
+<SourceRepo
+  repo="MinhHungPhan/aws-hands-on-labs"
+  url="https://github.com/MinhHungPhan/aws-hands-on-labs"
+  licence="MIT"
+  stars="~40"
+  effort="a few hours"
+  blurb="See 12-AWS-VPC/02-associate/01-analyzing-s3-traffic-via-nat-gateway-with-athena-and-vpc-flow-logs. It ships the Athena CREATE TABLE statement for the flow-log schema and the analysis queries, including flow logs on Transit Gateway attachments and mapping account numbers to readable names. That last touch matters more than it sounds when the output is a list for other teams to act on."
+/>
+
+<Takeaways
+  items={[
+    '<strong>VPC Flow Logs</strong> record source, destination, ports, action and <strong>bytes</strong> for every flow — on a VPC, subnet, ENI or Transit Gateway attachment.',
+    'Send high-volume flow logs to <strong>S3</strong>, not CloudWatch Logs: far cheaper, and it is where Athena can query them.',
+    'Flow logs contain <strong>IP addresses, not service names</strong> — identifying S3 traffic means matching AWS\'s published IP ranges.',
+    'Use <strong>Athena</strong> when the analysis needs <strong>joins</strong> and runs occasionally; Logs Insights is for filtering a stream.',
+    '<strong>Partition the logs</strong> and query a month at a time, or the scan cost can exceed the saving you are chasing.',
+    'The rule of thumb: <strong>CloudTrail = who called the API · flow logs = what crossed the network · Cost Explorer = what you were charged.</strong>',
+  ]}
+/>
+
+---
+
+The reason this project belongs in a Solutions Architect path rather than a billing one is the
+shape of the reasoning, which recurs constantly at this level.
+
+Nobody was arguing about whether gateway endpoints are good. Everybody already knew. The blocker
+was that **the fix was cheap and the targeting information was missing**, so the whole
+improvement sat undone for a year — not for want of knowledge, but for want of evidence.
+
+A large amount of architecture work is like this. The design change is usually the easy part.
+Being able to prove which of forty environments needs it, with a number attached, is what
+actually gets it done.

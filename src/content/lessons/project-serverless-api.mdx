@@ -133,6 +133,22 @@ single-digit milliseconds whether the table holds a thousand rows or a billion, 
 instance, no patching and no capacity planning. Ask a *different* shape of question — joins,
 ad-hoc reporting, "all customers who did X and Y" — and this becomes the wrong choice fast.
 
+<Callout type="note" title="Who is calling? — adding Cognito at Associate level">
+The diagram shows authentication as one box, which is doing a lot of quiet work. In practice
+this is usually an <strong>Amazon Cognito user pool</strong>: your customers sign up and sign in
+against it, it issues a JWT, and API Gateway validates that token <em>before</em> your function
+runs.
+
+The architectural point is that no authentication code ends up in your Lambda. It never sees an
+unauthenticated request, so there is no login logic, no password handling and no token
+verification for you to get subtly wrong.
+
+For anything already federated to a corporate identity provider, a <strong>Lambda
+authoriser</strong> does the same job against that provider instead — the repository linked below
+has worked examples of both, using Cognito and Keycloak, under
+<code>05-AWS-Lambda/02-associate</code>.
+</Callout>
+
 <Callout type="exam" title="The phrase that names this architecture">
 When a scenario says <strong>"without managing any servers"</strong> or <strong>"minimal
 operational overhead"</strong> alongside <strong>"variable"</strong> or
