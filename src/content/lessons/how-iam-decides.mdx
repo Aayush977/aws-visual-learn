@@ -301,7 +301,25 @@ billing settings). Everything else should be an IAM identity.
 ## Least privilege, and the tools that get you there
 
 **Least privilege** means granting exactly the permissions needed and no more. It is easy to
-say and tedious to do, so AWS provides help:
+say and tedious to do, so AWS provides help.
+
+<Callout type="note" title="Start with a managed policy, then tighten">
+Everything above may have left you with the impression that you must write a perfect,
+minimal policy before you are allowed to build anything. You must not, and believing so is
+exactly what drives people to attach <code>AdministratorAccess</code> and move on — the
+outcome least privilege exists to prevent.
+
+The workable order is: reach for an **AWS managed policy** that roughly fits — there are
+hundreds, and <code>AmazonS3ReadOnlyAccess</code> is a far better starting point than
+<code>AdministratorAccess</code> — get the thing working, and <em>then</em> narrow it using the
+tools below once you can see what it actually called. Access Analyzer will generate a
+tight policy from real CloudTrail activity, which is easier and more accurate than guessing.
+
+Least privilege is a direction of travel, not an entry requirement. What matters is that
+"temporarily" wide permissions have a date attached and somebody actually comes back.
+</Callout>
+
+The tools that get you there:
 
 - **IAM Access Analyzer** finds resources shared outside your account, and can generate a
   tightly-scoped policy from what an identity has *actually* used in CloudTrail.
