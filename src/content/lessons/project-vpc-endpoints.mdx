@@ -1,0 +1,230 @@
+---
+title: 'Project 7 — Reaching AWS Without Touching the Internet'
+summary: A Lambda in a private subnet needs a secret and a bucket. Gateway endpoints, interface endpoints and PrivateLink — how private things call AWS services, and why one of the three options is free.
+exams: [CCP, SAA]
+track: projects
+order: 70
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 1 — Design Secure Architectures'
+minutes: 11
+hook: Your function has no route to the internet. Amazon S3 lives on a public address. So how does one call the other — and why does the obvious answer cost £32 a month when a better one is free?
+updated: 2026-08-16
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import Callout from '../../components/Callout.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The problem
+
+Aldgate Health have a Lambda function that reads a database password from **Secrets Manager**
+and writes a report to **S3**. Both perfectly ordinary things to do.
+
+The security team's requirement is equally ordinary: the function handles patient data, so it
+must sit in a **private subnet** with no route to the internet.
+
+And then it stops working, with a timeout rather than an error — which is the most confusing
+possible failure, because a timeout looks like a bug in your code.
+
+Here is what is actually happening, and it catches almost everybody once. AWS service APIs live
+on **public** endpoints. `secretsmanager.eu-west-1.amazonaws.com` is a public hostname. So the
+moment you put a function in a private subnet, you have cut it off from the very services it
+needs — because "no internet access" turns out to include AWS itself.
+
+There are three ways out of this, and choosing between them is worth real money.
+
+<Diagram
+  title="Three ways for a private function to reach an AWS service"
+  viewBox="0 30 1020 560"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'The function is walled in — on purpose',
+      body: 'A Lambda attached to a VPC sits in a subnet with no route to an internet gateway. Nothing can reach it, and — the part people forget — <strong>it can reach almost nothing</strong>. This is the requirement working correctly, not a fault.',
+    },
+    {
+      title: 'Option A — send it out through NAT',
+      body: 'Add a <strong>NAT gateway</strong> and the traffic goes out to the internet, across the public network, and back into AWS. It works, and it has two costs: roughly <strong>£32 a month per gateway plus a charge per gigabyte</strong>, and your patient-data traffic has just taken a walk outside the VPC.',
+      flow: ['w-nat', 'w-igw', 'w-inet'],
+      duration: 1400,
+    },
+    {
+      title: 'Option B — a gateway endpoint, for free',
+      body: 'For <strong>S3 and DynamoDB only</strong>, a <strong>gateway endpoint</strong> adds an entry to your route table sending that traffic straight to the service across the AWS network. It costs <strong>nothing at all</strong>, and the traffic never leaves.',
+      flow: ['w-gw', 'w-gw-s3'],
+      duration: 1300,
+    },
+    {
+      title: 'Option C — an interface endpoint, via PrivateLink',
+      body: 'For nearly every <em>other</em> service, an <strong>interface endpoint</strong> puts a network interface with a <strong>private IP address from your own subnet</strong> inside your VPC. Requests go to that address. It is protected by a security group, like any other interface — and unlike a gateway endpoint, it is billed hourly.',
+      flow: ['w-if', 'w-if-sm'],
+      duration: 1400,
+    },
+    {
+      title: 'And your code never changes',
+      body: '<strong>Private DNS</strong> is the trick that makes this invisible. The public hostname now resolves, inside your VPC only, to the endpoint’s private address. Your function still calls <code>secretsmanager.eu-west-1.amazonaws.com</code> — the same line of code, quietly taking a completely different path.',
+      duration: 1300,
+    },
+  ]}
+  caption="Same destination, three routes. One leaves AWS and bills you monthly; one is free but only serves S3 and DynamoDB; one covers everything else and is billed by the hour."
+>
+  <Boundary x={50} y={95} w={580} h={450} label="Your VPC" icon="cloud" tone="navy" step={1} />
+  <Boundary x={70} y={240} w={230} h={125} label="Private subnet" icon="lock" tone="teal" step={1} />
+  <Node x={180} y={300} w={190} h={84} label="Lambda" sub="no internet route" icon="lambda" tone="teal" step={1} />
+
+  <Node x={470} y={150} w={150} h={60} label="NAT gateway" sub="~£32/month" icon="router" tone="red" step={2} />
+  <Node x={470} y={300} w={175} h={64} label="Gateway endpoint" sub="free · route table" icon="allow" tone="green" step={3} />
+  <Node x={470} y={455} w={185} h={74} label="Interface endpoint" sub="ENI · private IP · SG" icon="firewall" tone="purple" step={4} />
+
+  <Node x={745} y={150} w={140} h={60} label="Internet" sub="outside AWS" icon="globe" tone="red" step={2} />
+  <Node x={905} y={255} w={150} h={66} label="Amazon S3" icon="bucket" tone="green" step={3} />
+  <Node x={905} y={455} w={175} h={70} label="Secrets Manager" icon="key" tone="purple" step={4} />
+
+  <Wire id="w-nat" from={[275, 282]} to={[395, 150]} shape="elbow-h" mid={340} tone="red" step={2} />
+  <Wire id="w-igw" from={[545, 150]} to={[675, 150]} tone="red" step={2} />
+  <Wire id="w-inet" from={[815, 150]} to={[860, 222]} shape="elbow-v" tone="red" step={2} dashed label="leaves AWS" labelDx={70} />
+
+  <Wire id="w-gw" from={[275, 300]} to={[382, 300]} tone="green" step={3} />
+  <Wire id="w-gw-s3" from={[558, 292]} to={[830, 255]} shape="elbow-h" mid={700} tone="green" step={3} label="stays inside" labelDy={-12} />
+
+  <Wire id="w-if" from={[275, 320]} to={[377, 455]} shape="elbow-h" mid={330} tone="purple" step={4} />
+  <Wire id="w-if-sm" from={[563, 455]} to={[817, 455]} tone="purple" step={4} label="PrivateLink" labelDy={-12} />
+</Diagram>
+
+## Gateway or interface — the distinction that gets tested
+
+<Confusable
+  title="Gateway endpoint vs interface endpoint"
+  ask="Both give a private path from your VPC to an AWS service. They work in completely different ways, and only one of them is free."
+  options={[
+    {
+      name: 'Gateway endpoint',
+      tagline: 'A route table entry. Traffic for the service is simply directed across the AWS network.',
+      when: [
+        'The service is <strong>S3 or DynamoDB</strong> — those two, and nothing else',
+        'You want to take S3 traffic off a NAT gateway and stop paying to process it',
+        'It costs <strong>nothing</strong>, so for those two services there is rarely a reason not to',
+        'Cannot be reached from on-premises over Direct Connect or VPN',
+      ],
+      giveaway: ['"S3"', '"DynamoDB"', '"no additional cost"', '"route table"'],
+    },
+    {
+      name: 'Interface endpoint',
+      tagline: 'A network interface with a private IP in your subnet, powered by AWS PrivateLink.',
+      when: [
+        'The service is <strong>anything else</strong> — Secrets Manager, KMS, SNS, SQS, ECR, CloudWatch…',
+        'You need a <strong>security group</strong> in front of the private path',
+        'On-premises systems must reach it over Direct Connect or VPN',
+        'Accept in exchange: an <strong>hourly charge per endpoint per AZ</strong>, plus per GB',
+      ],
+      giveaway: ['"PrivateLink"', '"elastic network interface"', '"private IP"', '"from on-premises"'],
+    },
+  ]}
+  rule="<strong>S3 and DynamoDB get the free one; everything else gets the paid one.</strong> If you remember only that sentence, you will get these questions right."
+/>
+
+**Why is one free and the other not?** Because they are genuinely different mechanisms. A
+gateway endpoint is a *routing* change — AWS adds a prefix list to your route table and no
+resource is created inside your VPC. An interface endpoint creates a real **elastic network
+interface**, consuming an IP address in your subnet, in each Availability Zone you choose. You
+are paying for a thing that exists.
+
+That difference explains the rest of the table. Only the interface endpoint can have a
+**security group**, because only it has a network interface for one to attach to. And only it
+can be reached from your own data centre, because a route table entry means nothing to a server
+that is not in the VPC.
+
+<Callout type="cost" title="The gateway endpoint is free money">
+If a VPC has private instances talking to S3 through a NAT gateway, you are paying twice — once
+for the NAT hours and again for every gigabyte it processes — to reach a service that would
+answer for free over a gateway endpoint.
+
+This is one of the few genuinely free wins on AWS, and it is why <strong>"reduce NAT gateway
+costs"</strong> in an exam question is almost always answered with <strong>"create a gateway
+VPC endpoint for S3"</strong>.
+</Callout>
+
+## Private DNS, and why the timeout was so confusing
+
+Worth dwelling on, because it explains the failure this lesson opened with.
+
+When you enable **private DNS** on an interface endpoint, AWS creates a private hosted zone so
+that inside your VPC, `secretsmanager.eu-west-1.amazonaws.com` resolves to the endpoint's
+private address instead of the public one. Everywhere else in the world it still resolves
+normally.
+
+The consequence is the nice part: **no application code changes.** The SDK, the CLI and your
+function all keep using the ordinary public hostname.
+
+The consequence when it is *not* set up is the nasty part. The name still resolves — to a public
+address — and your function dutifully tries to reach it, and there is no route, so it sits there
+until it times out. **A missing endpoint does not look like a permissions error. It looks like
+your code hanging**, which is why people lose an afternoon to it.
+
+<Callout type="gotcha" title="Three things that produce the same timeout">
+When something in a private subnet cannot reach an AWS service, check these in order — they all
+fail identically:
+<br />1. <strong>Is there an endpoint at all?</strong> No endpoint and no NAT means no path.
+<br />2. <strong>Is private DNS enabled</strong> on the interface endpoint? Without it the name
+still points at the public address.
+<br />3. <strong>Does the endpoint's security group allow HTTPS on port 443 inbound</strong> from
+your function's security group? An interface endpoint is a network interface, and it is
+firewalled like one.
+</Callout>
+
+## The full picture in the lab
+
+The repository below builds exactly this, in four steps that stack: an interface endpoint for
+Secrets Manager, a customer-managed KMS key, a secret encrypted with that key, and finally a
+Lambda in private subnets that fetches it.
+
+The Lambda is the part worth reading. Before calling Secrets Manager at all it resolves the
+hostname and reports the IP it got back, then tests whether port 443 will open. That is a
+genuinely good habit to steal: **when a private path fails, prove the DNS answer and the
+connectivity separately**, because the timeout alone tells you nothing about which of the two
+is broken.
+
+It also ties this project to two other lessons. The **customer-managed KMS key** is the
+*Encryption and Key Management* lesson made concrete — the key policy names exactly who may
+decrypt. And putting the secret in Secrets Manager rather than an environment variable is the
+rule from *How IAM Decides*: applications get roles and short-lived secrets, never credentials
+sitting in a file.
+
+<SourceRepo
+  repo="MinhHungPhan/aws-hands-on-labs"
+  url="https://github.com/MinhHungPhan/aws-hands-on-labs"
+  licence="MIT"
+  stars="~40"
+  effort="a couple of hours"
+  blurb="Labs organised by service and then by certification level, so 01-foundational maps to Cloud Practitioner and 02-associate to the Associate exams. For this project see 12-AWS-VPC/01-foundational — one lab for the S3 gateway endpoint, and a four-part chain building the interface endpoint, KMS key, secret and private Lambda. The EC2, Elastic Beanstalk and CloudWatch Logs Insights labs in the same repo are worth a look afterwards."
+/>
+
+<Takeaways
+  items={[
+    'A resource in a <strong>private subnet cannot reach AWS service APIs</strong> either — their endpoints are public addresses.',
+    'Three routes out: <strong>NAT gateway</strong> (works, monthly cost, leaves the VPC) · <strong>gateway endpoint</strong> (free, S3 and DynamoDB only) · <strong>interface endpoint</strong> (hourly, nearly everything else).',
+    '<strong>Gateway endpoint = a route table entry.</strong> No interface, no security group, no cost, and unreachable from on-premises.',
+    '<strong>Interface endpoint = an ENI with a private IP</strong>, powered by <strong>PrivateLink</strong>, protected by a security group, and reachable over Direct Connect or VPN.',
+    '"Reduce NAT gateway costs" almost always means <strong>add a gateway endpoint for S3</strong>.',
+    '<strong>Private DNS</strong> means no code changes — and when it is missing, the failure is a <strong>timeout</strong>, not a permissions error.',
+  ]}
+/>
+
+---
+
+The reason this project is worth the effort is that it is the first one where **the security
+requirement and the cost saving point the same way.**
+
+Usually they fight: the safer design costs more, and somebody has to argue for it. Here, taking
+your S3 traffic off the public internet also takes it off the NAT gateway, and the bill goes
+down while the blast radius shrinks.
+
+Those alignments are rare enough that it is worth recognising one when you see it — and this is
+the example the exam reaches for most often.

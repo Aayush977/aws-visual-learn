@@ -1,0 +1,728 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { url } from '../lib/paths';
+import { QUESTIONS } from '../lib/questions';
+import { EXAMS, EXAM_META } from '../content.config';
+
+/**
+ * The daily review queue.
+ *
+ * Every question in the bank is emitted once as JSON; the browser decides
+ * which of them are due using the scheduler in lib/review.ts and its own
+ * localStorage. Nothing is sent anywhere — there is no account and no server,
+ * so a reader's progress lives on the device they studied on.
+ */
+const payload = QUESTIONS.map((q) => ({
+  id: q.id,
+  prompt: q.prompt,
+  options: q.options.map((o) => ({ text: o.text, correct: Boolean(o.correct), why: o.why })),
+  choose: q.choose ?? 1,
+  explain: q.explain ?? '',
+  track: q.track,
+  exams: q.exams,
+}));
+---
+
+<BaseLayout
+  title="Daily Review"
+  description="A spaced-repetition queue over every practice question on the site. Answer what is due today; anything you get wrong comes back sooner."
+>
+  <article class="rv wrap">
+    <header class="rv__head">
+      <p class="rv__eyebrow">Review</p>
+      <h1 class="rv__title">What you should look at today</h1>
+      <p class="rv__lede">
+        Questions you get wrong come back tomorrow. Questions you know come back in a week, then
+        three, then rarely. That gap is the whole point — <strong>recalling something just before
+        you would have forgotten it</strong> is what moves it into memory that lasts.
+      </p>
+      <p class="rv__privacy">
+        Your progress is stored in this browser only. No account, nothing sent anywhere — and
+        clearing your site data will clear it.
+      </p>
+    </header>
+
+    <section class="rv__stats" aria-label="Your progress">
+      <div class="rv__stat rv__stat--streak">
+        <span class="rv__statNum" data-streak>0</span>
+        <span class="rv__statLbl">day streak</span>
+      </div>
+      <div class="rv__stat">
+        <span class="rv__statNum" data-due>0</span>
+        <span class="rv__statLbl">due now</span>
+      </div>
+      <div class="rv__stat">
+        <span class="rv__statNum" data-learning>0</span>
+        <span class="rv__statLbl">learning</span>
+      </div>
+      <div class="rv__stat">
+        <span class="rv__statNum" data-known>0</span>
+        <span class="rv__statLbl">known</span>
+      </div>
+      <div class="rv__stat rv__stat--quiet">
+        <span class="rv__statNum" data-unseen>0</span>
+        <span class="rv__statLbl">not yet seen</span>
+      </div>
+    </section>
+
+    <div class="rv__bar" aria-hidden="true"><span data-bar-known></span><span data-bar-learning
+      ></span></div>
+
+    <div class="rv__filter">
+      <label for="rv-exam">Studying for</label>
+      <select id="rv-exam" data-exam>
+        <option value="all">Both exams</option>
+        {EXAMS.map((e) => <option value={e}>{EXAM_META[e].full}</option>)}
+      </select>
+      <button type="button" class="rv__reset" data-reset>Reset all progress</button>
+    </div>
+
+    <!-- The card -->
+    <section class="rv__card" data-card hidden aria-live="polite">
+      <p class="rv__meta">
+        <span data-track></span>
+        <span class="rv__sep" aria-hidden="true">·</span>
+        <span data-remaining></span>
+      </p>
+      <h2 class="rv__q" data-prompt></h2>
+      <p class="rv__choose" data-choose hidden></p>
+
+      <ol class="rv__options" data-options></ol>
+
+      <button type="button" class="rv__submit" data-submit disabled>Check answer</button>
+
+      <div class="rv__result" data-result hidden>
+        <p class="rv__verdict" data-verdict></p>
+        <div class="rv__why" data-why></div>
+        <p class="rv__gradeLead" data-grade-lead></p>
+        <div class="rv__grades" data-grades role="group" aria-label="How well did you know it?">
+        </div>
+      </div>
+    </section>
+
+    <!-- Nothing due -->
+    <section class="rv__done" data-done hidden>
+      <p class="rv__doneIcon" aria-hidden="true">✓</p>
+      <h2 class="rv__doneTitle" data-done-title>Nothing due right now</h2>
+      <p class="rv__doneBody" data-done-body></p>
+      <p class="rv__doneActions">
+        <a class="rv__btn" href={url('/lessons')}>Read a lesson</a>
+        <button type="button" class="rv__btn rv__btn--ghost" data-learn-more>
+          Learn 10 new questions anyway
+        </button>
+      </p>
+    </section>
+
+    <noscript>
+      <p class="rv__noscript">
+        The review queue needs JavaScript, because the scheduling happens in your browser. The
+        <a href={url('/quiz')}>practice question sets</a> work without it.
+      </p>
+    </noscript>
+  </article>
+
+  <script is:inline type="application/json" id="rv-data" set:html={JSON.stringify(payload)} />
+</BaseLayout>
+
+<script>
+  import {
+    bumpStreak,
+    dueCards,
+    newCard,
+    schedule,
+    streakAlive,
+    summarise,
+    type Card,
+    type Grade,
+  } from '../lib/review';
+
+  interface Q {
+    id: string;
+    prompt: string;
+    options: { text: string; correct: boolean; why: string }[];
+    choose: number;
+    explain: string;
+    track: string;
+    exams: string[];
+  }
+
+  const root = document.querySelector<HTMLElement>('.rv');
+  if (root) {
+    const KEY = 'awsvl:review:v1';
+    const NEW_PER_SESSION = 10;
+
+    const raw = document.getElementById('rv-data')?.textContent ?? '[]';
+    const ALL: Q[] = JSON.parse(raw);
+    const byId = new Map(ALL.map((q) => [q.id, q]));
+
+    type Store = { cards: Record<string, Card>; streak: { count: number; lastDay: number } };
+    const empty: Store = { cards: {}, streak: { count: 0, lastDay: -1 } };
+
+    function load(): Store {
+      try {
+        const s = JSON.parse(localStorage.getItem(KEY) || 'null');
+        return s && s.cards ? s : { ...empty };
+      } catch {
+        return { ...empty }; // corrupt or blocked storage just starts fresh
+      }
+    }
+    function save(s: Store) {
+      try {
+        localStorage.setItem(KEY, JSON.stringify(s));
+      } catch {
+        /* private browsing — the session still works, it just will not persist */
+      }
+    }
+
+    let store = load();
+    let queue: string[] = [];
+    let current: Q | null = null;
+    let picked = new Set<number>();
+    let answered = false;
+    let extraNew = 0;
+
+    const el = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const cardBox = el('[data-card]');
+    const doneBox = el('[data-done]');
+    const optionsBox = el<HTMLOListElement>('[data-options]');
+    const submitBtn = el<HTMLButtonElement>('[data-submit]');
+    const resultBox = el('[data-result]');
+    const gradesBox = el('[data-grades]');
+    const examSel = el<HTMLSelectElement>('[data-exam]');
+
+    const examFilter = () => examSel.value;
+    const inScope = (q: Q) => examFilter() === 'all' || q.exams.includes(examFilter());
+
+    function refreshStats() {
+      const scoped = ALL.filter(inScope);
+      const cards = scoped.map((q) => store.cards[q.id]).filter(Boolean) as Card[];
+      const p = summarise(cards, scoped.length);
+      el('[data-due]').textContent = String(p.due);
+      el('[data-learning]').textContent = String(p.learning);
+      el('[data-known]').textContent = String(p.known);
+      el('[data-unseen]').textContent = String(p.unseen);
+
+      const streak = streakAlive(store.streak) ? store.streak.count : 0;
+      el('[data-streak]').textContent = String(streak);
+      root.classList.toggle('is-streaking', streak > 0);
+
+      const total = scoped.length || 1;
+      el('[data-bar-known]').style.width = `${(p.known / total) * 100}%`;
+      el('[data-bar-learning]').style.width = `${(p.learning / total) * 100}%`;
+    }
+
+    function buildQueue() {
+      const scoped = ALL.filter(inScope);
+      const due = dueCards(
+        scoped.map((q) => store.cards[q.id]).filter(Boolean) as Card[],
+      ).map((c) => c.id);
+      const unseen = scoped.filter((q) => !store.cards[q.id]).map((q) => q.id);
+      queue = [...due, ...unseen.slice(0, NEW_PER_SESSION + extraNew)];
+    }
+
+    function next() {
+      refreshStats();
+      const id = queue.shift();
+      if (!id) return finish();
+      current = byId.get(id) ?? null;
+      if (!current) return next();
+      render(current);
+    }
+
+    function finish() {
+      current = null;
+      cardBox.hidden = true;
+      doneBox.hidden = false;
+      const scoped = ALL.filter(inScope);
+      const unseen = scoped.filter((q) => !store.cards[q.id]).length;
+      el('[data-done-title]').textContent = unseen
+        ? 'Nothing due right now'
+        : 'You have seen everything';
+      el('[data-done-body]').textContent = unseen
+        ? `Come back tomorrow and the next batch will be waiting. ${unseen} question${unseen === 1 ? '' : 's'} in this set you have not met yet.`
+        : 'Every question in this set is scheduled. The queue will refill as things come due — that is the system working, not running out.';
+      el<HTMLButtonElement>('[data-learn-more]').hidden = unseen === 0;
+    }
+
+    function render(q: Q) {
+      answered = false;
+      picked = new Set();
+      doneBox.hidden = true;
+      cardBox.hidden = false;
+      resultBox.hidden = true;
+      submitBtn.hidden = false;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Check answer';
+
+      el('[data-track]').textContent = q.track;
+      el('[data-remaining]').textContent = `${queue.length + 1} left in this session`;
+      el('[data-prompt]').textContent = q.prompt;
+      const chooseEl = el('[data-choose]');
+      chooseEl.hidden = q.choose < 2;
+      chooseEl.textContent = `Choose ${q.choose}.`;
+
+      optionsBox.innerHTML = '';
+      q.options.forEach((o, i) => {
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'rv__option';
+        btn.dataset.i = String(i);
+        btn.textContent = o.text;
+        li.appendChild(btn);
+        optionsBox.appendChild(li);
+      });
+    }
+
+    optionsBox.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.rv__option');
+      if (!btn || answered || !current) return;
+      const i = Number(btn.dataset.i);
+      if (current.choose === 1) {
+        picked = new Set([i]);
+        optionsBox
+          .querySelectorAll('.rv__option')
+          .forEach((b) => b.classList.toggle('is-picked', b === btn));
+      } else {
+        picked.has(i) ? picked.delete(i) : picked.add(i);
+        btn.classList.toggle('is-picked', picked.has(i));
+      }
+      submitBtn.disabled = picked.size !== current.choose;
+    });
+
+    submitBtn.addEventListener('click', () => {
+      if (!current || answered) return;
+      answered = true;
+      submitBtn.hidden = true;
+
+      const correctIdx = new Set(
+        current.options.map((o, i) => (o.correct ? i : -1)).filter((i) => i >= 0),
+      );
+      const right =
+        picked.size === correctIdx.size && [...picked].every((i) => correctIdx.has(i));
+
+      optionsBox.querySelectorAll<HTMLElement>('.rv__option').forEach((b) => {
+        const i = Number(b.dataset.i);
+        b.classList.add('is-locked');
+        if (correctIdx.has(i)) b.classList.add('is-correct');
+        else if (picked.has(i)) b.classList.add('is-wrong');
+      });
+
+      el('[data-verdict]').textContent = right ? 'Correct' : 'Not quite';
+      resultBox.className = `rv__result ${right ? 'is-right' : 'is-wrong'}`;
+
+      const why = el('[data-why]');
+      why.innerHTML = '';
+      current.options.forEach((o, i) => {
+        if (!o.correct && !picked.has(i)) return; // only explain what is relevant
+        const p = document.createElement('p');
+        p.className = o.correct ? 'rv__whyLine is-correct' : 'rv__whyLine is-wrong';
+        p.innerHTML = `<strong>${o.text}</strong> — ${o.why}`;
+        why.appendChild(p);
+      });
+      if (current.explain) {
+        const p = document.createElement('p');
+        p.className = 'rv__explain';
+        p.innerHTML = current.explain;
+        why.appendChild(p);
+      }
+
+      // Grading. Getting it wrong is always 'again' — no point pretending otherwise.
+      gradesBox.innerHTML = '';
+      el('[data-grade-lead]').textContent = right
+        ? 'How easily did that come back?'
+        : 'It will come back at the start of the queue.';
+      const grades: [Grade, string][] = right
+        ? [
+            ['hard', 'Hard'],
+            ['good', 'Good'],
+            ['easy', 'Easy'],
+          ]
+        : [['again', 'Continue']];
+      grades.forEach(([g, label]) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `rv__grade rv__grade--${g}`;
+        b.dataset.grade = g;
+        b.textContent = label;
+        gradesBox.appendChild(b);
+      });
+      resultBox.hidden = false;
+    });
+
+    gradesBox.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-grade]');
+      if (!btn || !current) return;
+      const grade = btn.dataset.grade as Grade;
+      const existing = store.cards[current.id] ?? newCard(current.id);
+      const updated = schedule(existing, grade);
+      store.cards[current.id] = updated;
+      store.streak = bumpStreak(store.streak);
+      save(store);
+      // A lapsed card goes to the back of this session rather than vanishing.
+      if (grade === 'again') queue.push(current.id);
+      next();
+    });
+
+    examSel.addEventListener('change', () => {
+      extraNew = 0;
+      buildQueue();
+      next();
+    });
+
+    el('[data-learn-more]').addEventListener('click', () => {
+      extraNew += NEW_PER_SESSION;
+      buildQueue();
+      next();
+    });
+
+    el('[data-reset]').addEventListener('click', () => {
+      if (!confirm('Clear every card, interval and your streak? This cannot be undone.')) return;
+      store = { cards: {}, streak: { count: 0, lastDay: -1 } };
+      save(store);
+      extraNew = 0;
+      buildQueue();
+      next();
+    });
+
+    buildQueue();
+    next();
+  }
+</script>
+
+<style>
+  .rv {
+    padding: var(--sp-6) 0 var(--sp-8);
+  }
+  .rv__eyebrow {
+    margin: 0 0 var(--sp-2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--aws-purple);
+  }
+  .rv__title {
+    margin: 0;
+    font-size: var(--step-3);
+  }
+  .rv__lede {
+    margin: var(--sp-3) 0 0;
+    color: var(--text-muted);
+  }
+  .rv__privacy {
+    margin: var(--sp-3) 0 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+    opacity: 0.85;
+  }
+
+  .rv__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+    gap: var(--sp-2);
+    margin: var(--sp-6) 0 var(--sp-3);
+  }
+  .rv__stat {
+    padding: var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    text-align: center;
+  }
+  .rv__stat--quiet {
+    opacity: 0.7;
+  }
+  .rv__statNum {
+    display: block;
+    font-size: var(--step-2);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .rv__statLbl {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+  .rv.is-streaking .rv__stat--streak {
+    border-color: color-mix(in srgb, var(--aws-orange) 55%, var(--border));
+    background: color-mix(in srgb, var(--aws-orange) 10%, var(--bg-raised));
+  }
+  .rv.is-streaking .rv__stat--streak .rv__statNum {
+    color: var(--aws-orange);
+  }
+
+  .rv__bar {
+    display: flex;
+    height: 6px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+  }
+  .rv__bar span {
+    display: block;
+    width: 0;
+    transition: width 0.3s ease;
+  }
+  .rv__bar span:first-child {
+    background: var(--aws-green);
+  }
+  .rv__bar span:last-child {
+    background: var(--aws-orange);
+  }
+
+  .rv__filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: var(--sp-4) 0 var(--sp-6);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .rv__filter select {
+    font: inherit;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    color: var(--text);
+  }
+  .rv__reset {
+    margin-left: auto;
+    font: inherit;
+    font-size: 0.78rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .rv__reset:hover {
+    border-color: var(--aws-red);
+    color: var(--aws-red);
+  }
+
+  .rv__card,
+  .rv__done {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+    padding: var(--sp-5);
+  }
+
+  .rv__meta {
+    display: flex;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .rv__q {
+    margin: 0;
+    font-size: var(--step-1);
+    line-height: 1.4;
+  }
+  .rv__choose {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--step--1);
+    font-weight: 650;
+    color: var(--accent);
+  }
+
+  .rv__options {
+    list-style: none;
+    margin: var(--sp-4) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--sp-2);
+  }
+  .rv__option {
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    font-size: var(--step--1);
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .rv__option:hover:not(.is-locked) {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .rv__option.is-picked {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    font-weight: 600;
+  }
+  .rv__option.is-locked {
+    cursor: default;
+  }
+  .rv__option.is-correct {
+    border-color: var(--aws-green);
+    background: color-mix(in srgb, var(--aws-green) 12%, var(--bg));
+  }
+  .rv__option.is-wrong {
+    border-color: var(--aws-red);
+    background: color-mix(in srgb, var(--aws-red) 10%, var(--bg));
+  }
+
+  .rv__submit {
+    margin-top: var(--sp-4);
+    font: inherit;
+    font-weight: 650;
+    padding: 0.5rem 1.1rem;
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+  }
+  .rv__submit:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .rv__result {
+    margin-top: var(--sp-5);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--border);
+  }
+  .rv__verdict {
+    margin: 0 0 var(--sp-3);
+    font-size: var(--step-1);
+    font-weight: 700;
+  }
+  .rv__result.is-right .rv__verdict {
+    color: var(--aws-green);
+  }
+  .rv__result.is-wrong .rv__verdict {
+    color: var(--aws-red);
+  }
+  .rv__whyLine {
+    margin: 0 0 var(--sp-2);
+    padding-left: var(--sp-3);
+    border-left: 3px solid var(--border);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .rv__whyLine.is-correct {
+    border-left-color: var(--aws-green);
+  }
+  .rv__whyLine.is-wrong {
+    border-left-color: var(--aws-red);
+  }
+  .rv__whyLine :global(strong) {
+    color: var(--text);
+  }
+  .rv__explain {
+    margin: var(--sp-3) 0 0;
+    padding: var(--sp-3);
+    border-radius: var(--radius);
+    background: var(--bg-sunken);
+    font-size: var(--step--1);
+  }
+
+  .rv__gradeLead {
+    margin: var(--sp-4) 0 var(--sp-2);
+    font-size: var(--step--1);
+    font-weight: 650;
+  }
+  .rv__grades {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+  .rv__grade {
+    font: inherit;
+    font-weight: 650;
+    font-size: var(--step--1);
+    padding: 0.45rem 1rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .rv__grade:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .rv__grade--good {
+    border-color: color-mix(in srgb, var(--aws-green) 50%, var(--border));
+  }
+  .rv__grade--again {
+    border-color: color-mix(in srgb, var(--aws-red) 50%, var(--border));
+  }
+
+  .rv__done {
+    text-align: center;
+  }
+  .rv__doneIcon {
+    margin: 0;
+    font-size: 2.2rem;
+    color: var(--aws-green);
+  }
+  .rv__doneTitle {
+    margin: var(--sp-2) 0 var(--sp-2);
+    font-size: var(--step-1);
+  }
+  .rv__doneBody {
+    margin: 0 auto;
+    max-width: 34rem;
+    color: var(--text-muted);
+    font-size: var(--step--1);
+  }
+  .rv__doneActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    justify-content: center;
+    margin: var(--sp-5) 0 0;
+  }
+  .rv__btn {
+    font: inherit;
+    font-size: var(--step--1);
+    font-weight: 650;
+    padding: 0.45rem 1rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .rv__btn--ghost {
+    background: transparent;
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .rv__btn--ghost:hover {
+    border-color: var(--accent);
+  }
+
+  .rv__noscript {
+    margin-top: var(--sp-5);
+    padding: var(--sp-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-sunken);
+    font-size: var(--step--1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rv__bar span {
+      transition: none;
+    }
+  }
+</style>

@@ -1,0 +1,196 @@
+---
+title: 'Project 6 — Half In The Cloud, On Purpose'
+summary: Direct Connect, a VPN backup and Storage Gateway joining a data centre to a VPC. The architecture for everyone who cannot move everything — which is most large organisations, permanently.
+exams: [CCP, SAA]
+track: projects
+order: 60
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 2 — Design Resilient Architectures'
+minutes: 10
+hook: Hybrid is not a migration that stalled. For a hospital with a scanner that cannot leave the building and a regulator with opinions, it is the finished design.
+updated: 2026-08-16
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import Callout from '../../components/Callout.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The problem
+
+Aldgate Health cannot move everything, and never will.
+
+The MRI scanner writes to a machine in the basement, over a protocol designed in the 1990s, and
+the manufacturer's support contract voids if anything about that changes. The patient
+administration system is licensed per physical socket on hardware the trust owns. And a
+regulator has views about where certain records live.
+
+Meanwhile the things that *should* be in the cloud obviously should: the eleven-year archive of
+scans nobody looks at, the analytics, the disaster recovery copy, the burst capacity for
+research workloads.
+
+So the answer is both, permanently — and the exam is unusually clear that this is a legitimate,
+finished architecture rather than a migration somebody abandoned halfway.
+
+<Diagram
+  title="One organisation, two locations, joined properly"
+  viewBox="0 30 1020 540"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Things that cannot move, do not move',
+      body: 'The scanner, its acquisition workstation and the licensed administration system stay in the hospital. No amount of architecture changes a support contract or a socket-based licence.',
+    },
+    {
+      title: 'A dedicated line joins the two',
+      body: '<strong>AWS Direct Connect</strong> is a physical circuit from the hospital into AWS, not touching the public internet. It is the answer whenever a requirement mentions <strong>consistent latency</strong> or traffic that must not traverse the internet. It takes weeks to install.',
+      flow: 'w-dx',
+      duration: 1400,
+    },
+    {
+      title: 'A VPN stands behind it',
+      body: 'A <strong>Site-to-Site VPN</strong> runs as backup — an encrypted tunnel over the ordinary internet. It is up in hours and costs little, so it is both the stopgap while Direct Connect is installed <em>and</em> the failover if a digger finds the circuit.',
+      flow: 'w-vpn',
+      duration: 1300,
+    },
+    {
+      title: 'Old scans drain into S3',
+      body: '<strong>Storage Gateway</strong> presents itself to the hospital as an ordinary network file share, while actually storing objects in <strong>S3</strong> and keeping recent files cached locally. The 1990s protocol never learns that anything changed.',
+      flow: ['w-sgw', 'w-s3'],
+      duration: 1400,
+    },
+    {
+      title: 'And the archive ages into Glacier',
+      body: 'A <strong>lifecycle rule</strong> moves scans nobody has opened in ninety days into a Glacier class. Eleven years of imaging costs a fraction of what the basement SAN did, and a reopened case still returns a file.',
+      flow: 'w-glacier',
+    },
+  ]}
+  caption="Nothing here is temporary. This is what a large regulated organisation looks like years after a successful cloud programme."
+>
+  <Boundary x={95} y={85} w={280} h={365} label="The hospital" icon="server" tone="red" solid step={1} />
+  <Node x={230} y={140} w={230} h={66} label="MRI scanner" sub="cannot move, ever" icon="disk" tone="red" step={1} />
+  <Node x={230} y={240} w={230} h={66} label="Admin system" sub="per-socket licence" icon="server" tone="red" step={1} />
+  <Node x={230} y={385} w={230} h={72} label="Storage Gateway" sub="looks like a file share" icon="folder" tone="orange" step={4} />
+
+  <Boundary x={665} y={95} w={250} h={400} label="AWS — the VPC and beyond" icon="cloud" tone="teal" step={2} />
+  <Node x={790} y={150} w={210} h={62} label="Direct Connect" sub="dedicated circuit" icon="router" tone="teal" step={2} />
+  <Node x={790} y={245} w={210} h={62} label="Site-to-Site VPN" sub="backup, over internet" icon="lock" tone="purple" step={3} />
+  <Node x={790} y={355} w={200} h={62} label="S3" sub="the scan archive" icon="bucket" tone="green" step={4} />
+  <Node x={790} y={445} w={200} h={62} label="Glacier classes" sub="after 90 days" icon="archive" tone="blue" step={5} />
+
+  <Wire id="w-dx" from={[350, 200]} to={[680, 150]} shape="elbow-h" mid={520} tone="teal" step={2} label="private" labelDy={-12} />
+  <Wire id="w-vpn" from={[350, 265]} to={[680, 245]} shape="elbow-h" mid={520} tone="purple" step={3} dashed label="backup" labelDy={16} />
+  <Wire id="w-sgw" from={[345, 385]} to={[520, 385]} tone="orange" step={4} />
+  <Wire id="w-s3" from={[520, 385]} to={[685, 358]} shape="elbow-h" mid={600} tone="green" step={4} />
+  <Wire id="w-glacier" from={[790, 390]} to={[790, 412]} tone="blue" step={5} />
+</Diagram>
+
+## Why each piece, and not the obvious alternative
+
+<Confusable
+  title="Direct Connect vs Site-to-Site VPN"
+  ask="You need your building to reach your VPC. Two ways, and exam questions decide it with a single word about time or consistency."
+  options={[
+    {
+      name: 'AWS Direct Connect',
+      tagline: 'A dedicated physical circuit into AWS, never touching the public internet.',
+      when: [
+        'The requirement says <strong>consistent</strong> or <strong>predictable latency</strong>',
+        'Large volumes move continuously and egress costs matter',
+        'Policy or regulation forbids the public internet',
+        'Accept in exchange: <strong>weeks to install</strong>, and real money',
+      ],
+      giveaway: ['"consistent latency"', '"dedicated connection"', '"not over the internet"'],
+    },
+    {
+      name: 'Site-to-Site VPN',
+      tagline: 'An encrypted tunnel across the ordinary internet.',
+      when: [
+        'You need connectivity <strong>this week</strong>',
+        'Cost matters more than perfectly predictable performance',
+        'As the <strong>backup path</strong> for a Direct Connect circuit',
+      ],
+      giveaway: ['"quickly"', '"cost-effective"', '"encrypted tunnel"', '"backup connection"'],
+    },
+  ]}
+  rule="<strong>Direct Connect takes weeks to install.</strong> Urgency in the question means VPN. Consistency means Direct Connect. Wanting both means Direct Connect with a VPN behind it — which is what most real organisations run."
+/>
+
+**Storage Gateway** is the piece people meet least and misidentify most. It is not a migration
+tool — that is **DataSync** for network transfers and **Snowball** when the wire would take
+months. Storage Gateway is for the *permanent* case: an on-premises application that must keep
+seeing a normal file share or iSCSI volume, while the bytes actually live in S3 with a local
+cache for recent files. Aldgate's acquisition workstation writes to what it believes is a
+Windows share; the objects land in S3; nobody rewrote a 1990s protocol.
+
+<Callout type="exam" title="Three services, three completely different jobs">
+This trio is confused constantly, and the distinction is about <em>time</em>:
+<br />· <strong>Snowball</strong> — a one-off bulk move where the network would take weeks or
+months. A physical box arrives by courier.
+<br />· <strong>DataSync</strong> — repeated or ongoing transfer over a network link that is
+perfectly adequate.
+<br />· <strong>Storage Gateway</strong> — <strong>not a move at all.</strong> A permanent hybrid
+arrangement where on-premises systems keep local access to cloud-backed storage.
+</Callout>
+
+**Why not just move the archive with a script?** Because the requirement is not "get the files
+to S3 once". It is that the scanner keeps writing, forever, to something that looks exactly like
+what it has always written to. A one-off migration solves a different problem than the one
+Aldgate has.
+
+## Roughly what it costs
+
+Hybrid is the most expensive pattern here, and the costs are unusually lumpy.
+
+| Line | Rough monthly cost |
+| --- | --- |
+| Direct Connect port | tens to hundreds of pounds by capacity, plus installation |
+| Direct Connect data transfer out | cheaper per GB than internet egress |
+| Site-to-Site VPN | roughly $0.05 per tunnel-hour, so tens of pounds |
+| Storage Gateway | the appliance is free; you pay for the S3 underneath |
+| S3 + Glacier for the archive | falls sharply once lifecycle rules run |
+| **Shape** | **a real fixed floor, then cheap storage** |
+
+The Direct Connect port is a genuine fixed cost, and the honest justification for it is rarely
+money — it is latency consistency, regulatory posture, or removing the public internet from a
+clinical path. If a question offers Direct Connect as the *cheap* answer, that is usually the
+distractor.
+
+<SourceRepo
+  repo="awslabs/aws-well-architected-labs"
+  url="https://github.com/awslabs/aws-well-architected-labs"
+  licence="Apache-2.0"
+  stars="~2,100"
+  effort="varies by lab"
+  blurb="The honest note on this one: hybrid networking is the least repo-shaped pattern here, because half of it is a physical circuit somebody installs in a building. These labs cover the reliability and disaster-recovery halves you can actually build, and AWS's Direct Connect and Storage Gateway documentation carries the rest."
+/>
+
+<Takeaways
+  items={[
+    '<strong>Hybrid is a destination, not a failed migration.</strong> Regulation, licensing and equipment that cannot move are permanent reasons.',
+    '<strong>Direct Connect</strong> = dedicated circuit, consistent latency, weeks to install. <strong>VPN</strong> = encrypted tunnel over the internet, up in hours.',
+    'Most real designs run <strong>both</strong>: Direct Connect for the path, VPN as its backup.',
+    '<strong>Storage Gateway</strong> is permanent hybrid access, not migration. <strong>DataSync</strong> moves data over the network; <strong>Snowball</strong> moves it by lorry.',
+    'Lifecycle rules into <strong>Glacier classes</strong> are what make a long archive affordable.',
+    'Direct Connect is chosen for <strong>consistency and compliance</strong>, rarely for cost.',
+  ]}
+/>
+
+---
+
+It is worth ending this section here rather than on something more modern, because this is where
+a large number of real careers are actually spent.
+
+The serverless architectures earlier are how new things get built, and they are a pleasure. But
+walk into a hospital, a bank, a manufacturer or a government department and you will find
+something that looks like this diagram: a building full of equipment that cannot move, joined by
+a circuit to a VPC full of things that should never have been in a building.
+
+Being able to look at that and see a *design* rather than a mess is most of what makes somebody
+useful in their first year.

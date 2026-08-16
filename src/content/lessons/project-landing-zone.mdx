@@ -1,0 +1,221 @@
+---
+title: 'Project 10 — Many Accounts, One Organisation'
+summary: Why serious AWS estates use dozens of accounts instead of one, what Control Tower builds for you, and how SCPs, a log archive account and IAM Identity Center fit together into a landing zone.
+exams: [SAA]
+track: projects
+order: 100
+domains:
+  SAA: 'Domain 1 — Design Secure Architectures'
+minutes: 12
+hook: The fastest way to limit what a mistake can destroy is to put a wall around it that no policy inside can move. On AWS that wall is an account boundary.
+updated: 2026-08-16
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The problem
+
+Brightwell started, as almost everyone does, with **one AWS account**. Development, test and
+production in the same place, separated by naming conventions and good intentions.
+
+It works until it does not, and the failures are all the same shape:
+
+- Somebody testing a cleanup script deletes production data, because nothing physically
+  prevented it — only a prefix in a name.
+- Nobody can say what the claims team spends, because every resource is in one bill and half of
+  them are untagged.
+- The security team wants to stop anyone using unapproved Regions. The only tool is IAM policies
+  on hundreds of principals, and one missed policy defeats the whole thing.
+- An auditor asks who can read production data and the honest answer takes three weeks.
+
+Every one of those is the same underlying issue: **there is no boundary that a mistake cannot
+cross**. IAM can express any rule you like, but IAM is also editable by anybody with sufficient
+IAM permissions, which is a circular sort of protection.
+
+An **account** is a different kind of boundary. Resources in one account are invisible to
+another unless somebody deliberately builds a path. That is not a policy — it is the shape of
+the platform.
+
+<Diagram
+  title="A landing zone, and what each part is for"
+  viewBox="0 30 1020 570"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Organizations is the container',
+      body: '<strong>AWS Organizations</strong> groups accounts under a <strong>management account</strong> and gives you one consolidated bill, volume discounts pooled across the estate, and a place to attach policy.',
+      flow: ['w-ou1', 'w-ou2', 'w-ou3'],
+      duration: 1400,
+    },
+    {
+      title: 'Organizational Units group by how they are governed',
+      body: 'An <strong>OU</strong> is a folder of accounts that should be treated alike. The useful test is not "which team owns it" but <strong>"which rules should apply"</strong> — that is what makes an OU worth creating.',
+    },
+    {
+      title: 'SCPs set a ceiling nothing inside can raise',
+      body: 'A <strong>Service Control Policy</strong> on an OU caps what every account in it may ever do — <em>including its root user</em>. It grants nothing; it only limits. This is the wall IAM alone could not build.',
+      flow: ['w-scp1', 'w-scp2'],
+      duration: 1400,
+    },
+    {
+      title: 'Two accounts exist purely for evidence',
+      body: 'Control Tower creates a <strong>log archive</strong> account holding CloudTrail and Config history, and an <strong>audit</strong> account for the security team. Logs live where the people who might want to delete them have no access.',
+      flow: 'w-log',
+      duration: 1300,
+    },
+    {
+      title: 'And humans arrive through one front door',
+      body: '<strong>IAM Identity Center</strong> federates your existing directory, so people log in once and choose which account and role to assume. <strong>No IAM users anywhere</strong>, and a leaver is removed in one place.',
+      flow: ['w-sso1', 'w-sso2'],
+      duration: 1300,
+    },
+  ]}
+  caption="Nothing here is exotic — it is folders, a ceiling policy, two accounts for logs, and one login. The strength comes from the account boundary, not the cleverness."
+>
+  <Node x={500} y={110} w={230} h={70} label="Management account" sub="billing · no workloads" icon="cloud" tone="navy" step={1} />
+  <Node x={130} y={110} w={180} h={70} label="IAM Identity Center" sub="one login" icon="users" tone="purple" step={5} />
+
+  <Boundary x={60} y={235} w={290} h={205} label="OU — Workloads" icon="folder" tone="teal" step={2} />
+  <Node x={205} y={300} w={230} h={62} label="Production" icon="server" tone="teal" step={2} />
+  <Node x={205} y={385} w={230} h={62} label="Development" icon="server" tone="teal" step={2} />
+
+  <Boundary x={390} y={235} w={280} h={205} label="OU — Sandbox" icon="folder" tone="orange" step={2} />
+  <Node x={530} y={300} w={220} h={62} label="Experiments" icon="server" tone="orange" step={2} />
+  <Node x={530} y={385} w={220} h={62} label="Training" icon="server" tone="orange" step={2} />
+
+  <Boundary x={710} y={235} w={270} h={205} label="OU — Security" icon="shield" tone="purple" step={4} />
+  <Node x={845} y={300} w={210} h={62} label="Log archive" sub="CloudTrail · Config" icon="archive" tone="purple" step={4} />
+  <Node x={845} y={385} w={210} h={62} label="Audit" sub="read-only access" icon="eye" tone="purple" step={4} />
+
+  <Node x={205} y={520} w={250} h={64} label="SCP: approved Regions only" icon="deny" tone="red" step={3} />
+  <Node x={530} y={520} w={230} h={64} label="SCP: no CloudTrail deletion" icon="deny" tone="red" step={3} />
+
+  <Wire id="w-ou1" from={[420, 130]} to={[240, 225]} shape="elbow-v" tone="navy" step={1} />
+  <Wire id="w-ou2" from={[500, 145]} to={[530, 225]} tone="navy" step={1} />
+  <Wire id="w-ou3" from={[580, 130]} to={[810, 225]} shape="elbow-v" tone="navy" step={1} />
+
+  <Wire id="w-scp1" from={[205, 488]} to={[205, 450]} tone="red" step={3} />
+  <Wire id="w-scp2" from={[530, 488]} to={[530, 450]} tone="red" step={3} />
+
+  <Wire id="w-log" from={[740, 340]} to={[810, 320]} tone="purple" step={4} dashed />
+
+  <Wire id="w-sso1" from={[130, 145]} to={[130, 260]} tone="purple" step={5} />
+  <Wire id="w-sso2" from={[220, 110] } to={[385, 110]} tone="purple" step={5} label="assume a role" labelDy={-12} />
+</Diagram>
+
+## What Control Tower actually does
+
+**AWS Control Tower** is not a new capability. Everything it builds could be assembled by hand
+from Organizations, CloudTrail, Config, IAM Identity Center and a pile of CloudFormation. What
+it provides is that assembly, done to AWS's recommended pattern, in an afternoon rather than a
+quarter.
+
+It sets up:
+
+- An **Organization** with a recommended OU structure
+- A **log archive** account and an **audit** account, separated from workloads on purpose
+- **CloudTrail and Config** enabled organisation-wide, writing to the log archive
+- **Guardrails** — preventive ones implemented as SCPs, detective ones as Config rules
+- **IAM Identity Center** for human access
+- **Account Factory**, so a new account arrives already governed rather than as a blank space
+  somebody has to remember to configure
+
+<Callout type="exam" title="Landing zone, Control Tower, Organizations">
+Three terms that get used interchangeably and are not the same:
+<br />· <strong>AWS Organizations</strong> — the underlying service. Accounts, OUs, consolidated
+billing, SCPs.
+<br />· <strong>Landing zone</strong> — the <em>design</em>: a well-architected multi-account
+environment. You can build one by hand.
+<br />· <strong>AWS Control Tower</strong> — the <em>service that builds and maintains</em> a
+landing zone for you, using Organizations underneath.
+<br />If a question asks for the fastest way to establish a governed multi-account environment,
+the answer is <strong>Control Tower</strong>. If it asks what enforces a permission ceiling, the
+answer is an <strong>SCP</strong>.
+</Callout>
+
+## Why separate accounts beat separate anything else
+
+<Mnemonic
+  title="What an account boundary gives you that a tag cannot"
+  phrase="Blast radius, Bills, Boundaries, Bandwidth to move"
+  tone="purple"
+  items={[
+    { key: 'B', term: 'Blast radius', note: 'a script run in the sandbox cannot see production — not by policy, but because the resources are not there' },
+    { key: 'B', term: 'Bills', note: 'per-account costs need no tagging discipline; the account is the tag, and it cannot be forgotten' },
+    { key: 'B', term: 'Boundaries you cannot edit from inside', note: 'an SCP is set above the account, so nobody inside it — root user included — can widen it' },
+    { key: 'B', term: 'Bandwidth to move fast', note: 'a sandbox with a hard ceiling can be handed over freely, because the worst case is bounded' },
+  ]}
+/>
+
+The last one is the argument that wins the meeting, and it is not the obvious one. Guardrails
+are usually sold as restriction, but their real effect is **permission to stop supervising**.
+Once an SCP makes it impossible to launch in an unapproved Region, spend beyond a boundary, or
+disable the audit trail, a team can be handed an account and left alone — because the damage
+they can do has a ceiling somebody already agreed to.
+
+## How people actually log in
+
+The **IAM Identity Center** half is the piece that makes a multi-account estate usable rather
+than infuriating. Without it, thirty accounts means thirty sets of credentials and a spreadsheet.
+
+With it, an engineer signs in once against the corporate directory and picks an account and a
+role. On the command line the same thing works through an SSO profile:
+
+```bash
+aws configure sso          # once, per profile
+aws sso login --profile production-readonly
+aws s3 ls --profile production-readonly
+```
+
+The credentials that arrive are **temporary**, they expire, and there is no access key stored
+anywhere. This is the *How IAM Decides* rule applied to human beings rather than applications:
+nobody holds a long-lived credential, so nothing long-lived can leak.
+
+<Callout type="cost">
+Organizations, Control Tower, SCPs and IAM Identity Center have <strong>no direct charge</strong>
+— you pay for what the underlying services do, chiefly CloudTrail and Config in the log archive
+account, which on a large estate is not nothing. Consolidated billing usually pays for that by
+itself, since usage across all accounts pools into the same volume discount tiers and Savings
+Plans can be shared estate-wide.
+</Callout>
+
+<SourceRepo
+  repo="MinhHungPhan/aws-hands-on-labs"
+  url="https://github.com/MinhHungPhan/aws-hands-on-labs"
+  licence="MIT"
+  stars="~40"
+  effort="an afternoon, plus setup time"
+  blurb="See 08-AWS-Control-Tower/02-associate/01-setting-up-a-landing-zone-using-aws-control-tower for the landing zone walkthrough, and 02-AWS-CLI/02-associate/01-configuring-aws-profile-with-sso for the Identity Center CLI profile — the piece you will use every single day afterwards. Note that Control Tower is one of the few things here that is awkward to tear down, so read before you enable it on an account you care about."
+/>
+
+<Takeaways
+  items={[
+    'An <strong>account boundary</strong> is the strongest isolation AWS offers — resources in one account are simply not visible from another.',
+    '<strong>Organizations</strong> is the service · a <strong>landing zone</strong> is the design · <strong>Control Tower</strong> is the service that builds the design for you.',
+    '<strong>SCPs cap what an account may ever do, including its root user.</strong> They limit and never grant.',
+    'Group accounts into <strong>OUs by how they should be governed</strong>, not by who owns them.',
+    'A separate <strong>log archive account</strong> means audit evidence lives where the people who might want it gone cannot reach it.',
+    '<strong>IAM Identity Center</strong> replaces IAM users for humans: one login, temporary credentials, and one place to remove a leaver.',
+    'Guardrails are not mainly about restriction — they are what lets you <strong>stop supervising</strong> a team safely.',
+  ]}
+/>
+
+---
+
+It is worth ending this path where a real career tends to end up.
+
+Projects 1 to 9 are about building things. This one is about the conditions under which other
+people can build things without you watching — and at a certain scale that becomes the actual
+job. Not designing the architecture, but designing **the space in which a hundred other people
+design architectures**, and making the expensive mistakes structurally impossible rather than
+merely discouraged.
+
+That is what "Solutions Architect" tends to mean by the time anybody is paying well for it.

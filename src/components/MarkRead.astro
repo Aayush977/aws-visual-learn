@@ -1,0 +1,124 @@
+---
+/**
+ * "I have read this" — a per-lesson toggle stored in localStorage.
+ *
+ * Deliberately manual rather than inferred from scrolling: a reader who
+ * skimmed to the bottom has not read the lesson, and a progress number that
+ * lies is worse than no progress number. The same key is read by the lesson
+ * index and the study paths to tick cards and count what is left.
+ */
+interface Props {
+  /** Lesson id (its filename without the extension). */
+  id: string;
+}
+const { id } = Astro.props;
+---
+
+<div class="mr" data-mark-read={id} hidden>
+  <button type="button" class="mr__btn" data-toggle aria-pressed="false">
+    <span class="mr__tick" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"></path></svg>
+    </span>
+    <span class="mr__label" data-label>Mark as read</span>
+  </button>
+  <p class="mr__note" data-note hidden>
+    Saved in this browser. Your progress shows on the <a data-lessons-link>lesson list</a>.
+  </p>
+</div>
+
+<script>
+  import { READ_KEY, readSet, saveRead } from '../lib/progress';
+
+  document.querySelectorAll<HTMLElement>('[data-mark-read]').forEach((root) => {
+    const id = root.dataset.markRead!;
+    const btn = root.querySelector<HTMLButtonElement>('[data-toggle]')!;
+    const label = root.querySelector<HTMLElement>('[data-label]')!;
+    const note = root.querySelector<HTMLElement>('[data-note]')!;
+    const link = root.querySelector<HTMLAnchorElement>('[data-lessons-link]');
+
+    // Only reveal the control once we know storage is usable.
+    root.hidden = false;
+    if (link) {
+      const base = document.querySelector<HTMLAnchorElement>('a[href$="/lessons"]');
+      link.href = base?.href ?? '../';
+    }
+
+    const paint = (on: boolean) => {
+      root.classList.toggle('is-read', on);
+      btn.setAttribute('aria-pressed', String(on));
+      label.textContent = on ? 'Read' : 'Mark as read';
+      note.hidden = !on;
+    };
+
+    paint(readSet().has(id));
+
+    btn.addEventListener('click', () => {
+      const set = readSet();
+      set.has(id) ? set.delete(id) : set.add(id);
+      saveRead(set);
+      paint(set.has(id));
+      // Let anything else on the page (there is nothing yet) react.
+      window.dispatchEvent(new CustomEvent(READ_KEY));
+    });
+  });
+</script>
+
+<style>
+  .mr {
+    margin: var(--sp-6) 0 0;
+    padding-top: var(--sp-5);
+    border-top: 1px solid var(--border);
+  }
+  .mr__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-3);
+    font: inherit;
+    font-weight: 650;
+    padding: 0.5rem 1rem 0.5rem 0.7rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--bg-raised);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .mr__btn:hover {
+    border-color: var(--aws-green);
+  }
+  .mr__tick {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--border-strong);
+    border-radius: 50%;
+    background: var(--bg);
+  }
+  .mr__tick svg {
+    width: 13px;
+    height: 13px;
+    fill: none;
+    stroke: var(--text-inverse);
+    stroke-width: 3.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0;
+  }
+  .mr.is-read .mr__btn {
+    border-color: var(--aws-green);
+    background: color-mix(in srgb, var(--aws-green) 10%, var(--bg-raised));
+    color: var(--aws-green);
+  }
+  .mr.is-read .mr__tick {
+    background: var(--aws-green);
+    border-color: var(--aws-green);
+  }
+  .mr.is-read .mr__tick svg {
+    opacity: 1;
+  }
+  .mr__note {
+    margin: var(--sp-2) 0 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+</style>

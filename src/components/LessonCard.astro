@@ -15,8 +15,11 @@ interface Props {
 const { id, title, summary, exams, minutes, n } = Astro.props;
 ---
 
-<li class="cd">
+<li class="cd" data-lesson={id}>
   <a class="cd__link" href={lessonUrl(id)}>
+    <span class="cd__read" data-read-tick hidden aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"></path></svg>
+    </span>
     {n !== undefined && <span class="cd__n" aria-hidden="true">{String(n).padStart(2, '0')}</span>}
     <span class="cd__main">
       <span class="cd__title">{title}</span>
@@ -29,11 +32,37 @@ const { id, title, summary, exams, minutes, n } = Astro.props;
   </a>
 </li>
 
+<script>
+  import { readSet } from '../lib/progress';
+
+  const read = readSet();
+  document.querySelectorAll<HTMLElement>('[data-lesson]').forEach((card) => {
+    const done = read.has(card.dataset.lesson!);
+    card.classList.toggle('is-read', done);
+    const tick = card.querySelector<HTMLElement>('[data-read-tick]');
+    if (tick) tick.hidden = !done;
+  });
+
+  // "7 of 37 read" counters, wherever a page asks for one.
+  document.querySelectorAll<HTMLElement>('[data-read-count]').forEach((box) => {
+    const cards = document.querySelectorAll('[data-lesson]').length;
+    const done = [...document.querySelectorAll<HTMLElement>('[data-lesson]')].filter((c) =>
+      read.has(c.dataset.lesson!),
+    ).length;
+    box.hidden = false;
+    box.querySelector('[data-read-done]')!.textContent = String(done);
+    box.querySelector('[data-read-total]')!.textContent = String(cards);
+    const bar = box.querySelector<HTMLElement>('[data-read-bar]');
+    if (bar) bar.style.width = `${cards ? (done / cards) * 100 : 0}%`;
+  });
+</script>
+
 <style>
   .cd {
     list-style: none;
   }
   .cd__link {
+    position: relative;
     display: flex;
     gap: var(--sp-4);
     height: 100%;
@@ -89,6 +118,33 @@ const { id, title, summary, exams, minutes, n } = Astro.props;
   }
   .cd__minutes {
     font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .cd__read {
+    position: absolute;
+    top: var(--sp-3);
+    right: var(--sp-3);
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--aws-green);
+  }
+  .cd__read svg {
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: #fff;
+    stroke-width: 3.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .cd.is-read .cd__link {
+    border-color: color-mix(in srgb, var(--aws-green) 40%, var(--border));
+  }
+  .cd.is-read .cd__title {
     color: var(--text-muted);
   }
 </style>

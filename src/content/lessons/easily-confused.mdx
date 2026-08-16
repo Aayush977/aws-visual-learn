@@ -1,6 +1,6 @@
 ---
-title: The Ten Pairs Everyone Mixes Up
-summary: The service comparisons that decide more exam marks than any single lesson — SQS vs SNS, EBS vs EFS vs S3, security groups vs NACLs and seven more, each with the wording that gives it away.
+title: The Pairs Everyone Mixes Up
+summary: The twelve service comparisons that decide more exam marks than any single lesson — SQS vs SNS, EBS vs EFS vs S3, security groups vs NACLs, WAF vs Shield and eight more, each with the wording that gives it away.
 exams: [CCP, SAA]
 track: reference
 order: 10
@@ -29,7 +29,7 @@ The exam is built this way on purpose. A question with three obviously wrong ans
 nothing. Almost every real item is a **discrimination test between two services that overlap**,
 and the discriminating detail is usually one clause in the middle of the paragraph.
 
-So this page is not another list. It is the ten pairs that do the damage, each one laid out
+So this page is not another list. It is the twelve pairs that do the damage, each one laid out
 the same way: what each service actually is, when you reach for it, and — the part worth more
 than everything else — **the exact wording in a question that points at it**.
 
@@ -417,6 +417,76 @@ appears often enough to be worth its own line in your memory.
   rule="Snow = <strong>ship a box</strong> because the wire is too slow. DataSync = <strong>use the wire</strong>, repeatedly. Storage Gateway = <strong>stay hybrid</strong> on purpose."
 />
 
+## 11 · Protecting the front door
+
+<Confusable
+  title="AWS WAF vs Shield"
+  ask="Something unpleasant is arriving from the internet. Which service you want depends entirely on which layer it is arriving at."
+  options={[
+    {
+      name: 'AWS Shield',
+      tagline: 'DDoS protection — absorbing floods of traffic aimed at knocking you offline.',
+      when: [
+        'The attack is <strong>volumetric</strong>: too much traffic, not clever traffic',
+        '<strong>Shield Standard is free, automatic and always on</strong> for every AWS customer — you never choose it',
+        '<strong>Shield Advanced</strong> is the paid tier: a 24/7 response team, and <strong>cost protection</strong> so scaling under attack does not produce a punitive bill',
+      ],
+      giveaway: ['"DDoS"', '"volumetric attack"', '"24/7 response team"', '"cost protection"'],
+    },
+    {
+      name: 'AWS WAF',
+      tagline: 'A web application firewall — inspecting individual HTTP requests and blocking the bad ones.',
+      when: [
+        'The attack is in the <strong>content of the request</strong>: SQL injection, cross-site scripting',
+        'You want to <strong>rate-limit</strong> a caller, or block by country',
+        'Attaches to <strong>CloudFront, ALB, API Gateway</strong> and a few others — not to an EC2 instance directly',
+      ],
+      giveaway: ['"SQL injection"', '"cross-site scripting"', '"block by country"', '"rate limit"'],
+    },
+  ]}
+  rule="<strong>Shield stops a flood; WAF stops a sentence.</strong> Too much traffic is Shield. Malicious traffic is WAF. And Shield Standard is already on, so a question offering it as something to <em>enable</em> is usually pointing at Advanced."
+/>
+
+## 12 · Three ways to run a web app
+
+<Confusable
+  title="Lightsail vs Elastic Beanstalk vs EC2"
+  ask="All three run your web application on virtual machines. What differs is how many decisions you are asked to make — and how many you are allowed to make."
+  options={[
+    {
+      name: 'Amazon Lightsail',
+      tagline: 'A bundled virtual server at a flat monthly price, with the complexity hidden.',
+      when: [
+        'A simple site, a WordPress blog, a small dev or test box',
+        'You want a <strong>predictable fixed monthly price</strong> rather than a metered bill',
+        'The person running it does not want to learn VPCs and security groups first',
+      ],
+      giveaway: ['"simple"', '"predictable monthly price"', '"small website"', '"minimal configuration"'],
+    },
+    {
+      name: 'AWS Elastic Beanstalk',
+      tagline: 'You hand over code; it provisions and manages the EC2 instances, load balancer and scaling for you.',
+      when: [
+        'A standard web application you want deployed <strong>without wiring the infrastructure yourself</strong>',
+        'You still want the underlying resources visible and adjustable — unlike Lightsail, nothing is hidden',
+        'Capacity, health checks and rolling deployments should be somebody else’s problem',
+      ],
+      giveaway: ['"deploy without managing infrastructure"', '"quickly deploy a web application"'],
+    },
+    {
+      name: 'Amazon EC2',
+      tagline: 'The raw machine. Everything above is built out of this, and you build it yourself.',
+      when: [
+        'You need <strong>control of the operating system</strong>, or specific kernel-level software',
+        'The architecture is unusual enough that a template would fight you',
+        'Licensing is tied to the host, or you want a commitment discount',
+      ],
+      giveaway: ['"full control"', '"custom configuration"', '"install specific software"'],
+    },
+  ]}
+  rule="<strong>How many decisions do you want?</strong> Almost none, at a fixed price → Lightsail. Give it code, let it decide → Elastic Beanstalk. Decide everything → EC2."
+/>
+
 ## Now test the ones that catch people
 
 Reading a comparison and recognising it under pressure are different skills. These three are
@@ -509,6 +579,8 @@ where the marks are actually lost.
     '<strong>Cognito</strong> is your customers · <strong>IAM Identity Center</strong> is your colleagues.',
     '<strong>VPN</strong> is fast to set up · <strong>Direct Connect</strong> is consistent, and takes weeks to install.',
     '<strong>Snow</strong> when the wire is too slow · <strong>DataSync</strong> over the wire, repeatedly · <strong>Storage Gateway</strong> to stay hybrid.',
+    '<strong>Shield</strong> stops a flood (DDoS) · <strong>WAF</strong> stops a sentence (SQL injection, XSS, rate limits). Shield Standard is already on, free.',
+    '<strong>Lightsail</strong> fixed price, few decisions · <strong>Elastic Beanstalk</strong> give it code · <strong>EC2</strong> decide everything.',
   ]}
 />
 

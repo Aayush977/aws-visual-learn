@@ -1,6 +1,7 @@
 ---
 import BaseLayout from './BaseLayout.astro';
 import ExamTag from '../components/ExamTag.astro';
+import MarkRead from '../components/MarkRead.astro';
 import { TRACK_META, type EXAMS, type TRACKS } from '../content.config';
 import { url, lessonUrl } from '../lib/paths';
 
@@ -16,6 +17,8 @@ interface Neighbour {
 }
 
 interface Props {
+  /** Lesson id, used to remember that this one has been read. */
+  id: string;
   title: string;
   summary: string;
   exams: (typeof EXAMS)[number][];
@@ -29,7 +32,7 @@ interface Props {
   next?: Neighbour;
 }
 
-const { title, summary, exams, track, domains, minutes, hook, updated, headings, prev, next } =
+const { id, title, summary, exams, track, domains, minutes, hook, updated, headings, prev, next } =
   Astro.props;
 
 // Show only the domains for exams this lesson is actually on, labelled by exam
@@ -94,6 +97,8 @@ const trackMeta = TRACK_META[track];
 
       <div class="ls__body prose">
         <slot />
+
+        <MarkRead id={id} />
 
         <footer class="ls__foot">
           {

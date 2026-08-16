@@ -1,0 +1,186 @@
+---
+title: 'Project 5 — A Data Lake You Can Query With SQL'
+summary: Raw files into S3, catalogued by Glue, queried with Athena and charted in QuickSight — analytics with no database server anywhere, billed per question asked.
+exams: [CCP, SAA]
+track: projects
+order: 50
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+minutes: 10
+hook: Keep everything, decide what it means later, and pay only when somebody actually asks a question. The opposite of every data warehouse anyone built before 2015.
+updated: 2026-08-16
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import Callout from '../../components/Callout.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The problem
+
+Meridian's customers send them data in whatever shape it arrives: nightly CSV exports, JSON
+from an API, the occasional spreadsheet somebody emails. It adds up to a few terabytes and grows
+every month.
+
+The traditional answer is a data warehouse: design a schema, build a pipeline that transforms
+everything into it, and load it in. That works, and it has a cost people underestimate — **you
+must decide what the data means before you store it**, and every time a customer adds a column
+or a new question gets asked, the schema and the pipeline both have to change.
+
+Meanwhile a warehouse cluster runs, and bills, whether anybody queries it or not. For a
+four-person company where somebody asks a serious analytical question perhaps twice a week,
+that is a large amount of money spent on readiness.
+
+A data lake inverts the order. **Store first, decide what it means when you ask.**
+
+<Diagram
+  title="From raw files to a chart, with no database server"
+  viewBox="0 40 1020 440"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Everything lands in S3, unchanged',
+      body: 'CSV, JSON, logs, exports — written to <strong>S3</strong> exactly as they arrived. No schema, no transformation, no decision. Storage is cheap enough that keeping everything is the sensible default.',
+      flow: 'w1',
+    },
+    {
+      title: 'A crawler works out the shape',
+      body: 'An <strong>AWS Glue crawler</strong> reads the files, infers columns and types, and writes what it found into the <strong>Glue Data Catalog</strong> — a table definition that points at the files. <strong>The data never moves.</strong>',
+      flow: 'w2',
+    },
+    {
+      title: 'The catalogue is the "database"',
+      body: 'The catalog holds tables, columns and partitions. There is no database server here — just a description of files that already exist, which several services can then read.',
+      flow: 'w3',
+    },
+    {
+      title: 'Athena runs SQL over the files',
+      body: '<strong>Amazon Athena</strong> is serverless SQL. You write ordinary <code>SELECT</code> statements, it reads the files in S3 directly, and you are billed <strong>per terabyte scanned</strong>. Nothing runs between queries.',
+      flow: 'w4',
+      duration: 1300,
+    },
+    {
+      title: 'And somebody non-technical sees a chart',
+      body: '<strong>QuickSight</strong> points at Athena and turns the answers into dashboards for people who will never write SQL. This is usually the step that makes the whole thing worth having.',
+      flow: 'w5',
+    },
+  ]}
+  caption="Notice what is missing: there is no database server in this diagram at all. Between queries, nothing is running and nothing is billed except storage."
+>
+  <Node x={95} y={250} w={140} h={92} label="Raw feeds" sub="CSV · JSON · logs" icon="file" tone="muted" step={1} />
+  <Node x={310} y={250} w={160} h={92} label="S3" sub="store it all, as-is" icon="bucket" tone="green" step={1} />
+  <Node x={310} y={110} w={190} h={60} label="Glue crawler" sub="infers the schema" icon="gear" tone="orange" step={2} />
+  <Node x={545} y={250} w={165} h={92} label="Glue Data Catalog" sub="tables · no server" icon="table" tone="purple" step={3} />
+  <Node x={780} y={250} w={150} h={92} label="Athena" sub="SQL, per TB scanned" icon="chart" tone="blue" step={4} />
+  <Node x={780} y={415} w={170} h={66} label="QuickSight" sub="dashboards" icon="eye" tone="teal" step={5} />
+
+  <Wire id="w1" from={[165, 250]} to={[230, 250]} tone="muted" step={1} />
+  <Wire id="w2" from={[310, 204]} to={[310, 140]} tone="orange" step={2} />
+  <Wire id="w3" from={[390, 250]} to={[462, 250]} tone="green" step={3} />
+  <Wire id="w4" from={[628, 250]} to={[705, 250]} tone="purple" step={4} />
+  <Wire id="w5" from={[780, 296]} to={[780, 382]} tone="blue" step={5} />
+</Diagram>
+
+## Why each piece, and not the obvious alternative
+
+<Confusable
+  title="Athena vs Redshift"
+  ask="Both let analysts run SQL over large amounts of data. The deciding question is not size — it is how often somebody asks."
+  options={[
+    {
+      name: 'Amazon Athena',
+      tagline: 'Serverless SQL directly against files in S3. Billed per terabyte scanned.',
+      when: [
+        'Queries are <strong>occasional or ad-hoc</strong> — a few a day, not all day',
+        'You do not want to run, size, patch or pay for a cluster',
+        'The data is already in S3 and you would rather not move it',
+        'Between queries you want to pay <strong>nothing but storage</strong>',
+      ],
+      giveaway: ['"ad-hoc"', '"directly in S3"', '"serverless"', '"no infrastructure"'],
+    },
+    {
+      name: 'Amazon Redshift',
+      tagline: 'A data warehouse on provisioned compute, built for constant, complex, repeated SQL.',
+      when: [
+        'Analysts are querying <strong>all day, every day</strong>',
+        'Complex joins across billions of rows, feeding live dashboards',
+        'Consistent fast response matters enough to pay for a cluster',
+      ],
+      giveaway: ['"data warehouse"', '"business intelligence"', '"complex queries"', '"petabyte"'],
+    },
+  ]}
+  rule="<strong>Per question, or per hour?</strong> Athena bills you for asking; Redshift bills you for being ready. Twice a week → Athena. All day → Redshift."
+/>
+
+**Glue** is the piece newcomers skip and then cannot work out why nothing queries. Athena does
+not read S3 blindly — it needs to know that a folder of files is a *table* with *columns*, and
+that is precisely what the **Glue Data Catalog** holds. The crawler is what fills it in
+automatically. Glue also does the ETL work when raw files genuinely do need transforming, but
+its catalogue role is what makes the lake queryable at all.
+
+**S3 rather than a database** for storage comes down to three properties this pattern depends
+on: it is cheap enough that keeping everything is reasonable, it has **eleven nines** of
+durability so the lake is also the archive, and lifecycle rules can move old partitions to
+Glacier classes without changing a single query.
+
+<Callout type="cost" title="Athena bills per terabyte scanned — so scan less">
+This is where data lakes get expensive, and it is entirely avoidable. Athena charges roughly
+<strong>$5 per terabyte scanned</strong>, and <code>SELECT *</code> across an unpartitioned
+bucket scans everything, every time.
+
+Two fixes, both worth remembering: <strong>partition</strong> the data (typically by date, so a
+query for last month reads one month of files rather than four years of them), and store it in a
+<strong>columnar format like Parquet</strong>, so a query touching three columns reads three
+columns instead of all forty. Together these routinely cut the bill by an order of magnitude
+without changing a single query.
+</Callout>
+
+## Roughly what it costs
+
+| Line | Rough monthly cost |
+| --- | --- |
+| S3 storage — a few TB, with lifecycle rules | tens of pounds |
+| Glue crawler — a short run daily | a few pounds |
+| Athena — per TB scanned, partitioned sensibly | a few pounds at this volume |
+| QuickSight — per author/reader | roughly $9–24 per user |
+| **Typical total for a small team** | **tens of pounds, dominated by storage** |
+
+The shape is worth noticing again: with a Redshift cluster the bill starts at hundreds of pounds
+and stays there whether anybody logs in. Here, a quiet month genuinely costs almost nothing —
+and a month where somebody runs a badly-written query over unpartitioned data can cost more than
+the cluster would have. **The cost moves from readiness to usage, which cuts both ways.**
+
+<SourceRepo
+  repo="aws-samples/aws-glue-samples"
+  url="https://github.com/aws-samples/aws-glue-samples"
+  licence="MIT-0"
+  stars="~1,500"
+  effort="a few hours"
+  blurb="AWS's own Glue examples: crawlers, ETL scripts and catalogue setup. Pair it with aws-samples/data-lake-as-code (MIT-0) if you would rather see the whole lake defined as infrastructure-as-code than click through the console."
+/>
+
+<Takeaways
+  items={[
+    'A data lake is <strong>store first, decide what it means when you query</strong> — the inverse of a traditional warehouse.',
+    '<strong>S3 holds the data · Glue catalogues it · Athena queries it · QuickSight charts it.</strong> No database server anywhere.',
+    'The <strong>Glue Data Catalog</strong> is what makes files look like tables. Without it Athena has nothing to query.',
+    '<strong>Athena bills per terabyte scanned</strong>; Redshift bills per hour of cluster. Occasional → Athena, constant → Redshift.',
+    '<strong>Partition your data and use Parquet.</strong> Both cut scan cost by an order of magnitude and neither changes your SQL.',
+    'Cost moves from <strong>readiness to usage</strong> — cheaper when quiet, and capable of surprising you when somebody writes a careless query.',
+  ]}
+/>
+
+---
+
+The quiet radicalism of this architecture is the decision it lets you postpone.
+
+Every warehouse design forces you to say, up front and permanently, what your data means. A lake
+lets you keep the raw thing and answer next year's question — the one nobody has thought of yet
+— without having thrown away the column that turns out to matter.
+
+That is worth real money in a way that is hard to put on a slide, and it is why "keep everything
+in S3, work it out later" became the default posture for analytics on AWS.
