@@ -40,6 +40,28 @@ why the very first thing you will do is set up a spending alarm. Do not skip tha
 not skip the teardown at the end.
 </Callout>
 
+<Callout type="note" title="No card? There is a way to practise without one">
+If handing over card details to learn is a genuine blocker — and for plenty of people it is —
+**LocalStack** runs a convincing imitation of AWS on your own machine in Docker. It fakes S3,
+Lambda, DynamoDB, IAM and dozens of other services, and the ordinary AWS CLI talks to it by
+pointing at a local address:
+
+```bash
+docker run --rm -p 4566:4566 localstack/localstack
+aws --endpoint-url=http://localhost:4566 s3 mb s3://my-practice-bucket
+```
+
+Nothing is provisioned anywhere, so nothing can ever be billed. It is genuinely useful for
+drilling CLI commands until they are muscle memory.
+
+Two honest caveats: it is a simulation, so behaviour around IAM permissions and service limits
+is approximate rather than real, and it will not teach you the console — which is where most
+beginners actually need the practice. Treat it as a safe sandbox alongside a real account, not
+a replacement for one. The lab in
+[MinhHungPhan/aws-hands-on-labs](https://github.com/MinhHungPhan/aws-hands-on-labs) under
+`02-AWS-CLI/01-foundational` walks through the setup.
+</Callout>
+
 ## Step 1 — The account, and the safety net
 
 AWS changed how new accounts work in 2025, and most tutorials you will find online are still

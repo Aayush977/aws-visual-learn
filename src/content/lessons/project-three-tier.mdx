@@ -72,22 +72,22 @@ internet. Handle Monday morning, which is three times Wednesday afternoon.
   ]}
   caption="Losing an instance is invisible. Losing an entire Availability Zone costs half the capacity and a short database failover — and nobody is paged for either."
 >
-  <Boundary x={520} y={60} w={960} h={560} label="VPC — one Region" icon="cloud" tone="navy" step={1} />
+  <Boundary x={190} y={95} w={790} h={520} label="VPC — one Region" icon="cloud" tone="navy" step={1} />
 
   <Node x={90} y={330} w={120} h={70} label="Users" icon="users" tone="muted" step={2} />
 
-  <Boundary x={330} y={110} w={330} h={110} label="Public subnets" icon="globe" tone="orange" step={2} />
+  <Boundary x={200} y={112} w={280} h={105} label="Public subnets" icon="globe" tone="orange" step={2} />
   <Node x={330} y={165} w={220} h={62} label="Application Load Balancer" sub="health checks" icon="balancer" tone="orange" step={2} />
 
-  <Boundary x={790} y={110} w={330} h={110} label="Public subnets · NAT" icon="router" tone="orange" step={5} />
+  <Boundary x={635} y={112} w={330} h={105} label="Public subnets · NAT" icon="router" tone="orange" step={5} />
   <Node x={720} y={165} w={130} h={58} label="NAT · AZ-A" icon="router" tone="orange" step={5} />
   <Node x={880} y={165} w={130} h={58} label="NAT · AZ-B" icon="router" tone="orange" step={5} />
 
-  <Boundary x={560} y={290} w={800} h={140} label="Private subnets — application tier · Auto Scaling group" icon="server" tone="teal" step={3} />
+  <Boundary x={215} y={292} w={680} h={118} label="Private subnets — application tier · Auto Scaling group" icon="server" tone="teal" step={3} />
   <Node x={330} y={350} w={190} h={72} label="App · AZ-A" sub="no public IP" icon="server" tone="teal" step={3} />
   <Node x={780} y={350} w={190} h={72} label="App · AZ-B" sub="no public IP" icon="server" tone="teal" step={3} />
 
-  <Boundary x={560} y={480} w={800} h={130} label="Private subnets — data tier" icon="database" tone="blue" step={4} />
+  <Boundary x={210} y={482} w={690} h={118} label="Private subnets — data tier" icon="database" tone="blue" step={4} />
   <Node x={330} y={540} w={200} h={72} label="RDS primary" sub="AZ-A" icon="database" tone="blue" step={4} />
   <Node x={780} y={540} w={200} h={72} label="RDS standby" sub="AZ-B · no traffic" icon="database" tone="muted" step={4} />
 
