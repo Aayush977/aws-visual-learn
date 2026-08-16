@@ -34,7 +34,11 @@ const BLURB: Record<typeof exam, string> = {
           Math.round(totalMinutes / 60) === 1 ? '' : 's'
         } of reading
       </p>
-    </header>
+          <p class="rd" data-read-count hidden>
+        <span class="rd__bar" aria-hidden="true"><span data-read-bar></span></span>
+        <span class="rd__txt"><strong data-read-done>0</strong> of <span data-read-total>0</span> read</span>
+      </p>
+</header>
 
     {
       groups.length === 0 ? (
@@ -126,5 +130,34 @@ const BLURB: Record<typeof exam, string> = {
     gap: var(--sp-3);
     padding: 0;
     margin: 0;
+  }
+
+  .rd {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: var(--sp-3) 0 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .rd__bar {
+    flex: 1;
+    max-width: 16rem;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .rd__bar span {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--aws-green);
+    transition: width 0.3s ease;
+  }
+  .rd__txt strong {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
   }
 </style>

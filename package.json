@@ -11,7 +11,9 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "check:iam": "node src/lib/iam.check.ts"
+    "check:iam": "node src/lib/iam.check.ts",
+    "check:review": "node src/lib/review.check.ts",
+    "check:all": "pnpm check:iam && pnpm check:review"
   },
   "dependencies": {
     "@astrojs/mdx": "^7.0.5",
