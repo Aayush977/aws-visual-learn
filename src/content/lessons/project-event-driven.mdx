@@ -1,0 +1,202 @@
+---
+title: 'Project 4 — When a File Lands, Things Happen'
+summary: S3 triggering Lambda, fanning out through SNS and SQS so four unrelated systems each react to one upload — without any of them knowing the others exist.
+exams: [CCP, SAA]
+track: projects
+order: 40
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 2 — Design Resilient Architectures'
+minutes: 10
+hook: Nothing polls, nothing waits, and nothing knows about anything else. Adding a fifth thing that cares about uploads takes ten minutes and changes no existing code.
+updated: 2026-08-16
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import Callout from '../../components/Callout.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The problem
+
+When a radiographer at Aldgate Health uploads a scan, four separate things need to happen: a
+thumbnail for the browser list, an entry in the searchable index, a check that no patient
+identifiers are sitting in the file, and a notification to the consultant who requested it.
+
+The obvious implementation is one program that does all four in order. It is also the wrong one,
+and it fails in a specific, familiar way: the notification service goes down at 2am, so the
+upload fails, so the *radiographer* cannot upload a scan — because the mail server is unwell.
+Four unrelated things have been tied together into one thing that fails as a unit.
+
+Worse, adding a fifth consumer next year means editing, retesting and redeploying the code that
+handles uploads. The upload path becomes the most dangerous file in the codebase, because
+everything ends up in it.
+
+<Diagram
+  title="One upload, four independent reactions"
+  viewBox="0 30 1020 560"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'The file lands',
+      body: 'The scan is written to an <strong>S3 bucket</strong>. That is the whole of the uploader’s job — it stores the object and it is finished. Nothing downstream can make this step fail.',
+      flow: 'w1',
+    },
+    {
+      title: 'S3 emits an event',
+      body: 'S3 raises an <strong>event notification</strong> on object creation. Nobody is polling a folder asking "anything new?" — the storage layer says so itself, within moments.',
+      flow: 'w2',
+    },
+    {
+      title: 'One message, four copies',
+      body: 'The event publishes to an <strong>SNS topic</strong>. SNS pushes a copy to <em>every</em> subscriber at once. This is <strong>fan-out</strong>, and it is why adding a fifth consumer changes no existing code.',
+      flow: ['w3', 'w4', 'w5', 'w6'],
+      duration: 1500,
+    },
+    {
+      title: 'Each consumer gets its own queue',
+      body: 'Every subscriber has its own <strong>SQS queue</strong>. If the notifier is down for an hour, its messages wait in <em>its</em> queue. The other three neither know nor care — and nothing is lost.',
+      duration: 1300,
+    },
+    {
+      title: 'Workers take work when they can',
+      body: 'A <strong>Lambda</strong> drains each queue at its own pace. A crash mid-job is not a loss: the message becomes visible again after the <strong>visibility timeout</strong> and another worker picks it up. Repeated failures land in a <strong>dead-letter queue</strong> for a human.',
+      flow: ['w7', 'w8', 'w9', 'w10'],
+      duration: 1400,
+    },
+  ]}
+  caption="Nothing polls. Nothing waits on anything else. A dead consumer builds a backlog in its own queue instead of breaking the upload."
+>
+  <Node x={110} y={300} w={150} h={80} label="Radiographer" sub="uploads a scan" icon="user" tone="muted" step={1} />
+  <Node x={330} y={300} w={150} h={80} label="S3 bucket" sub="object created" icon="bucket" tone="green" step={1} />
+  <Node x={545} y={300} w={150} h={80} label="SNS topic" sub="one → many" icon="queue" tone="purple" step={3} />
+
+  <Node x={780} y={110} w={140} h={56} label="Queue · thumb" icon="queue" tone="orange" step={4} />
+  <Node x={780} y={235} w={140} h={56} label="Queue · index" icon="queue" tone="orange" step={4} />
+  <Node x={780} y={360} w={140} h={56} label="Queue · scan PII" icon="queue" tone="orange" step={4} />
+  <Node x={780} y={485} w={140} h={56} label="Queue · notify" icon="queue" tone="orange" step={4} />
+
+  <Node x={960} y={110} w={130} h={56} label="Thumbnail" icon="lambda" tone="teal" step={5} />
+  <Node x={960} y={235} w={130} h={56} label="Index" icon="lambda" tone="teal" step={5} />
+  <Node x={960} y={360} w={130} h={56} label="Macie check" icon="shield" tone="teal" step={5} />
+  <Node x={960} y={485} w={130} h={56} label="Notify" icon="mail" tone="teal" step={5} />
+
+  <Wire id="w1" from={[185, 300]} to={[255, 300]} tone="muted" step={1} />
+  <Wire id="w2" from={[405, 300]} to={[470, 300]} tone="green" step={2} />
+  <Wire id="w3" from={[620, 280]} to={[710, 130]} shape="elbow-v" tone="purple" step={3} />
+  <Wire id="w4" from={[620, 292]} to={[710, 245]} shape="elbow-v" tone="purple" step={3} />
+  <Wire id="w5" from={[620, 315]} to={[710, 355]} shape="elbow-v" tone="purple" step={3} />
+  <Wire id="w6" from={[620, 328]} to={[710, 480]} shape="elbow-v" tone="purple" step={3} />
+
+  <Wire id="w7" from={[850, 110]} to={[895, 110]} tone="orange" step={5} />
+  <Wire id="w8" from={[850, 235]} to={[895, 235]} tone="orange" step={5} />
+  <Wire id="w9" from={[850, 360]} to={[895, 360]} tone="orange" step={5} />
+  <Wire id="w10" from={[850, 485]} to={[895, 485]} tone="orange" step={5} />
+</Diagram>
+
+## Why SNS *and* SQS, rather than one of them
+
+This is the pattern's whole trick, and it is worth being precise about why both are there.
+
+<Confusable
+  title="SNS alone vs SQS alone vs SNS fanning out to SQS"
+  ask="Four systems need to know about one upload. Three designs are possible and only one of them is robust."
+  options={[
+    {
+      name: 'SQS on its own',
+      tagline: 'One queue, and each message is taken by exactly one consumer.',
+      when: [
+        'Only <strong>one</strong> thing needs to process each message',
+        'Here it would be <strong>wrong</strong>: the four systems would <em>divide</em> the uploads between them rather than each seeing all of them',
+      ],
+      giveaway: ['"decouple"', '"process later"', '"must not be lost"'],
+    },
+    {
+      name: 'SNS on its own',
+      tagline: 'Every subscriber gets a copy, pushed immediately.',
+      when: [
+        'All four <em>would</em> get their copy — the delivery is right',
+        'But it is <strong>push, now</strong>: a subscriber that is down misses its message, with limited retries',
+        'Fine for alerting a human, risky for work that must happen',
+      ],
+      giveaway: ['"notify multiple"', '"fan-out"', '"send an alert"'],
+    },
+    {
+      name: 'SNS → four SQS queues',
+      tagline: 'Everyone gets a copy, and every copy waits safely until its owner is ready.',
+      when: [
+        'Several consumers <strong>and</strong> the work must survive one of them being down',
+        'Each consumer retries and scales at its own pace',
+        'Failures land in a <strong>dead-letter queue</strong> rather than vanishing',
+      ],
+      giveaway: ['"each system must receive"', '"must not be lost"', '"process independently"'],
+    },
+  ]}
+  rule="<strong>SNS decides who hears about it. SQS decides that nobody loses their copy.</strong> Needing both properties at once is what makes this the single most examined event pattern on AWS."
+/>
+
+**Why not have S3 call the four Lambdas directly?** S3 can trigger Lambda, and for *one*
+consumer that is the right, simplest answer. It stops being right at the point where a second
+consumer appears: you would be reconfiguring the bucket every time the business grows a new
+interest in uploads, and the bucket would slowly accumulate knowledge of every system in the
+company.
+
+**EventBridge instead of SNS?** A fair question, and increasingly the modern default. Reach for
+**EventBridge** when routing should depend on the *content* of the event — send MRI scans one
+way and X-rays another — or when events come from other AWS services or third-party SaaS. Reach
+for **SNS** when everybody simply gets everything. Aldgate's four consumers all want every
+upload, so SNS is the simpler correct answer.
+
+<Callout type="exam" title="The giveaway sentence">
+<strong>"Each system must receive a copy of every message"</strong> plus <strong>"no message may
+be lost if a system is unavailable"</strong> is the exam describing SNS fanning out to SQS. If
+only the first half is present, plain SNS is enough. If neither, a single SQS queue.
+</Callout>
+
+## Roughly what it costs
+
+This is the cheapest architecture in this section by a distance, because everything is priced
+per message and there is nothing to keep running.
+
+| Line | Rough monthly cost |
+| --- | --- |
+| S3 event notifications | free |
+| SNS — first million publishes | free tier, then cents per million |
+| SQS — first million requests | free tier, then cents per million |
+| Lambda — first million invocations | free, then about $0.20 per million |
+| **Typical total at modest volume** | **pennies** |
+
+<SourceRepo
+  repo="cdk-patterns/serverless"
+  url="https://github.com/cdk-patterns/serverless"
+  licence="MIT"
+  stars="~2,400"
+  effort="an hour"
+  blurb="Look for 'the-big-fan' — SNS fanning out to SQS queues with filtering, deployable as a CDK stack with a written explanation of every decision. The sibling patterns cover the variations: S3 triggers, dead-letter queues, and EventBridge routing."
+/>
+
+<Takeaways
+  items={[
+    '<strong>S3 event notifications</strong> mean nothing has to poll a bucket asking what is new.',
+    '<strong>SNS fanning out to SQS queues</strong> is the standard pattern when several systems each need every message <em>and</em> none may lose it.',
+    '<strong>SQS alone divides</strong> messages between consumers. <strong>SNS alone</strong> delivers to all but does not hold anything for a consumer that is down.',
+    'A failed worker does not lose the job — the <strong>visibility timeout</strong> makes the message visible again, and a <strong>dead-letter queue</strong> catches repeat failures.',
+    '<strong>EventBridge</strong> when routing depends on event content or the source is another AWS service or SaaS. <strong>SNS</strong> when everyone gets everything.',
+    'The architectural win is that <strong>adding a fifth consumer changes no existing code</strong>.',
+  ]}
+/>
+
+---
+
+The property worth taking from this one is not cost or even resilience. It is that **nothing in
+this diagram knows about anything else.**
+
+S3 does not know four systems care about uploads. The thumbnail worker has never heard of the
+notifier. When somebody asks next year for uploads to also trigger an audit log, that is a new
+queue and a new function, and not one existing component is touched, retested or redeployed.
+
+That property has a name the exam uses constantly — **decoupling** — and this is what it buys.

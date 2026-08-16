@@ -1,0 +1,112 @@
+---
+/**
+ * "Go and build it" — a link out to the public repository an architecture is
+ * drawn from, with its licence stated.
+ *
+ * The diagrams on this site are drawn from scratch rather than copied, so this
+ * block is where credit goes. Always name the licence: these are other people's
+ * repositories and readers deserve to know the terms before they fork one.
+ */
+interface Props {
+  /** owner/name, as it appears on GitHub. */
+  repo: string;
+  url: string;
+  /** SPDX identifier, e.g. Apache-2.0, MIT, MIT-0. */
+  licence: string;
+  /** Approximate star count, for a sense of how well-trodden it is. */
+  stars?: string;
+  /** What the reader will find, and what shape the work is. */
+  blurb: string;
+  /** Roughly how long a first pass takes. */
+  effort?: string;
+}
+
+const { repo, url, licence, stars, blurb, effort } = Astro.props;
+---
+
+<aside class="sr">
+  <p class="sr__eyebrow">Go and build it</p>
+  <p class="sr__repo">
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+      ></path>
+    </svg>
+    <a href={url} rel="noopener">{repo}</a>
+  </p>
+  <p class="sr__blurb">{blurb}</p>
+  <p class="sr__meta">
+    <span class="sr__tag">{licence}</span>
+    {stars && <span class="sr__tag sr__tag--quiet">{stars} stars</span>}
+    {effort && <span class="sr__tag sr__tag--quiet">{effort}</span>}
+  </p>
+</aside>
+
+<style>
+  .sr {
+    margin: var(--sp-5) 0;
+    padding: var(--sp-4);
+    border: 1px solid color-mix(in srgb, var(--aws-squid) 30%, var(--border));
+    border-left: 4px solid var(--aws-squid);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--aws-squid) 5%, var(--bg-raised));
+  }
+  :global([data-theme='dark']) .sr,
+  :global(:root:not([data-theme='light'])) .sr {
+    border-left-color: var(--aws-orange);
+  }
+
+  .sr__eyebrow {
+    margin: 0 0 var(--sp-2);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .sr__repo {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    font-size: var(--step-0);
+    font-weight: 650;
+  }
+  .sr__repo svg {
+    flex: none;
+    width: 17px;
+    height: 17px;
+    fill: currentColor;
+    color: var(--text-muted);
+  }
+  .sr__repo a {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    word-break: break-word;
+  }
+  .sr__blurb {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .sr__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin: var(--sp-3) 0 0;
+  }
+  .sr__tag {
+    padding: 0.1rem 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--aws-green) 35%, var(--border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--aws-green) 10%, var(--bg));
+    color: var(--aws-green);
+    font-size: 0.7rem;
+    font-weight: 650;
+  }
+  .sr__tag--quiet {
+    border-color: var(--border);
+    background: var(--bg-sunken);
+    color: var(--text-muted);
+  }
+</style>

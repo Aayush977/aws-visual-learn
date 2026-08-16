@@ -1,0 +1,198 @@
+---
+title: 'Project 2 — An API That Costs Nothing At 3am'
+summary: API Gateway, Lambda and DynamoDB behind a single endpoint. The default shape of a modern AWS application, why each piece replaced something older, and where this architecture stops being the right answer.
+exams: [CCP, SAA]
+track: projects
+order: 20
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+minutes: 10
+hook: Three services, no servers, and a bill that goes to zero when nobody is using it. This is the shape most new things on AWS are built in — and the shape most exam scenarios are quietly describing.
+updated: 2026-08-16
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import Callout from '../../components/Callout.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The problem
+
+Meridian — the four-person analytics company from the IAM lesson — sell a dashboard. Their
+customers' browsers need to ask questions like *"give me last month's figures for account
+4471"* and get an answer back.
+
+The load is not large and it is extremely uneven. Weekday mornings are busy. Nights and weekends
+are dead. Once a quarter, on results day, it is twenty times normal for about an hour.
+
+With four engineers, the constraint is not really traffic. It is that **nobody has time to look
+after servers.** Anything requiring a patching schedule or a capacity review will simply not get
+done, and will quietly become a security problem.
+
+<Diagram
+  title="One API request, from browser to table and back"
+  viewBox="0 40 1020 420"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'A request hits the endpoint',
+      body: 'The browser calls <code>GET /accounts/4471/figures</code>. <strong>API Gateway</strong> is the front door: one HTTPS endpoint, with routes mapped to what should handle them.',
+      flow: 'w1',
+    },
+    {
+      title: 'The door checks the caller first',
+      body: 'Before any of your code runs, API Gateway handles <strong>authentication</strong> (a Cognito token or a Lambda authoriser), <strong>throttling</strong> so one customer cannot swamp the rest, and request validation. Work you did not write and do not maintain.',
+      flow: 'w2',
+    },
+    {
+      title: 'Lambda runs your function',
+      body: 'A <strong>Lambda function</strong> starts, runs your code, and stops. You are billed for the milliseconds it ran. If a hundred requests arrive together, AWS runs a hundred copies — <strong>you configured nothing to make that happen</strong>.',
+      flow: 'w3',
+    },
+    {
+      title: 'It reads DynamoDB through a role',
+      body: 'The function assumes an <strong>execution role</strong> granting it exactly one table and nothing else. No credentials exist anywhere in the code. <strong>DynamoDB</strong> answers a key lookup in single-digit milliseconds at any table size.',
+      flow: ['w4', 'w5'],
+      duration: 1300,
+    },
+    {
+      title: 'And it is all written down',
+      body: 'Every invocation logs to <strong>CloudWatch Logs</strong> with duration, memory used and any error. When something breaks at 3am, this is where you find out what — and it was on by default.',
+      flow: 'w6',
+    },
+  ]}
+  caption="At 3am none of this is running, and none of it is billed. There is no idle cost because there is nothing sitting idle."
+>
+  <Node x={95} y={230} w={140} h={80} label="Browser" sub="customer" icon="user" tone="muted" step={1} />
+  <Node x={320} y={230} w={170} h={90} label="API Gateway" sub="routes · auth · throttling" icon="router" tone="purple" step={1} />
+  <Node x={320} y={105} w={200} h={62} label="Cognito / authoriser" sub="who is calling?" icon="key" tone="orange" step={2} />
+  <Node x={580} y={230} w={160} h={90} label="Lambda" sub="your code, briefly" icon="lambda" tone="teal" step={3} />
+  <Node x={840} y={230} w={160} h={90} label="DynamoDB" sub="key lookup, any size" icon="database" tone="blue" step={4} />
+  <Node x={580} y={400} w={200} h={66} label="CloudWatch Logs" sub="on by default" icon="eye" tone="muted" step={5} />
+
+  <Wire id="w1" from={[165, 230]} to={[235, 230]} tone="muted" step={1} />
+  <Wire id="w2" from={[320, 185]} to={[320, 136]} tone="orange" step={2} />
+  <Wire id="w3" from={[405, 230]} to={[500, 230]} tone="purple" step={3} />
+  <Wire id="w4" from={[660, 215]} to={[760, 215]} tone="teal" step={4} label="query" labelDy={-12} />
+  <Wire id="w5" from={[760, 250]} to={[660, 250]} tone="blue" step={4} label="items" labelDy={16} />
+  <Wire id="w6" from={[580, 275]} to={[580, 367]} tone="muted" step={5} dashed />
+</Diagram>
+
+## Why each piece, and not the obvious alternative
+
+<Confusable
+  title="Lambda vs EC2 vs Fargate"
+  ask="Your code has to run somewhere. All three of these will run it, and the deciding factors are duration and idleness."
+  options={[
+    {
+      name: 'AWS Lambda',
+      tagline: 'Code that runs on an event and stops. Billed per millisecond, nothing when idle.',
+      when: [
+        'Each run finishes <strong>within 15 minutes</strong>',
+        'Load is <strong>spiky or occasional</strong> — the quiet hours cost nothing',
+        'You want zero patching and scaling you never configured',
+      ],
+      giveaway: ['"without managing servers"', '"event-driven"', '"only pay when running"'],
+    },
+    {
+      name: 'AWS Fargate',
+      tagline: 'A container that runs as long as it likes, without you managing the cluster.',
+      when: [
+        'The job <strong>exceeds 15 minutes</strong>, or needs more memory than Lambda allows',
+        'You already have a container image and want it unchanged',
+        'Long-running work that is still not worth owning servers for',
+      ],
+      giveaway: ['"containers"', '"no cluster management"', '"long-running"'],
+    },
+    {
+      name: 'Amazon EC2',
+      tagline: 'A whole machine, running whether or not anyone is using it.',
+      when: [
+        'You need <strong>control of the operating system</strong> or specific kernel modules',
+        'Load is steady around the clock, where a commitment discount wins',
+        'Licensing is tied to the physical host',
+      ],
+      giveaway: ['"full control"', '"install specific software"', '"steady-state"'],
+    },
+  ]}
+  rule="<strong>How long does one run take, and what happens when nobody is using it?</strong> Under 15 minutes and idle a lot → Lambda. Longer but still idle → Fargate. Never idle, or you need the OS → EC2."
+/>
+
+**API Gateway** is doing more than routing, and this is the bit that is easy to undervalue.
+Authentication, throttling, request validation, CORS and API keys are all *there* — features
+every API needs, that every team otherwise writes badly. Without it, that work lands inside your
+Lambda function, where you own it forever.
+
+**DynamoDB** rather than a relational database, for one specific reason: the query is always
+*"give me this account's figures"* — a lookup by key. A key-value store answers that in
+single-digit milliseconds whether the table holds a thousand rows or a billion, and it needs no
+instance, no patching and no capacity planning. Ask a *different* shape of question — joins,
+ad-hoc reporting, "all customers who did X and Y" — and this becomes the wrong choice fast.
+
+<Callout type="exam" title="The phrase that names this architecture">
+When a scenario says <strong>"without managing any servers"</strong> or <strong>"minimal
+operational overhead"</strong> alongside <strong>"variable"</strong> or
+<strong>"unpredictable"</strong> traffic, it is describing this stack. The answer is almost
+always <strong>API Gateway + Lambda + DynamoDB</strong>, and the distractors are usually the
+same architecture on EC2.
+</Callout>
+
+## Where this stops being the right answer
+
+Every architecture has an edge, and pretending otherwise is how people get burned.
+
+- **Cold starts.** A function that has not run recently takes extra time to start — usually tens
+  to hundreds of milliseconds. Irrelevant for a dashboard, potentially unacceptable for a
+  latency-critical trading path.
+- **The 15-minute ceiling.** Lambda stops at 15 minutes. Video encoding, large batch jobs and
+  long migrations do not fit and belong on Fargate or EC2.
+- **Steady, heavy load.** Per-millisecond billing is superb when you are idle most of the time.
+  A function running flat out 24 hours a day can cost more than an equivalent instance — and at
+  that point the idleness argument, which is the whole case for Lambda, no longer applies.
+- **The wrong query shape.** DynamoDB punishes access patterns you did not design for. If you
+  cannot say in advance how the data will be queried, a relational database is more forgiving.
+
+## Roughly what it costs
+
+Rough figures for a small API, and hedge them with the Pricing Calculator before trusting them.
+
+| Line | Rough monthly cost |
+| --- | --- |
+| Lambda — first 1M requests/month | free, always, then about $0.20 per million |
+| API Gateway (HTTP API) — per million requests | roughly $1 |
+| DynamoDB on-demand — modest read/write volume | a few pounds |
+| CloudWatch Logs — modest retention | pennies to a pound |
+| **Typical total for a small API** | **often under £5** |
+
+<SourceRepo
+  repo="cdk-patterns/serverless"
+  url="https://github.com/cdk-patterns/serverless"
+  licence="MIT"
+  stars="~2,400"
+  effort="an hour per pattern"
+  blurb="A collection of serverless patterns as deployable CDK stacks, each with a diagram and a written explanation. Start with 'the-simple-webservice' — it is precisely this architecture — then work outwards to the event-driven ones you will meet in Project 4."
+/>
+
+<Takeaways
+  items={[
+    'The default modern shape is <strong>API Gateway → Lambda → DynamoDB</strong>, and the exam signals it with "without managing servers" plus "variable traffic".',
+    'Choose compute on <strong>duration and idleness</strong>: under 15 minutes and often idle → Lambda · longer but idle → Fargate · never idle or needs the OS → EC2.',
+    '<strong>API Gateway</strong> supplies auth, throttling and validation. Skip it and that code lives in your function forever.',
+    '<strong>Lambda gets an execution role</strong>, so no credentials exist in the code — the same rule as EC2 instance roles.',
+    'DynamoDB is unbeatable for <strong>lookups by key</strong> and unforgiving for query shapes you did not plan.',
+    'The limits are real: <strong>cold starts, a 15-minute ceiling, and steady heavy load</strong> where per-millisecond billing stops being a bargain.',
+  ]}
+/>
+
+---
+
+Notice how much of this architecture is *absence*. No instances, no Auto Scaling group, no load
+balancer, no patch schedule, no capacity decision, and nothing running at three in the morning.
+
+For a team of four that is not a cost saving so much as a **staffing** one. The work that
+usually consumes a small team's attention — keeping the lights on — has largely been bought
+rather than done, and the exam's phrase for buying it is *reducing operational overhead*.

@@ -1,0 +1,217 @@
+---
+title: 'Project 3 — The Three-Tier Web Application'
+summary: Load balancer, Auto Scaling group and a Multi-AZ database across two Availability Zones, in public and private subnets. The architecture behind more exam questions than any other, and the one most real migrations land on.
+exams: [CCP, SAA]
+track: projects
+order: 30
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 2 — Design Resilient Architectures'
+minutes: 12
+hook: If you can draw this from memory — which tier sits in which subnet, and what talks to what — a large fraction of Solutions Architect scenario questions answer themselves.
+updated: 2026-08-16
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import Callout from '../../components/Callout.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The problem
+
+Brightwell's claims system is a normal enterprise web application: a Java front end, business
+logic behind it, an Oracle-shaped relational database underneath. It ran on three physical
+servers in the data centre they were closing, and it cannot be rewritten — it is twelve years
+old, it works, and the people who wrote it have gone.
+
+This is the ordinary case, and worth saying plainly: **most real migrations are not serverless
+rewrites.** They are applications like this one, moved as they are, onto an architecture that
+gives them the resilience the data centre never did.
+
+The requirements are unremarkable and completely typical. Survive losing a server. Survive
+losing a whole Availability Zone. Do not let anything holding claim data be reachable from the
+internet. Handle Monday morning, which is three times Wednesday afternoon.
+
+<Diagram
+  title="Three tiers, two Availability Zones, one VPC"
+  viewBox="0 30 1020 620"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Everything lives inside one VPC',
+      body: 'A <strong>VPC</strong> is your private network in one Region. Nothing inside it can reach the internet, or be reached, until you deliberately allow it. Every box below sits inside this fence.',
+    },
+    {
+      title: 'The load balancer takes the traffic',
+      body: 'An <strong>Application Load Balancer</strong> sits in the <strong>public subnets</strong> — the only tier with a route to the internet gateway. It health-checks every target and quietly stops sending traffic to anything that fails.',
+      flow: ['w-in', 'w-alb-a', 'w-alb-b'],
+      duration: 1400,
+    },
+    {
+      title: 'The application tier is private',
+      body: 'The instances sit in <strong>private subnets</strong>, spread across <strong>two Availability Zones</strong>, inside an <strong>Auto Scaling group</strong>. They have no public IP addresses. Nothing on the internet can reach them directly — only the load balancer can.',
+      duration: 1300,
+    },
+    {
+      title: 'The database is private and doubled',
+      body: '<strong>RDS Multi-AZ</strong>: a primary in one zone, a synchronous standby in the other. If the primary fails, AWS fails over automatically — usually in a minute or two, without anyone being paged. The standby serves <em>no</em> traffic; it exists only to take over.',
+      flow: ['w-a-db', 'w-b-db', 'w-db-sync'],
+      duration: 1400,
+    },
+    {
+      title: 'Outbound-only, through NAT',
+      body: 'The app tier still needs to fetch patches and call external APIs. A <strong>NAT gateway</strong> in each public subnet lets private instances start connections <em>out</em> while nothing can start one <em>in</em>. One per zone, or you have rebuilt a single point of failure.',
+      flow: ['w-nat-a', 'w-nat-b'],
+      duration: 1300,
+    },
+  ]}
+  caption="Losing an instance is invisible. Losing an entire Availability Zone costs half the capacity and a short database failover — and nobody is paged for either."
+>
+  <Boundary x={520} y={60} w={960} h={560} label="VPC — one Region" icon="cloud" tone="navy" step={1} />
+
+  <Node x={90} y={330} w={120} h={70} label="Users" icon="users" tone="muted" step={2} />
+
+  <Boundary x={330} y={110} w={330} h={110} label="Public subnets" icon="globe" tone="orange" step={2} />
+  <Node x={330} y={165} w={220} h={62} label="Application Load Balancer" sub="health checks" icon="balancer" tone="orange" step={2} />
+
+  <Boundary x={790} y={110} w={330} h={110} label="Public subnets · NAT" icon="router" tone="orange" step={5} />
+  <Node x={720} y={165} w={130} h={58} label="NAT · AZ-A" icon="router" tone="orange" step={5} />
+  <Node x={880} y={165} w={130} h={58} label="NAT · AZ-B" icon="router" tone="orange" step={5} />
+
+  <Boundary x={560} y={290} w={800} h={140} label="Private subnets — application tier · Auto Scaling group" icon="server" tone="teal" step={3} />
+  <Node x={330} y={350} w={190} h={72} label="App · AZ-A" sub="no public IP" icon="server" tone="teal" step={3} />
+  <Node x={780} y={350} w={190} h={72} label="App · AZ-B" sub="no public IP" icon="server" tone="teal" step={3} />
+
+  <Boundary x={560} y={480} w={800} h={130} label="Private subnets — data tier" icon="database" tone="blue" step={4} />
+  <Node x={330} y={540} w={200} h={72} label="RDS primary" sub="AZ-A" icon="database" tone="blue" step={4} />
+  <Node x={780} y={540} w={200} h={72} label="RDS standby" sub="AZ-B · no traffic" icon="database" tone="muted" step={4} />
+
+  <Wire id="w-in" from={[150, 330]} to={[210, 200]} shape="elbow-h" mid={180} tone="muted" step={2} />
+  <Wire id="w-alb-a" from={[300, 196]} to={[300, 314]} tone="orange" step={2} />
+  <Wire id="w-alb-b" from={[380, 196]} to={[760, 314]} shape="elbow-v" tone="orange" step={2} />
+
+  <Wire id="w-a-db" from={[330, 386]} to={[330, 504]} tone="teal" step={4} />
+  <Wire id="w-b-db" from={[780, 386]} to={[780, 504]} tone="teal" step={4} dashed label="on failover" labelDx={62} />
+  <Wire id="w-db-sync" from={[430, 540]} to={[680, 540]} tone="blue" step={4} label="synchronous replication" labelDy={-12} />
+
+  <Wire id="w-nat-a" from={[380, 314]} to={[690, 196]} shape="elbow-v" tone="muted" step={5} dashed />
+  <Wire id="w-nat-b" from={[830, 314]} to={[870, 196]} tone="muted" step={5} dashed />
+</Diagram>
+
+## Why each piece, and not the obvious alternative
+
+The single most examined confusion in this whole architecture:
+
+<Confusable
+  title="Multi-AZ vs read replica"
+  ask="You have two database instances. What are they for? Getting this wrong is the most common mistake on the entire exam."
+  options={[
+    {
+      name: 'Multi-AZ standby',
+      tagline: 'A synchronous copy in another zone that takes over automatically when the primary dies.',
+      when: [
+        'The requirement is <strong>availability</strong> or surviving a zone failure',
+        'You want failover without anybody being woken up',
+        'It serves <strong>no traffic whatsoever</strong> — it is insurance, not capacity',
+      ],
+      giveaway: ['"high availability"', '"automatic failover"', '"minimise downtime"'],
+    },
+    {
+      name: 'Read replica',
+      tagline: 'An asynchronous copy that answers read queries, taking load off the primary.',
+      when: [
+        'The requirement is <strong>performance</strong> — reads are swamping the database',
+        'Reporting queries are hurting live transactions',
+        'It can be promoted manually, but that is not its job',
+      ],
+      giveaway: ['"read-heavy"', '"improve performance"', '"offload reporting"'],
+    },
+  ]}
+  rule="<strong>Multi-AZ does not make anything faster. A read replica does not make anything more available.</strong> If a question asks for both, the answer uses both."
+/>
+
+**Public and private subnets** are the security spine of this design, and the distinction is
+simpler than it looks: a subnet is public because **its route table sends `0.0.0.0/0` to an
+internet gateway**. Nothing else makes it public — not its name, not its diagram colour. Only
+the load balancer and the NAT gateways live in those. Everything holding claim data sits in
+subnets with no such route, so there is no path from the internet to it at all.
+
+**Security groups referencing each other** is the detail that separates people who have built
+this from people who have read about it. The database's security group does not allow a range
+of IP addresses — it allows **port 5432 from the application tier's security group**. Instances
+come and go with scaling, their addresses change constantly, and the rule keeps working because
+it names an identity rather than an address.
+
+**One NAT gateway per Availability Zone.** Put a single NAT in one zone and you have built a
+cross-zone dependency into an architecture whose entire purpose is surviving the loss of a zone
+— plus you now pay to move traffic across zones. This is a favourite exam detail.
+
+<Callout type="cost" title="The NAT gateway is the surprise on this bill">
+Newcomers expect the instances or the database to dominate the cost. Frequently it is the
+<strong>NAT gateways</strong>: charged per hour <em>and</em> per gigabyte processed, and there
+are two of them for resilience.
+
+The standard fix is a <strong>gateway VPC endpoint</strong> for S3 and DynamoDB. It costs
+nothing, and it keeps that traffic off the NAT entirely — removing both the processing charge
+and an internet round trip. If a question mentions reducing NAT costs, this is the answer.
+</Callout>
+
+## Roughly what it costs
+
+This architecture has a **floor** — unlike the first two projects, it costs money at 3am
+because things are running at 3am.
+
+| Line | Rough monthly cost |
+| --- | --- |
+| Application Load Balancer | roughly $16–25 plus capacity units |
+| 2 × NAT gateway | roughly $32 each, plus per-GB processing |
+| EC2 instances (2 small, always on) | tens of pounds, less with a Savings Plan |
+| RDS Multi-AZ (small instance) | roughly double single-AZ |
+| **Floor before any traffic** | **well over £100/month** |
+
+That floor is the honest trade for resilience, and it is why the serverless patterns are so
+attractive for new work. It is also why **right-sizing** and **Savings Plans** matter here and
+barely register in Projects 1 and 2.
+
+<SourceRepo
+  repo="aws-samples/aws-three-tier-web-architecture-workshop"
+  url="https://github.com/aws-samples/aws-three-tier-web-architecture-workshop"
+  licence="MIT-0"
+  stars="~130"
+  effort="half a day"
+  blurb="AWS's own workshop building exactly this by hand — VPC, subnets, route tables, security groups, ALB, Auto Scaling group and RDS. Doing it manually once is genuinely worth it: the console makes you confront every decision the diagram above glosses over. Follow its teardown steps at the end, because this one costs real money to leave running."
+/>
+
+<Callout type="gotcha" title="This one is not free-tier friendly">
+Unlike the earlier projects, an ALB, two NAT gateways and a Multi-AZ database will spend real
+money within days. If you build it, build it in one sitting and <strong>tear it down the same
+day</strong> — and set the budget alarm from the <em>First 30 Minutes</em> lesson first.
+</Callout>
+
+<Takeaways
+  items={[
+    'The shape: <strong>ALB in public subnets · app tier in private subnets across two AZs · database private and Multi-AZ.</strong>',
+    'A subnet is public only because its <strong>route table</strong> points at an internet gateway.',
+    'Security groups should <strong>reference other security groups</strong>, not IP ranges — instances change addresses constantly.',
+    '<strong>Multi-AZ is availability; a read replica is performance.</strong> The standby serves no traffic.',
+    '<strong>One NAT gateway per Availability Zone</strong>, or you have rebuilt the single point of failure you were removing.',
+    'Use a free <strong>gateway VPC endpoint</strong> for S3 and DynamoDB to keep that traffic off the NAT.',
+    'This architecture has a real <strong>cost floor</strong> — it runs, and bills, whether or not anyone visits.',
+  ]}
+/>
+
+---
+
+This is the architecture the exam loves most, because almost every interesting requirement can
+be expressed as a change to one box in it. *Users in Asia are slow* — put CloudFront in front.
+*Reads are swamping the database* — add a read replica. *The batch job blocks the website* — put
+an SQS queue and a worker tier beside it. *Costs too much at night* — schedule the Auto Scaling
+group down.
+
+Learn the diagram once and you are not memorising a hundred scenarios. You are looking at one
+picture and deciding which box the question is pointing at.

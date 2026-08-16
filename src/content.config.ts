@@ -16,6 +16,7 @@ export const TRACKS = [
   'services',
   'architecture',
   'billing',
+  'projects',
   'reference',
 ] as const;
 
@@ -60,6 +61,11 @@ export const TRACK_META: Record<
   billing: {
     label: 'Billing & Support',
     blurb: 'Pricing models, cost tools, and which support plan answers the phone.',
+  },
+  projects: {
+    label: 'Real-World Architectures',
+    blurb:
+      'Six architectures you will actually meet, each drawn out end to end: the problem it solves, why every service was chosen over the obvious alternative, roughly what it costs, and a public repository where you can go and build it.',
   },
   reference: {
     label: 'Quick Reference',

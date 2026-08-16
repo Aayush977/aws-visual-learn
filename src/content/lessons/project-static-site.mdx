@@ -1,0 +1,192 @@
+---
+title: 'Project 1 — A Website With No Server At All'
+summary: S3, CloudFront and Route 53 serving a site to the whole world for a few pounds a month. The architecture almost everyone builds first, and the one that best shows what "serverless" actually buys you.
+exams: [CCP, SAA]
+track: projects
+order: 10
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+minutes: 9
+hook: There is no server in this architecture. Nothing to patch, nothing to scale, nothing to fall over on the Tuesday you end up on television — and it costs about the price of a coffee.
+updated: 2026-08-16
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import Callout from '../../components/Callout.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The problem
+
+Kettle & Fox — the Yorkshire homeware shop whose website went down on live television back in
+the first lesson — need somewhere to put their brochure site. Product photography, an about
+page, opening hours, a stockist map.
+
+It is *read* by everybody and *written* by two people about once a month. There is no login, no
+basket, no database. And on the one Tuesday a year when a television presenter mentions them,
+twenty thousand people arrive in nine minutes.
+
+Almost everybody's instinct is a web server. A small EC2 instance, nginx, the files on disk.
+That works, and it drags in a surprising amount of luggage: an operating system to patch, a
+disk that can fill, an instance that can fail, an Availability Zone that can fail, and a
+capacity decision you have to make in advance and get wrong.
+
+Here is the same site with none of that.
+
+<Diagram
+  title="A static site, from the address bar to the object"
+  viewBox="0 40 1000 400"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'Somebody types the domain',
+      body: 'The browser asks DNS where <code>kettleandfox.co.uk</code> lives. <strong>Route 53</strong> is the DNS service — an <strong>alias record</strong> points the domain at the CloudFront distribution, which is how a bare domain can point at an AWS service at all.',
+      flow: 'w1',
+    },
+    {
+      title: 'The nearest edge location answers',
+      body: '<strong>CloudFront</strong> has hundreds of edge locations. The request goes to whichever is closest — Manchester, Sydney, São Paulo — not to wherever the files actually live.',
+      flow: 'w2',
+    },
+    {
+      title: 'A cache hit never travels further',
+      body: 'If that edge already holds the page, it answers immediately and <strong>the story ends here</strong>. On a busy day the overwhelming majority of requests stop at this box, which is what absorbs the television spike.',
+      flow: 'w3',
+      duration: 1300,
+    },
+    {
+      title: 'A miss fetches once from the origin',
+      body: 'On a cache miss CloudFront fetches from the <strong>S3 bucket</strong> over a private path, then keeps a copy at that edge for everybody behind them. The bucket itself stays closed to the public.',
+      flow: ['w4', 'w5'],
+      duration: 1300,
+    },
+    {
+      title: 'HTTPS, free, and renewing itself',
+      body: '<strong>AWS Certificate Manager</strong> issues the TLS certificate at no charge and renews it automatically. Nobody gets paged at midnight because a certificate expired — historically one of the great causes of self-inflicted outages.',
+      flow: 'w6',
+    },
+  ]}
+  caption="Not one component here is a server you own. There is nothing to patch, nothing to size, and nothing that falls over when twenty thousand people arrive at once."
+>
+  <Node x={90} y={230} w={130} h={80} label="Visitor" sub="anywhere" icon="user" tone="muted" step={1} />
+  <Node x={300} y={230} w={150} h={80} label="Route 53" sub="DNS · alias record" icon="dns" tone="purple" step={1} />
+  <Node x={530} y={230} w={160} h={86} label="CloudFront" sub="edge location" icon="cdn" tone="blue" step={2} />
+  <Node x={530} y={110} w={190} h={66} label="Cache hit" sub="most requests end here" icon="allow" tone="green" step={3} />
+  <Node x={800} y={230} w={160} h={86} label="S3 bucket" sub="your files · private" icon="bucket" tone="green" step={4} />
+  <Node x={800} y={380} w={180} h={70} label="ACM certificate" sub="free · auto-renewing" icon="lock" tone="teal" step={5} />
+
+  <Wire id="w1" from={[155, 230]} to={[225, 230]} tone="muted" step={1} />
+  <Wire id="w2" from={[375, 230]} to={[450, 230]} tone="purple" step={2} />
+  <Wire id="w3" from={[530, 187]} to={[530, 143]} tone="green" step={3} label="hit" labelDx={26} labelDy={2} />
+  <Wire id="w4" from={[610, 230]} to={[720, 230]} tone="blue" step={4} label="miss" labelDy={-12} />
+  <Wire id="w5" from={[720, 262]} to={[610, 262]} tone="green" step={4} label="object" labelDy={16} />
+  <Wire id="w6" from={[610, 273]} to={[712, 370]} shape="elbow-v" tone="teal" step={5} />
+</Diagram>
+
+## Why each piece, and not the obvious alternative
+
+<Confusable
+  title="S3 static hosting vs an EC2 web server"
+  ask="You have files and you want people to see them. Why is a bucket the answer rather than the web server everybody already knows how to run?"
+  options={[
+    {
+      name: 'S3 + CloudFront',
+      tagline: 'Storage that answers HTTP requests, with copies cached near every user.',
+      when: [
+        'The content is the <strong>same for everybody</strong> — no per-user pages',
+        'Traffic is spiky and you refuse to think about capacity',
+        'You want <strong>nothing to patch</strong> and no operating system in your life',
+        'Durability of <strong>eleven nines</strong> matters more than flexibility',
+      ],
+      giveaway: ['"static website"', '"no servers to manage"', '"unpredictable traffic"'],
+    },
+    {
+      name: 'EC2 running nginx',
+      tagline: 'A real machine you control completely, and are completely responsible for.',
+      when: [
+        'Pages are <strong>generated per request</strong> — a logged-in dashboard',
+        'You need software that must run on a server you control',
+        'Legacy applications that cannot be pulled apart',
+        'Accept in exchange: patching, scaling, and an AZ that can fail',
+      ],
+      giveaway: ['"full control of the OS"', '"server-side processing"', '"install software"'],
+    },
+  ]}
+  rule="If every visitor receives <strong>identical bytes</strong>, you do not need a computer to send them — you need storage that speaks HTTP."
+/>
+
+**Route 53** is here for one specific reason: an ordinary DNS `CNAME` cannot sit at the root of
+a domain, so `kettleandfox.co.uk` (as opposed to `www.`) cannot point at CloudFront that way.
+Route 53's **alias record** is an AWS-specific record type that solves exactly this, at no extra
+query cost. It is a small detail that appears on the exam more often than it deserves to.
+
+**CloudFront** is doing two jobs at once, and beginners usually notice only the first.
+*Latency*: a visitor in Sydney gets the page from Sydney. *Origin protection*: the bucket
+itself never faces the public, requests are absorbed at the edge, and — the part nobody
+mentions — **data transfer out via CloudFront is cheaper than straight from S3**, so the CDN
+partly pays for itself.
+
+<Callout type="gotcha" title="The bucket should not be public here">
+The <em>First 30 Minutes</em> lesson had you make a bucket public on purpose, which is fine for
+learning. In production you do the opposite: the bucket stays private and CloudFront reaches it
+through <strong>Origin Access Control</strong>, an identity CloudFront uses that the bucket
+policy trusts.
+
+Why bother, when the content is public anyway? Because it forces every request through
+CloudFront, where your caching, your logging and your WAF rules live. A public bucket can be hit
+directly, bypassing all three — and running up S3 bandwidth charges you never see coming.
+</Callout>
+
+## Roughly what it costs
+
+Order-of-magnitude figures for a small brochure site, London pricing. Check the
+**Pricing Calculator** for anything you actually intend to build.
+
+| Line | Rough monthly cost |
+| --- | --- |
+| S3 storage — a few GB of images | pennies |
+| CloudFront data transfer — modest traffic | a few pounds |
+| Route 53 hosted zone | about $0.50, fixed |
+| ACM certificate | free |
+| **Typical total** | **a few pounds a month** |
+
+The interesting part is not the total, it is the **shape**. There is no fixed cost for capacity
+sitting idle — the television Tuesday costs a little more than a quiet Tuesday, and a quiet
+Tuesday costs almost nothing. Compare that with the EC2 version, which costs the same every
+single day whether anybody visits or not.
+
+<SourceRepo
+  repo="aws-samples/amazon-cloudfront-secure-static-site"
+  url="https://github.com/aws-samples/amazon-cloudfront-secure-static-site"
+  licence="Apache-2.0"
+  stars="~400"
+  effort="an afternoon"
+  blurb="AWS's own reference implementation of exactly this architecture, as a CloudFormation template: private bucket, Origin Access Control, ACM certificate and security headers already wired together. Deploy it, read the template, then change one thing at a time and watch what breaks."
+/>
+
+<Takeaways
+  items={[
+    'A site where <strong>every visitor gets identical bytes</strong> needs storage that speaks HTTP, not a server.',
+    '<strong>Route 53 alias records</strong> let a bare domain point at CloudFront, which an ordinary CNAME cannot do.',
+    '<strong>CloudFront</strong> cuts latency, shields the origin, <em>and</em> reduces egress cost — a rare case where fast and cheap agree.',
+    'In production the bucket stays <strong>private</strong>, reached through <strong>Origin Access Control</strong>, so nothing can bypass your caching, logging and WAF.',
+    '<strong>ACM</strong> issues and renews TLS certificates free — expired certificates stop being a category of outage.',
+    'The cost <strong>shape</strong> matters more than the total: nothing is charged for capacity you are not using.',
+  ]}
+/>
+
+---
+
+Worth pausing on what is absent here, because it is the whole point.
+
+No operating system. No patching. No instance type chosen months in advance. No Auto Scaling
+group, no load balancer, no health checks — and no Availability Zone that can take the site with
+it, because there is no zone involved at all.
+
+Kettle & Fox's television Tuesday would not have registered as an event. **That is what
+"serverless" actually buys**, and it is why this unglamorous little architecture is the one to
+understand before any of the others.
