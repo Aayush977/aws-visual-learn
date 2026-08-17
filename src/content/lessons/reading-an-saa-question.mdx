@@ -1,0 +1,387 @@
+---
+title: How to Read an SAA Question
+summary: The Solutions Architect exam is not a recall test — it is a constraint-extraction test wearing a costume. Five questions to ask of every scenario, the words that are load-bearing, the words that are decoration, and the qualifier in the last sentence that picks between four answers that all work.
+exams: [SAA]
+track: reference
+order: 40
+minutes: 14
+hook: He scored 58% on the mock and could not name a single service he had not heard of. That was the problem — he was studying the wrong thing entirely.
+updated: 2026-08-18
+---
+
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import DecisionTree from '../../components/DecisionTree.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## 58%, and not one unfamiliar service
+
+Brightwell's platform lead sat his first SAA mock on a Sunday evening and scored 58%. He went
+through the 27 he had got wrong expecting to find a service he had never met.
+
+There wasn't one. He knew what every service in every wrong answer did. He could have written a
+paragraph on each. On question after question he had picked an option that **worked** — it would
+have run, it would have served traffic, it would not have fallen over — and it was still marked
+incorrect, because a different option worked *and* satisfied a sentence he had skimmed past.
+
+One question described a batch job that could be interrupted and restarted. He chose On-Demand
+instances behind an Auto Scaling group. Correct answer: Spot. Another described a company that
+must not change its application code. He chose "refactor the application to run on Lambda".
+
+Here is what he was actually being told, twenty-seven times:
+
+> The Cloud Practitioner exam asks whether you know what a service is. The Solutions Architect
+> exam gives you four services you already know, all of which would work, and asks which one
+> the **constraints in the paragraph** permit. It is a reading test with an AWS vocabulary.
+
+He had spent six weeks studying services. He had spent zero minutes studying scenarios. Those
+are different skills, and only one of them is on the paper.
+
+## What the exam actually is
+
+<Callout type="exam" title="SAA-C03 at a glance">
+<strong>65 questions in 130 minutes.</strong> Only <strong>50 are scored</strong> — the other 15
+are unmarked questions AWS is trialling for future papers, and they are not identified. You are
+scored 100–1,000 and <strong>720 passes</strong>. Multiple choice (one right of four) and
+multiple response (two or more right of five or more). No penalty for a wrong answer, so never
+leave one blank. AWS puts the target candidate at around one year of hands-on design experience.
+</Callout>
+
+Two consequences worth sitting with.
+
+**You can get roughly 14 of the 50 scored questions wrong and still pass.** You do not need to
+answer everything. You need to answer the ones you can read properly, and stop bleeding time on
+the ones you cannot.
+
+**Two minutes per question is not much.** A scenario paragraph runs 60 to 100 words, and the four
+options run another 60. Reading everything twice is not affordable. Reading the *right* sentence
+once is — which is the entire skill this lesson is about.
+
+## The five questions
+
+Every scenario is a business brief with the constraints buried in it. Ask these five, in this
+order, and the architecture is largely chosen before you look at the options.
+
+<Mnemonic
+  title="The five constraints, in the order they decide things"
+  phrase="Lost Data Breaks Live Applications"
+  tone="purple"
+  items={[
+    { key: 'L', term: 'Lost — what can you not afford to lose?', note: 'This is RPO. Zero means synchronous replication: Multi-AZ RDS, Aurora. Five minutes means async or read replicas. A day means snapshots, and you just saved the client a fortune' },
+    { key: 'D', term: 'Down — how long can it be unavailable?', note: 'This is RTO, and it picks your recovery strategy: hours → backup & restore · tens of minutes → pilot light · minutes → warm standby · near zero → active/active' },
+    { key: 'B', term: 'Boundary — what must it survive?', note: 'An instance, an Availability Zone, a Region, or a human with the wrong credentials. "Highly available" means Multi-AZ. "Regional outage" or "data residency" means Multi-Region. "Blast radius" means separate accounts' },
+    { key: 'L', term: 'Load — what shape is the traffic?', note: 'Steady → Savings Plan. Spiky but scheduled → scheduled scaling. Spiky and unpredictable → target tracking or serverless. Interruptible → Spot' },
+    { key: 'A', term: 'Allowed — who may do what, and how is it proved?', note: 'Roles not access keys. Least privilege. Encrypted at rest and in transit. This is 30% of the paper — the single largest domain' },
+  ]}
+/>
+
+Notice what these five have in common: **every one of them is a number or a boundary the
+business states, not a preference you hold.** That is why the method works. The exam writer put
+those facts in the paragraph deliberately, because they are what makes exactly one option
+correct. Nothing else in the paragraph is doing any work.
+
+## Load-bearing words and decoration
+
+Most of a scenario is set dressing. Learning to see through it is worth more marks than any
+individual service.
+
+| Decoration — ignore it | Load-bearing — circle it |
+| --- | --- |
+| The industry, the country, the company size | "must not lose more than *n* minutes of data" |
+| "A solutions architect is designing…" | "must recover within *n* minutes" |
+| "The application runs on Amazon EC2 instances" | "traffic increases 10× **every Friday at 18:00**" |
+| "The team is small" *(usually — see below)* | "the job can be **interrupted and resumed**" |
+| The name of the internal system | "**without modifying the application**" |
+| "The company is growing rapidly" | "data must **remain in** the EU" |
+| | "must be **unreachable from the internet**" |
+| | "accessed **once or twice a year**" |
+| | "retrieval within **12 hours** is acceptable" |
+
+Two of these deserve unpacking, because they are where marks go missing.
+
+**"Without modifying the application"** is the single most under-read phrase on the exam. It
+eliminates every answer containing the words *rewrite*, *refactor*, *re-architect*, or
+*migrate to a different database engine* — no matter how much better that answer would be. If a
+question says the application uses a POSIX file system and cannot be changed, the answer is EFS
+or FSx, and "store the files in S3" is wrong even though S3 is cheaper and you would obviously
+use S3 in real life.
+
+**"The team is small"** or "the company has no operations staff" flips from decoration to
+load-bearing the moment it appears, because it is the exam telling you to prefer the managed
+service. It is the setup for the tie-breaker in the final sentence.
+
+## The last sentence picks the winner
+
+Here is the structural fact that changes how you sit the paper: **on a well-written SAA question,
+all four options are usually technically functional.** They will all run. The wrong ones violate
+a stated constraint, and when none of them does, the qualifier in the final sentence separates
+them.
+
+Find that qualifier before you read a single option.
+
+<DecisionTree
+  title="What is the last sentence asking you to optimise?"
+  intro="Read the final sentence of the scenario first — before the options. It tells you which axis the four answers differ on, and that is nearly always the whole question."
+  tree={{
+    q: 'Which qualifier appears in the final sentence?',
+    hint: 'It is almost always capitalised: MOST, LEAST, BEST.',
+    options: [
+      {
+        label: 'LEAST operational overhead',
+        note: 'also "least management effort", "minimal ongoing maintenance"',
+        next: {
+          result: 'Take the most managed option that still meets the constraints',
+          detail:
+            'Serverless over containers, containers over EC2, managed database over self-hosted, Fargate over EC2 launch type, NAT gateway over NAT instance. Any answer containing "install", "patch", "configure a cron job" or "maintain a fleet" is being offered to you as the wrong one.',
+          tone: 'good',
+        },
+      },
+      {
+        label: 'MOST cost-effective',
+        note: 'also "minimise cost", "lowest cost"',
+        next: {
+          q: 'And what shape is the load?',
+          hint: 'Cost-effective never means "the cheapest option on the page" — it means the cheapest one that still satisfies every constraint already stated.',
+          options: [
+            {
+              label: 'Steady, predictable, running all year',
+              next: {
+                result: 'Commit: Savings Plans or Reserved Instances',
+                detail:
+                  'Up to roughly 72% off against On-Demand for a one- or three-year commitment. Compute Savings Plans stay flexible across instance family, size and Region; EC2 Instance Savings Plans discount harder but lock you to a family in a Region.',
+                tone: 'good',
+              },
+            },
+            {
+              label: 'Interruptible — batch, rendering, CI, queue workers',
+              next: {
+                result: 'Spot Instances',
+                detail:
+                  'Up to about 90% off, because you have told AWS it may reclaim the capacity with two minutes\' notice. The words "can be interrupted", "fault-tolerant", "stateless batch" or "can be resumed" exist in the question purely to license this answer.',
+                tone: 'good',
+              },
+            },
+            {
+              label: 'Spiky, unpredictable, or idle much of the day',
+              next: {
+                result: 'Serverless — Lambda, Fargate, DynamoDB on-demand, Aurora Serverless',
+                detail:
+                  'You pay per request rather than per hour, so long idle periods cost nothing. This is the answer whenever a question stresses that traffic is unpredictable AND that the servers sit unused between bursts.',
+                tone: 'good',
+              },
+            },
+            {
+              label: 'It is data sitting still, not compute',
+              next: {
+                result: 'Move it down the storage ladder — a lifecycle policy, not a migration',
+                detail:
+                  'Match the retrieval requirement to the class: milliseconds but rarely read → Standard-IA or Glacier Instant Retrieval · minutes to hours → Glacier Flexible Retrieval · 12 hours and years of retention → Glacier Deep Archive. If the access pattern is described as unknown or changing, the answer is Intelligent-Tiering.',
+                tone: 'good',
+              },
+            },
+          ],
+        },
+      },
+      {
+        label: 'MOST secure, or "to meet compliance"',
+        next: {
+          result: 'Remove the exposure, do not merely restrict it',
+          detail:
+            'Prefer the option that means the traffic never touches the internet and no long-lived credential exists: VPC endpoints over NAT, IAM roles over access keys, private subnets over security-group rules on public ones, KMS customer-managed keys when the question stresses control over rotation or revocation. "Restrict the security group to a narrower range" is usually the plausible-but-second-best answer.',
+          tone: 'good',
+        },
+      },
+      {
+        label: 'Without changing the application, or "minimal changes"',
+        next: {
+          result: 'Eliminate every answer that rewrites anything',
+          detail:
+            'Strike out refactoring, re-platforming and engine changes on sight, however superior they are. What remains is usually a lift-and-shift with a managed service bolted alongside: EFS for a shared POSIX file system, ElastiCache in front of an unchanged database, an ALB in front of unchanged instances.',
+          tone: 'warn',
+        },
+      },
+      {
+        label: 'No qualifier at all',
+        next: {
+          result: 'Then a hard constraint is being violated by three options — go and find it',
+          detail:
+            'Re-read for the absolute words: must, cannot, never, only, at all times. One of the four options breaks one of them. This is the question type that rewards reading the scenario twice and the options once, rather than the reverse.',
+          tone: 'warn',
+        },
+      },
+    ],
+  }}
+/>
+
+## One question, taken apart
+
+> *A company runs a content management application on a fleet of Amazon EC2 instances behind an
+> Application Load Balancer. The application writes user-uploaded documents to a local directory
+> and expects a standard file system path. Users report that a document uploaded through one
+> session is missing when they return later. The company cannot modify the application code.
+> Which solution meets these requirements with the LEAST operational overhead?*
+
+Work it in order, and never touch the options until the end.
+
+**Lost?** Uploaded documents. They are currently being lost, which is the reported symptom — so
+durability is the actual problem, not performance.
+
+**Down?** Not mentioned. No RTO. Ignore anything about failover.
+
+**Boundary?** Not mentioned either. Nobody said Region, nobody said AZ failure. Resist adding
+Multi-Region: the exam does not award marks for generosity.
+
+**Load?** Not mentioned. Nothing about spikes. Auto Scaling is not the subject.
+
+**Allowed?** Not mentioned.
+
+**The constraint that decides it:** *"expects a standard file system path"* plus *"cannot modify
+the application code."* Together these eliminate S3 completely — S3 is object storage reached
+over an API, and using it requires changing the code. That is the trap, and it is baited with
+the answer you would give in real life.
+
+**The qualifier:** LEAST operational overhead. So between the two remaining file-system answers,
+take the managed one.
+
+The answer is **Amazon EFS mounted on every instance** — a shared POSIX file system, so any
+instance serves any session, and AWS runs it. The distractors will be: store the documents in S3
+(violates "cannot modify"), attach an EBS volume to each instance (EBS attaches to one instance,
+so the documents stay stranded exactly as they are now), and run a self-managed NFS server on
+EC2 (works, but you now patch and back up an NFS server — that is the operational overhead the
+question told you to minimise).
+
+<Callout type="gotcha">
+Notice that the diagnosis never required knowing anything obscure. It required noticing that
+<strong>"expects a standard file system path"</strong> was doing work, and that
+<strong>"cannot modify the application code"</strong> outranked your instinct. Both sentences
+were in plain sight. This is what "reading test" means.
+</Callout>
+
+## The five habits that convert this into marks
+
+1. **Read the last sentence first.** The qualifier tells you what the four options differ on, so
+   you read them looking for one thing instead of four.
+2. **Extract the constraints before you look at the options.** Once you have read four plausible
+   answers, they contaminate your reading of the paragraph — you start hunting for justification
+   instead of constraints.
+3. **Eliminate on violations, not on preference.** Do not ask "which is best?". Ask "which three
+   break something the company said?" It is a faster question and it has a defensible answer.
+4. **Never over-deliver.** Multi-Region when nobody mentioned a Region, encryption in transit
+   when nobody mentioned compliance, active/active when the RTO is four hours — all wrong, and
+   all wrong in the same way: they cost money the scenario did not authorise.
+5. **Flag and move at 90 seconds.** You can afford 14 wrong out of 50. You cannot afford four
+   minutes on one question and then rushing six others at the end.
+
+<Quiz
+  question="A retailer's application becomes unavailable during a promotional event broadcast on television at a published time each month, when traffic increases roughly 40x for about ten minutes. The application runs on EC2 instances in an Auto Scaling group using target tracking on average CPU. Which solution BEST addresses the problem?"
+  choose={1}
+  options={[
+    {
+      text: 'Add a scheduled scaling action that raises the desired capacity before the broadcast, and serve static assets through Amazon CloudFront',
+      correct: true,
+      why: 'The load-bearing words are "published time" and "40x". Scheduled scaling adds capacity in advance because the spike is predictable, and CloudFront absorbs the asset traffic so most of the surge never reaches the application at all.',
+    },
+    {
+      text: 'Lower the target tracking CPU threshold so the group scales out sooner',
+      why: 'Target tracking is reactive: it responds to load that has already arrived, then waits for instances to boot and pass health checks. A 40x step inside ten minutes outruns it regardless of the threshold. Lowering the target only means paying for idle capacity for the other 29 days.',
+    },
+    {
+      text: 'Replace the Auto Scaling group with larger instance types sized for peak traffic',
+      why: 'This works and is the classic wrong answer: you now pay for 40x capacity permanently to serve a ten-minute event once a month.',
+    },
+    {
+      text: 'Move the application to Spot Instances to reduce the cost of scaling out',
+      why: 'Spot is for interruptible workloads. Using it for a customer-facing site during its single most important ten minutes of the month inverts the risk exactly.',
+    },
+  ]}
+  explain="<strong>Predictable spike → scheduled scaling. Unpredictable spike → target tracking or serverless.</strong> The word doing the work here is <em>published</em>: the company already knows when it happens, so reacting is a choice, not a necessity."
+/>
+
+<Quiz
+  question="A media company processes video renders overnight. Each render takes about 20 minutes, jobs are pulled from a queue, and a job that fails partway through is simply retried from the start. Rendering must finish before 07:00 but the company does not care when individual jobs run. Which compute purchasing option is MOST cost-effective?"
+  choose={1}
+  options={[
+    {
+      text: 'Spot Instances',
+      correct: true,
+      why: 'Every phrase in the scenario is a licence for Spot: pulled from a queue, retried from the start, no per-job timing requirement. That is the definition of an interruptible workload, and it buys up to about a 90% discount.',
+    },
+    {
+      text: 'On-Demand Instances in an Auto Scaling group',
+      why: 'Functionally fine and the safe-feeling choice, but it pays full price for a workload that has explicitly told you it tolerates interruption. On a MOST cost-effective question, safe-feeling is the distractor.',
+    },
+    {
+      text: 'Reserved Instances for a three-year term',
+      why: 'Reserved Instances discount capacity you run continuously. This workload runs for part of one night and the commitment would sit idle the rest of the time — you would be pre-paying for hours you never use.',
+    },
+    {
+      text: 'Dedicated Hosts',
+      why: 'Dedicated Hosts exist for licence compliance and physical isolation requirements. Nothing in the scenario mentions either, and they are the most expensive option on the page.',
+    },
+  ]}
+  explain="Scan every scenario for the interruption licence: <strong>“can be interrupted”, “fault-tolerant”, “stateless”, “retried”, “no fixed deadline per job”.</strong> When it is present on a cost question, Spot is the answer; when it is absent, Spot is the trap."
+/>
+
+<Quiz
+  question="A company runs a legacy Java application on EC2 that stores session state in memory on each instance. Users are being logged out at random. The vendor no longer supports the application and the code cannot be changed. Which solution resolves the issue?"
+  choose={1}
+  options={[
+    {
+      text: 'Enable sticky sessions (session affinity) on the Application Load Balancer',
+      correct: true,
+      why: 'Sticky sessions pin a user to the instance holding their state, which fixes the symptom entirely at the load balancer — outside the application. It is the only listed option that changes nothing inside the code.',
+    },
+    {
+      text: 'Refactor the application to store session state in Amazon ElastiCache for Redis',
+      why: 'This is the genuinely better architecture and it is the wrong answer, because it requires modifying an application the question has told you twice cannot be modified. Externalising session state is what you would do if you could — recognise the constraint that forbids it.',
+    },
+    {
+      text: 'Store session state in Amazon DynamoDB with the DynamoDB Session Handler',
+      why: 'Same problem: it needs application changes, and that handler is a PHP library rather than a Java one.',
+    },
+    {
+      text: 'Replace the Application Load Balancer with a Network Load Balancer',
+      why: 'An NLB operates at layer 4 and would not, by itself, keep a user on the same instance across new connections. Swapping load balancer types does not address where the state lives.',
+    },
+  ]}
+  explain="Sticky sessions are a <strong>workaround, not an architecture</strong> — they undermine even load distribution and lose the session when the instance dies. The exam still wants them whenever the code is untouchable, which is the whole point: <strong>the best answer is the best answer <em>within the stated constraints</em>.</strong>"
+/>
+
+<Scenario
+  who="A career changer sitting SAA eight weeks after passing the Cloud Practitioner exam"
+  problem="Mock scores had plateaued at around 65% for three weeks despite finishing two full video courses and re-reading the FAQ pages for twenty services. Reviewing the wrong answers, almost none of them were services she could not explain — they were questions where she had picked an option that worked."
+  solution="She stopped adding services and changed what she practised. For every mock question, she wrote the five constraints on paper before uncovering the options, and afterwards recorded not the right answer but which constraint she had failed to notice. After 120 questions the tally was lopsided: 'a qualifier in the last sentence' and 'a phrase forbidding application changes' accounted for over half her losses."
+  outcome="Mock scores moved to 82% in eleven days, with no new services learned. She passed at 806."
+>
+The tally is the part worth copying. <strong>“I got it wrong” is not a diagnosis</strong> — the
+useful record is <em>which sentence you failed to treat as load-bearing</em>, because that is a
+habit you can drill, and there are only about six of them.
+</Scenario>
+
+<Takeaways
+  items={[
+    '<strong>65 questions, 130 minutes, only 50 are scored, 720 of 1,000 passes.</strong> You can be wrong about 14 of the scored questions and still pass — so flag and move rather than bleeding time.',
+    'SAA is a <strong>constraint-extraction test</strong>. On a well-written question all four options work; three of them violate something the paragraph stated.',
+    'Ask five things of every scenario — <strong>Lost Data Breaks Live Applications</strong>: what can be <strong>lost</strong> (RPO) · how long it can be <strong>down</strong> (RTO) · which <strong>boundary</strong> it must survive · the shape of the <strong>load</strong> · who is <strong>allowed</strong> to do what.',
+    '<strong>Read the final sentence first.</strong> LEAST operational overhead → the most managed option. MOST cost-effective → the cheapest option that still meets every constraint. MOST secure → remove the exposure, not just narrow it.',
+    '<strong>“Without modifying the application” outranks your engineering instinct.</strong> It eliminates every rewrite, refactor and engine change, however much better they are.',
+    'Never over-deliver. Multi-Region when no Region was mentioned, or active/active against a four-hour RTO, is <strong>wrong</strong> — it spends money the scenario never authorised.',
+    'Practise by recording <strong>which constraint you missed</strong>, not which answer was right. There are only about six recurring ones, and they are drillable.',
+  ]}
+/>
+
+---
+
+Brightwell's platform lead re-sat a fresh mock a fortnight later and scored 84%, having learned,
+by his own count, two new services in the interval. Nothing about his AWS knowledge had
+meaningfully changed. What changed was that he stopped reading each scenario as a description of
+a system and started reading it as **a list of things the company had told him he was not
+allowed to do**.
+
+That is the reframe the whole exam turns on, and it survives the exam. A real architecture brief
+arrives in exactly the same shape: several paragraphs of context, a handful of load-bearing
+constraints buried in it, and four approaches that would all technically work. The job — on the
+paper and afterwards — is not knowing the most services. It is noticing which sentence is the
+one you are not permitted to break.
