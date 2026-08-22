@@ -120,7 +120,8 @@ Anything crossing a network should be encrypted in transit, which in practice me
 (the protocol people still call SSL). You need a certificate to do it, and **AWS Certificate
 Manager (ACM)** issues them:
 
-- **Free** for use with AWS services — load balancers, CloudFront, API Gateway.
+- **Free**, but only while the certificate stays attached to an AWS service that integrates
+  with ACM — a load balancer, CloudFront, API Gateway.
 - **Renewed automatically**, which quietly eliminates one of the most common causes of
   self-inflicted outages.
 - Certificates are **Regional**, and a certificate used by CloudFront must live in
