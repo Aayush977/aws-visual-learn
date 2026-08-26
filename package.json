@@ -13,7 +13,8 @@
     "check": "astro check",
     "check:iam": "node src/lib/iam.check.ts",
     "check:review": "node src/lib/review.check.ts",
-    "check:all": "pnpm check:iam && pnpm check:review"
+    "check:all": "pnpm check:iam && pnpm check:vpc && pnpm check:review",
+    "check:vpc": "node src/lib/reachability.check.ts"
   },
   "dependencies": {
     "@astrojs/mdx": "^7.0.5",

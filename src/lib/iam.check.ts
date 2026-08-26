@@ -27,9 +27,9 @@ assert.equal(req({ mfa: true, scpAllowsRegion: false }).stoppedAt, 'scp');
 assert.equal(req({ mfa: true, identityAllow: false }).stoppedAt, 'allow');
 
 // The CLI tail is the whole practical point: each denial names a different rule.
-assert.match(req({ bucketDenyWithoutMfa: true }).cli, /explicit deny in a resource-based policy$/);
-assert.match(req({ scpAllowsRegion: false }).cli, /explicit deny in a service control policy$/);
-assert.match(req({ identityAllow: false }).cli, /no identity-based policy allows/);
-assert.doesNotMatch(req().cli, /AccessDenied/);
+assert.match(req({ bucketDenyWithoutMfa: true }).output, /explicit deny in a resource-based policy$/);
+assert.match(req({ scpAllowsRegion: false }).output, /explicit deny in a service control policy$/);
+assert.match(req({ identityAllow: false }).output, /no identity-based policy allows/);
+assert.doesNotMatch(req().output, /AccessDenied/);
 
 console.log('iam.check.ts — all assertions passed');

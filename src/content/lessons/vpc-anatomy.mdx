@@ -13,6 +13,7 @@ updated: 2026-08-15
 ---
 
 import Diagram from '../../components/Diagram.astro';
+import GateSimulator from '../../components/GateSimulator.astro';
 import Node from '../../components/svg/Node.astro';
 import Boundary from '../../components/svg/Boundary.astro';
 import Wire from '../../components/svg/Wire.astro';
@@ -170,6 +171,12 @@ internet gateway; the <strong>security group</strong> has no inbound rule for th
 <strong>network ACL</strong> is blocking the return traffic. Exam questions describing a
 connectivity failure are almost always testing one of these three.
 </Callout>
+
+So go and break it yourself. Below is one instance in one subnet and the four things that decide
+whether you can reach it. Turn any one of them off and the connection dies — and notice that
+three of the four failures print you exactly the same timeout.
+
+<GateSimulator model="vpc" />
 
 ## NAT gateways: out, but not in
 

@@ -1,59 +1,60 @@
 ---
 /**
- * "Would this request be allowed?" — flip the policies, watch the answer change.
+ * "What happens to this request?" — flip the switches, watch where it stops.
  *
- * The request walks left to right through the three gates AWS actually applies,
- * in order, and stops at the first one that refuses it. Every verdict comes from
- * evaluate() in lib/iam.ts, so the animation cannot drift away from the rule.
+ * The request walks left to right through the gates AWS actually applies, in
+ * order, and stops at the first one that refuses it. Every verdict comes from a
+ * pure evaluate() in src/lib, so the animation cannot drift away from the rule.
+ *
+ * Two models today: `iam` (policy evaluation) and `vpc` (network reachability).
+ * A third one is a new lib exporting the same shape, plus a line in MODELS.
  *
  * Without JavaScript the default scenario renders fully decided and readable.
  */
-import { GATES, evaluate, type IamRequest } from '../lib/iam.ts';
+import { IAM_SIM } from '../lib/iam.ts';
+import { VPC_SIM } from '../lib/reachability.ts';
+
+interface SimModel {
+  title: string;
+  intro: string;
+  /** The command the learner is imagining themselves running. */
+  command: string;
+  outputLabel: string;
+  verdictLabels: { allowed: string; denied: string };
+  gates: { id: string; label: string; question: string }[];
+  /** Typed strictly in its own lib; loose here so both models fit one shape. */
+  evaluate: (state: any) => {
+    verdict: 'allowed' | 'denied';
+    stoppedAt: string | null;
+    headline: string;
+    reason: string;
+    output: string;
+  };
+  initial: Record<string, boolean>;
+  switches: { key: string; label: string; note: string }[];
+}
+
+const MODELS: Record<'iam' | 'vpc', SimModel> = { iam: IAM_SIM, vpc: VPC_SIM };
 
 interface Props {
+  model: keyof typeof MODELS;
   title?: string;
   intro?: string;
 }
 
-const {
-  title = 'Would this request be allowed?',
-  intro = 'Alice asks to delete one object. Flip the policies below and watch where the request gets stopped.',
-} = Astro.props;
+const { model } = Astro.props;
+const M = MODELS[model];
+const title = Astro.props.title ?? M.title;
+const intro = Astro.props.intro ?? M.intro;
 
-const SWITCHES: { key: keyof IamRequest; label: string; note: string }[] = [
-  {
-    key: 'identityAllow',
-    label: 'Identity policy allows it',
-    note: 'Allow s3:DeleteObject on company-reports/2026/*',
-  },
-  {
-    key: 'scpAllowsRegion',
-    label: 'SCP permits eu-west-1',
-    note: 'The organisation’s ceiling for this account',
-  },
-  {
-    key: 'bucketDenyWithoutMfa',
-    label: 'Bucket policy denies without MFA',
-    note: 'An explicit Deny with a Condition on MFA',
-  },
-  { key: 'mfa', label: 'Alice signed in with MFA', note: 'Satisfies the Condition above' },
-];
-
-/** The happy path: everything passes, so the learner starts by breaking it. */
-const initial: IamRequest = {
-  identityAllow: true,
-  scpAllowsRegion: true,
-  bucketDenyWithoutMfa: false,
-  mfa: false,
-};
-const decision = evaluate(initial);
-const stopIndex = decision.stoppedAt ? GATES.findIndex((g) => g.id === decision.stoppedAt) : -1;
+const decision = M.evaluate(M.initial);
+const stopIndex = decision.stoppedAt ? M.gates.findIndex((g) => g.id === decision.stoppedAt) : -1;
 const stateOf = (i: number) => (stopIndex === -1 || i < stopIndex ? 'pass' : i === stopIndex ? 'stop' : 'idle');
 
 const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
 ---
 
-<section class="sim" aria-labelledby={`${uid}-h`}>
+<section class="sim" data-model={model} aria-labelledby={`${uid}-h`}>
   <header class="sim__head">
     <p class="sim__eyebrow">Simulate</p>
     <h4 class="sim__title" id={`${uid}-h`}>{title}</h4>
@@ -62,14 +63,20 @@ const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
 
   <p class="sim__req">
     <span class="sim__prompt" aria-hidden="true">$</span>
-    <code>aws s3 rm s3://company-reports/2026/q3.pdf --region eu-west-1</code>
+    <code>{M.command}</code>
   </p>
 
-  <div class="sim__switches" role="group" aria-label="Policies in effect">
+  <div class="sim__switches" role="group" aria-label="What is configured">
     {
-      SWITCHES.map((s) => (
+      M.switches.map((s) => (
         <label class="sw">
-          <input type="checkbox" class="sw__input" data-key={s.key} checked={initial[s.key]} />
+          <input
+            type="checkbox"
+            class="sw__input"
+            data-key={s.key}
+            data-initial={String(M.initial[s.key])}
+            checked={M.initial[s.key]}
+          />
           <span class="sw__track" aria-hidden="true" />
           <span class="sw__text">
             <span class="sw__label">{s.label}</span>
@@ -88,7 +95,7 @@ const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
         <span class="sim__cardQ">who · what · which</span>
       </li>
       {
-        GATES.map((g, i) => (
+        M.gates.map((g, i) => (
           <li class="sim__card" data-card={g.id} data-state={stateOf(i)}>
             <span class="sim__cardLabel">{g.label}</span>
             <span class="sim__cardQ">{g.question}</span>
@@ -104,7 +111,7 @@ const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
         data-verdict={decision.verdict}
         data-state={decision.verdict === 'allowed' ? 'pass' : 'stop'}
       >
-        <span class="sim__cardLabel" data-endlabel>{decision.verdict === 'allowed' ? 'ALLOWED' : 'DENIED'}</span>
+        <span class="sim__cardLabel" data-endlabel>{M.verdictLabels[decision.verdict]}</span>
         <span class="sim__cardQ">what AWS does</span>
       </li>
     </ol>
@@ -113,8 +120,8 @@ const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
   <div class={`sim__out sim__out--${decision.verdict}`} data-out>
     <p class="sim__outHead" data-outhead>{decision.headline}</p>
     <p class="sim__outWhy" data-outwhy>{decision.reason}</p>
-    <p class="sim__cliLabel">What the CLI prints</p>
-    <pre class="sim__cli" data-cli>{decision.cli}</pre>
+    <p class="sim__cliLabel">{M.outputLabel}</p>
+    <pre class="sim__cli" data-cli>{decision.output}</pre>
   </div>
 
   <div class="sim__foot">
@@ -126,12 +133,16 @@ const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
 </section>
 
 <script>
-  import { GATES, evaluate, type IamRequest } from '../lib/iam.ts';
+  import { IAM_SIM } from '../lib/iam.ts';
+  import { VPC_SIM } from '../lib/reachability.ts';
+
+  const MODELS = { iam: IAM_SIM, vpc: VPC_SIM };
 
   const TRAVEL = 460; // ms per hop
   const HOLD = 240; // ms paused at each gate
 
   document.querySelectorAll<HTMLElement>('.sim').forEach((root) => {
+    const M = MODELS[root.dataset.model as keyof typeof MODELS];
     const stage = root.querySelector<HTMLElement>('[data-stage]')!;
     const dot = root.querySelector<HTMLElement>('[data-dot]')!;
     const out = root.querySelector<HTMLElement>('[data-out]')!;
@@ -148,8 +159,7 @@ const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
     let token = 0;
     let timers: number[] = [];
 
-    const readState = (): IamRequest =>
-      Object.fromEntries(inputs.map((i) => [i.dataset.key, i.checked])) as unknown as IamRequest;
+    const readState = () => Object.fromEntries(inputs.map((i) => [i.dataset.key!, i.checked]));
 
     const lane = dot.parentElement!;
 
@@ -166,8 +176,10 @@ const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
       timers.forEach(clearTimeout);
       timers = [];
 
-      const decision = evaluate(readState());
-      const stopIndex = decision.stoppedAt ? GATES.findIndex((g) => g.id === decision.stoppedAt) : -1;
+      const decision = M.evaluate(readState());
+      const stopIndex = decision.stoppedAt
+        ? M.gates.findIndex((g) => g.id === decision.stoppedAt)
+        : -1;
 
       for (const c of cards.values()) c.dataset.state = 'idle';
       cards.forEach((c) => {
@@ -179,8 +191,8 @@ const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
       park(cards.get('start')!);
 
       // One hop per gate, stopping at the first refusal.
-      const last = stopIndex === -1 ? GATES.length : stopIndex;
-      const hops = GATES.slice(0, last + 1);
+      const last = stopIndex === -1 ? M.gates.length : stopIndex;
+      const hops = M.gates.slice(0, last + 1);
 
       hops.forEach((g, i) => {
         timers.push(
@@ -210,23 +222,23 @@ const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
               park(end);
               settle(mine, decision, end);
             },
-            (GATES.length + 1) * (TRAVEL + HOLD),
+            (M.gates.length + 1) * (TRAVEL + HOLD),
           ),
         );
       }
     }
 
-    function settle(mine: number, decision: ReturnType<typeof evaluate>, at: HTMLElement) {
+    function settle(mine: number, decision: ReturnType<typeof M.evaluate>, at: HTMLElement) {
       if (mine !== token) return;
       dot.dataset.verdict = decision.verdict;
       const end = cards.get('end')!;
       end.dataset.verdict = decision.verdict;
-      endLabel.textContent = decision.verdict === 'allowed' ? 'ALLOWED' : 'DENIED';
+      endLabel.textContent = M.verdictLabels[decision.verdict];
       if (at !== end) end.dataset.state = decision.verdict === 'allowed' ? 'pass' : 'stop';
       out.className = `sim__out sim__out--${decision.verdict}`;
       outHead.textContent = decision.headline;
       outWhy.textContent = decision.reason;
-      outCli.textContent = decision.cli;
+      outCli.textContent = decision.output;
       live.textContent = `${decision.headline}. ${decision.reason}`;
     }
 
@@ -236,7 +248,7 @@ const uid = 'sim-' + Math.random().toString(36).slice(2, 9);
     root.addEventListener('click', (e) => {
       const act = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-act]')?.dataset.act;
       if (act === 'reset') {
-        inputs.forEach((i) => (i.checked = i.dataset.key !== 'bucketDenyWithoutMfa' && i.dataset.key !== 'mfa'));
+        inputs.forEach((i) => (i.checked = i.dataset.initial === 'true'));
       }
       if (act) run();
     });

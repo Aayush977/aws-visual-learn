@@ -13,7 +13,7 @@ updated: 2026-08-14
 ---
 
 import Diagram from '../../components/Diagram.astro';
-import IamSimulator from '../../components/IamSimulator.astro';
+import GateSimulator from '../../components/GateSimulator.astro';
 import Node from '../../components/svg/Node.astro';
 import Wire from '../../components/svg/Wire.astro';
 import Callout from '../../components/Callout.astro';
@@ -160,7 +160,7 @@ Flip the switches and find every way to get told no — then read the last few w
 `AccessDenied`. **That tail names the gate that stopped you**, and it is the single most useful
 IAM debugging habit you can build.
 
-<IamSimulator />
+<GateSimulator model="iam" />
 
 <Callout type="exam" title="Read the tail of the error">
 Those three endings are worth memorising, because they map exactly onto the evaluation order:
