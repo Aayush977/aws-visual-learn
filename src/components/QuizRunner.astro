@@ -34,9 +34,15 @@ interface Props {
    * a full practice test; 'track' reports by site topic.
    */
   groupBy?: 'track' | 'ccpDomain';
+  /**
+   * Overrides the intro paragraph. The default promises an explanation on every
+   * option, which is only true of the hand-written bank — imported sets pass
+   * their own honest description here.
+   */
+  lead?: string;
 }
 
-const { questions, label, passMark = 70, groupBy = 'track' } = Astro.props;
+const { questions, label, passMark = 70, groupBy = 'track', lead } = Astro.props;
 
 /** Resolved server-side so the runner only ever deals in display strings. */
 function groupLabel(q: Question): string {
@@ -61,9 +67,10 @@ const uid = 'qr-' + Math.random().toString(36).slice(2, 9);
       <p class="qr__eyebrow">Practice test</p>
       <h2 class="qr__title" id={`${uid}-h`}>{label}</h2>
       <p class="qr__lead">
-        {questions.length} questions, written in the style the real exam uses. You get the answer
-        and an explanation straight after each one — including why the wrong options are wrong,
-        which is where most of the learning is.
+        {
+          lead ??
+            `${questions.length} questions, written in the style the real exam uses. You get the answer and an explanation straight after each one — including why the wrong options are wrong, which is where most of the learning is.`
+        }
       </p>
       <div class="qr__introActions">
         <button type="button" class="btn btn--primary" data-act="start">
@@ -119,7 +126,7 @@ const uid = 'qr-' + Math.random().toString(36).slice(2, 9);
                       </span>
                       <span class="qr__optionBody">
                         <span class="qr__text">{o.text}</span>
-                        <span class="qr__why">{o.why}</span>
+                        {o.why && <span class="qr__why">{o.why}</span>}
                       </span>
                     </button>
                   </li>

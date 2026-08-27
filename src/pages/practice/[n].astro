@@ -1,0 +1,138 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import QuizRunner from '../../components/QuizRunner.astro';
+import { url } from '../../lib/paths';
+import { PRACTICE_EXAMS, TOTAL_QUESTIONS, SOURCE, type PracticeExam } from '../../lib/practice-exams';
+
+export function getStaticPaths() {
+  return PRACTICE_EXAMS.map((exam, i) => ({
+    params: { n: String(exam.n) },
+    props: {
+      exam,
+      prev: PRACTICE_EXAMS[i - 1]?.n,
+      next: PRACTICE_EXAMS[i + 1]?.n,
+    },
+  }));
+}
+
+interface Props {
+  exam: PracticeExam;
+  prev?: number;
+  next?: number;
+}
+
+const { exam, prev, next } = Astro.props;
+const count = exam.questions.length;
+// The real CLF-C02 is 65 questions in 90 minutes; scale that pace to this paper.
+const minutes = Math.round((count / 65) * 90);
+---
+
+<BaseLayout
+  title={`Practice exam ${exam.n} — Cloud Practitioner`}
+  description={`A full-length AWS Cloud Practitioner practice exam: ${count} scored questions with an answer key and a breakdown by CLF-C02 domain.`}
+>
+  <div class="wrap page">
+    <nav class="crumb" aria-label="Breadcrumb">
+      <a href={url('/practice')}>Practice exams</a>
+      <span aria-hidden="true">/</span>
+      <span>Exam {exam.n}</span>
+    </nav>
+
+    <header class="page__head">
+      <p class="page__eyebrow">Full-length mock</p>
+      <h1>Practice exam {exam.n}</h1>
+      <p class="page__lead">
+        {count} questions. At the pace of the real exam — 65 questions in 90 minutes — you should
+        give this about <strong>{minutes} minutes</strong>. Sit it in one go, phone away, and do
+        not look anything up until the score comes back.
+      </p>
+    </header>
+
+    <QuizRunner
+      questions={exam.questions}
+      label={`Practice exam ${exam.n}`}
+      passMark={70}
+      groupBy="ccpDomain"
+      lead={`${count} questions, scored and shuffled, broken down by CLF-C02 domain at the end. These are imported from a public MIT-licensed question bank: you get the answer key after each one, not a rationale on every option — for that, use the practice questions written for this site.`}
+    />
+
+    <footer class="page__foot">
+      <nav class="page__pager" aria-label="Other practice exams">
+        {prev ? <a href={url(`/practice/${prev}`)}>← Exam {prev}</a> : <span />}
+        <a href={url('/practice')}>All {PRACTICE_EXAMS.length} papers</a>
+        {next ? <a href={url(`/practice/${next}`)}>Exam {next} →</a> : <span />}
+      </nav>
+      <p class="page__foot-note">
+        Questions reproduced under the {SOURCE.licence} licence from{' '}
+        <a href={SOURCE.url} rel="noopener nofollow">{SOURCE.repo}</a>, one of
+        {PRACTICE_EXAMS.length} papers and {TOTAL_QUESTIONS} questions in the imported bank. If an
+        answer looks wrong, it may well be — check the{' '}
+        <a href="https://docs.aws.amazon.com/" rel="noopener nofollow">AWS documentation</a> and
+        trust that over the key.
+      </p>
+      <p class="page__foot-note">
+        Missed something? The <a href={url('/lessons')}>lessons</a> explain it properly, and{' '}
+        <a href={url('/review')}>daily review</a> makes it stick.
+      </p>
+    </footer>
+  </div>
+</BaseLayout>
+
+<style>
+  .page {
+    padding: var(--sp-6) 0 var(--sp-8);
+    width: min(100% - 2rem, 54rem);
+    margin-inline: auto;
+  }
+
+  .crumb {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: center;
+    font-size: var(--step--1);
+    color: var(--text-muted);
+    margin-bottom: var(--sp-5);
+  }
+
+  .page__head {
+    margin-bottom: var(--sp-6);
+  }
+  .page__eyebrow {
+    margin: 0 0 var(--sp-2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .page__head h1 {
+    margin: 0 0 var(--sp-3);
+  }
+  .page__lead {
+    margin: 0;
+    font-size: var(--step-1);
+    color: var(--text-muted);
+    max-width: 42rem;
+  }
+
+  .page__foot {
+    margin-top: var(--sp-7);
+    padding-top: var(--sp-5);
+    border-top: 1px solid var(--border);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+  }
+  .page__pager {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+  }
+  .page__foot-note {
+    margin: 0 0 var(--sp-3);
+  }
+  .page__foot-note:last-child {
+    margin-bottom: 0;
+  }
+</style>

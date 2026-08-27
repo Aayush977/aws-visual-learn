@@ -19,13 +19,15 @@ interface Props {
   blurb: string;
   /** Roughly how long a first pass takes. */
   effort?: string;
+  /** Overrides the label. Not every credited repo is one you go and build. */
+  eyebrow?: string;
 }
 
-const { repo, url, licence, stars, blurb, effort } = Astro.props;
+const { repo, url, licence, stars, blurb, effort, eyebrow = 'Go and build it' } = Astro.props;
 ---
 
 <aside class="sr">
-  <p class="sr__eyebrow">Go and build it</p>
+  <p class="sr__eyebrow">{eyebrow}</p>
   <p class="sr__repo">
     <svg viewBox="0 0 16 16" aria-hidden="true">
       <path
