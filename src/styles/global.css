@@ -329,3 +329,24 @@ blockquote {
   top: var(--sp-4);
   color: #fff;
 }
+
+/* One-sheet reference images (the service map). Portrait, so cap the width and
+   let the link carry people to the full-size file. */
+.sheet {
+  margin: var(--sp-6) auto;
+  max-width: 620px;
+}
+.sheet img {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+.sheet figcaption {
+  margin-top: var(--sp-3);
+  font-size: var(--step--1);
+  line-height: 1.55;
+  color: var(--text-muted);
+  text-align: center;
+}

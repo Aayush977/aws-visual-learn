@@ -20,6 +20,7 @@ import Mnemonic from '../../components/Mnemonic.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
+import { url as asset } from '../../lib/paths.ts';
 
 ## The three weeks nobody could work
 
@@ -103,6 +104,31 @@ ability to tell apart three or four pairs that sound similar.
   <Wire id="w-front" from={[248, 405]} to={[452, 405]} tone="purple" step={4} />
   <Wire id="w-iot" from={[248, 500]} to={[452, 500]} tone="green" step={5} />
 </Diagram>
+
+## The whole machine, on one sheet
+
+The five categories above are one floor of a much larger building. This is every service in
+this course drawn as a single machine: **security is the hood over it**, **global
+infrastructure is the plinth under it**, and the nine shelves between them are the categories a
+question will be pointing at. Learn which shelf a name sits on and half the recall problem
+disappears.
+
+<figure class="sheet">
+  <a href={asset('/aws-service-map.jpg')} target="_blank" rel="noopener">
+    <img
+      src={asset('/aws-service-map.jpg')}
+      width="1240"
+      height="2204"
+      loading="lazy"
+      decoding="async"
+      alt="A blueprint drawing of the AWS service landscape as one machine. A hood labelled Security and Identity — IAM, IAM Identity Center, Cognito, KMS, Secrets Manager, WAF, Shield, GuardDuty, Inspector, Macie — sits over nine shelves: Integration, Compute, Storage, Database, Analytics and AI, Network and Edge, Develop and Deploy, Operate and Govern, and Cost. The whole stack rests on a plinth labelled Global Infrastructure: Regions, Availability Zones, Edge Locations, Local Zones, Outposts, Wavelength. Each shelf names its services and how many it holds, and a note reads: security is not a shelf, it is the hood."
+    />
+  </a>
+  <figcaption>
+    Seventy-four services, nine shelves. Tap or click to open it full size — it prints on one
+    A4 page. Every name on it is taught somewhere in this course.
+  </figcaption>
+</figure>
 
 ## Application integration
 
