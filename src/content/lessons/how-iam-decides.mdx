@@ -14,6 +14,7 @@ updated: 2026-08-14
 
 import Diagram from '../../components/Diagram.astro';
 import GateSimulator from '../../components/GateSimulator.astro';
+import { url as asset } from '../../lib/paths.ts';
 import Node from '../../components/svg/Node.astro';
 import Wire from '../../components/svg/Wire.astro';
 import Callout from '../../components/Callout.astro';
@@ -420,6 +421,25 @@ you deploy.
 with the principal, the action and the resource. This is the audit trail that answered "what did
 the leaked key do" in the story above.
 </Callout>
+
+## The whole lesson on one sheet
+
+The evaluation order, where policies live, users against roles, and what the 02:14 bill actually
+cost — on one page you can pin up.
+
+<figure class="sheet">
+  <a href={asset('/how-iam-decides-sheet.jpg')} target="_blank" rel="noopener">
+    <img
+      src={asset('/how-iam-decides-sheet.jpg')}
+      width="1240"
+      height="2204"
+      loading="lazy"
+      decoding="async"
+      alt="A blueprint sheet titled How IAM Decides. A request carrying who, what, which, source IP and MFA travels left to right through three gates: explicit deny, which is unoverridable; the service control policy guardrail, which limits and never grants; and any allow, where silence means no. Each gate drops a refused request into a denied box, and a dimension line reads: evaluation stops at the first refusal. Only a request clearing all three reaches Allowed. Three panels below compare an IAM user with an IAM role, list the four places policies live — identity, resource, service control policy and permissions boundary — and show the incident figures: nine minutes from push to the first GPU launch, four Regions, eight thousand dollars, and zero policies that said Deny."
+    />
+  </a>
+  <figcaption>Sheet 03 of the drawing set. Click to open it full size.</figcaption>
+</figure>
 
 <Scenario
   who="An engineer on their first week, three months after the incident"

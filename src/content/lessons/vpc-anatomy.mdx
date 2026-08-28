@@ -14,6 +14,7 @@ updated: 2026-08-15
 
 import Diagram from '../../components/Diagram.astro';
 import GateSimulator from '../../components/GateSimulator.astro';
+import { url as asset } from '../../lib/paths.ts';
 import Node from '../../components/svg/Node.astro';
 import Boundary from '../../components/svg/Boundary.astro';
 import Wire from '../../components/svg/Wire.astro';
@@ -253,6 +254,26 @@ You will not need to configure these, but you must recognise the phrase that poi
 - **AWS Direct Connect** — a dedicated physical circuit into AWS. Consistent, private,
   high-bandwidth, and it takes weeks to provision. The answer when a question stresses
   **consistent latency** or **dedicated bandwidth**.
+
+## The whole lesson on one sheet
+
+Everything above, drawn as a single sectional drawing: two zones, the four things that decide
+reachability, the five addresses AWS keeps, and the two firewalls side by side. Print it, put it
+next to you, and answer the exam's networking questions off it.
+
+<figure class="sheet">
+  <a href={asset('/vpc-anatomy-sheet.jpg')} target="_blank" rel="noopener">
+    <img
+      src={asset('/vpc-anatomy-sheet.jpg')}
+      width="1240"
+      height="2204"
+      loading="lazy"
+      decoding="async"
+      alt="A blueprint sheet titled Anatomy of a VPC. A sectional drawing shows one VPC of 10.0.0.0/16 spanning two Availability Zones, each with a public subnet routing 0.0.0.0/0 to the internet gateway and holding a NAT gateway, and a private subnet routing 0.0.0.0/0 to NAT and holding an EC2 instance inside a security group. The internet gateway straddles the VPC boundary. Callouts mark the route table row as the whole definition of a public subnet, the network ACL as the stateless subnet edge, and the security group as the stateful instance wrapper. Three panels below compare security groups with network ACLs, list the five addresses AWS reserves in every subnet and the sizes of a slash 16, slash 24 and slash 28, and give the four checks to run when an instance is not reachable."
+    />
+  </a>
+  <figcaption>Sheet 02 of the drawing set. Click to open it full size — it prints on one A4 page.</figcaption>
+</figure>
 
 <Scenario
   who="A healthcare company moving a patient-records system to AWS"
