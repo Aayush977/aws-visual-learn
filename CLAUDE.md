@@ -57,3 +57,24 @@ only from `main`, so nothing on `dev` is live.
 
 **Claude cannot push.** The SSH key needs a passphrase the tool shell cannot supply. Ask the
 user to run `! git push` rather than retrying.
+
+**Work in place on `dev` — do not create a worktree** for this repo unless the user asks.
+Treat that as the standing preference, so there is nothing to ask about.
+
+**Never merge to `main` and never push.** If a skill offers to finish a branch by merging or
+opening a PR, the answer here is "commit to `dev` and hand back" — the user does the rest.
+
+## If you are running with a process plugin
+
+Generic engineering skills assume a shape this repo does not have. The mapping:
+
+- **There is no `npm test`.** The suite is `pnpm check:all` plus `pnpm build`. Anything that
+  wants to "run the full test suite" means those two.
+- **TDD applies to `src/lib` only**, and the test is the `*.check.ts` file next to the module —
+  write the assertion first, watch it fail, then make it pass. Do **not** add a test runner;
+  the absence of one is deliberate, and `node:assert` is the convention.
+- **A lesson is prose, not production code.** MDX content has no unit test. Its gate is
+  `pnpm build` plus the checklist in `docs/writing-a-lesson.md`.
+- **Design-first skills are a good fit for a new lesson** — which cast member, which cold
+  open, which components — but the recipe in `docs/writing-a-lesson.md` is the starting
+  point, not a blank page.
