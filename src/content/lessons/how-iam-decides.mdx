@@ -7,9 +7,9 @@ order: 20
 domains:
   CCP: 'Domain 2 — Security and Compliance'
   SAA: 'Domain 1 — Design Secure Architectures'
-minutes: 12
+minutes: 16
 hook: At 02:14 the pager went off. Somebody was running GPUs in four Regions on the company card — and AWS had said yes to every single request. This is the story of why.
-updated: 2026-08-14
+updated: 2026-09-22
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -25,7 +25,7 @@ import Takeaways from '../../components/Takeaways.astro';
 
 ## 02:14 — the billing alarm
 
-A four-person analytics company. Two days earlier a developer had pushed a tidy little
+**Meridian** is a four-person analytics company. Two days earlier a developer had pushed a tidy little
 refactor: the reporting service moved from a hard-coded path to a config file. The config file
 had a comment above it that said `# TODO: move to secrets manager`, and underneath the comment,
 in plain text, an AWS access key.
@@ -327,7 +327,8 @@ The tools that get you there:
 - **Last accessed information** shows which services a user or role has not touched in months —
   a straightforward list of permissions to remove.
 - **Permissions boundaries** cap the maximum permissions an identity can have, which lets you
-  safely let a team create their own roles without letting them create an administrator.
+  safely let a team create their own roles without letting them create an administrator. They
+  are also a classic source of "but the policy says Allow" — see the next section.
 - **IAM Policy Simulator** answers "would this request be allowed?" before you find out the
   hard way. From the CLI:
 
@@ -337,6 +338,139 @@ The tools that get you there:
     --action-names s3:GetObject \
     --resource-arns arn:aws:s3:::company-reports/2026/q3.pdf
   ```
+
+## The four denials that make no sense at first
+
+Everything so far has been the rule. This section is the part nobody warns you about: four
+refusals that are all working exactly as designed, and all of which look like a bug the first
+time you meet them. Between them they account for most of the afternoons people lose to IAM.
+
+### 1. You can create the thing, but you cannot attach a role to it
+
+You have `AdministratorAccess` on Lambda. You write the function, pick the execution role from
+the dropdown, click create, and:
+
+```
+An error occurred (AccessDenied) when calling the CreateFunction operation:
+User: arn:aws:iam::123456789012:user/alice is not authorized to perform:
+iam:PassRole on resource: arn:aws:iam::123456789012:role/reporting-exec
+```
+
+You are not creating a role. You are not editing one. You are *handing an existing role to a
+service* — and that is its own permission, called **`iam:PassRole`**.
+
+The reason it exists is the whole point of this lesson. If handing a role to a service were
+free, then anyone who could create a Lambda function could hand it the administrator role and
+run any code they liked inside it. Their own permissions would be irrelevant within two
+minutes. `iam:PassRole` is the gate that stops "can create a function" from silently meaning
+"can do anything any role in the account can do".
+
+So the permission is deliberately scoped to *which roles* you may pass:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "iam:PassRole",
+  "Resource": "arn:aws:iam::123456789012:role/service-role/lambda-*"
+}
+```
+
+That grants passing the `lambda-*` roles and nothing else. The admin role stays unreachable.
+
+<Callout type="gotcha" title="It is not only Lambda">
+The same gate applies every time a service is given a role to act as: launching an EC2
+instance with an instance profile, creating an ECS task definition, giving CodeBuild a
+service role, handing Glue a job role. If you can build the resource but not attach the
+role, this is nearly always why.
+</Callout>
+
+### 2. Cross-account access has to be allowed twice
+
+Account A needs to read a bucket in account B. Someone edits the role in account B to trust
+account A, tests it, and gets:
+
+```
+User: arn:aws:iam::111111111111:user/alice is not authorized to perform:
+sts:AssumeRole on resource: arn:aws:iam::222222222222:role/ReportsReader
+```
+
+They go back and edit the trust policy again. And again. The trust policy was never the
+problem — it was already correct.
+
+**Cross-account access needs both sides to say yes, independently:**
+
+- **In the target account**, the role's *trust policy* says who may assume it
+  (`"Principal": {"AWS": "arn:aws:iam::111111111111:root"}`).
+- **In the calling account**, the caller's own *identity policy* must allow
+  `sts:AssumeRole` on that role's ARN.
+
+Neither one grants anything on its own. The trust policy opens the door; the identity policy
+is permission to walk through it. Naming the whole account as principal in the trust policy
+(`:root`) does not mean every user in it can assume the role — it means the account is
+*allowed to delegate* that, and account A's administrator still decides who actually gets it.
+
+*This is the same shape as everything else in the lesson: two independent gates, and the
+request has to clear both.*
+
+<Callout type="exam" title="Which side is broken?">
+Read the error's principal. If it names a user or role in <strong>your</strong> account and
+the action is <code>sts:AssumeRole</code>, the caller's identity policy is missing the
+permission. If the message mentions the trust relationship, the target account's role is the
+one to edit. One error tail, two very different files.
+</Callout>
+
+### 3. You fixed it. Try again in a minute.
+
+You add the missing Allow, retry immediately, and get `AccessDenied` again. So you conclude
+the fix was wrong, undo it, and try something else — and now you are debugging a policy that
+was correct.
+
+**IAM is eventually consistent.** It is a global service replicated worldwide, and a change
+has to reach the endpoint your request actually lands on. That usually takes seconds, and
+occasionally longer. The same applies to a newly created access key, a new role, and a
+changed trust policy.
+
+The habit worth building: after a policy change, **wait and retry the identical request
+before changing anything else.** If a request starts working on its own a minute later, the
+policy was right and propagation was the only problem. Rolling your change back at second
+thirty is how people end up convinced IAM is haunted.
+
+### 4. A permissions boundary can take away what a policy grants
+
+You attach `AdministratorAccess` to a role. It still cannot create a user. The policy is
+right there, and nothing in the account denies it.
+
+A **permissions boundary** is a policy attached to an identity that sets the *maximum* it can
+ever have. The identity's effective permissions are the **overlap** of its identity policy
+and its boundary:
+
+- Identity policy says yes, boundary says yes → **allowed**
+- Identity policy says yes, boundary is silent → **denied**
+- Boundary says yes, identity policy is silent → **denied**
+
+A boundary **never grants anything**. It only caps. That is the detail that makes it read as
+broken: you are looking at a policy that plainly says Allow, and the ceiling above it is in a
+different place in the console.
+
+It exists to solve a real problem — letting a team create their own roles without letting
+them create an administrator. You give the team `iam:CreateRole`, and require that every role
+they create carries a boundary. Now they can grant themselves anything *up to* the ceiling
+you set, and nothing above it. Delegation without escalation.
+
+<Callout type="note" title="Boundary, SCP or policy?">
+Three things can cap permissions and they are constantly confused.
+<br />· A <strong>service control policy</strong> caps an entire <em>account</em>, set by the
+organisation.
+<br />· A <strong>permissions boundary</strong> caps one <em>identity</em>, set by whoever
+created it.
+<br />· An <strong>identity policy</strong> is the only one of the three that actually
+<em>grants</em>.
+<br />All three must permit a request before it is allowed — which is the evaluation order
+you simulated above, seen from the other direction.
+</Callout>
+
+*None of the four is a bug. Each one is a gate that exists because, without it, the previous
+section's $8,000 night would have been much easier to cause and much harder to stop.*
 
 ## The rebuild, in three artifacts
 

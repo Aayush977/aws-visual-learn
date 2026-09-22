@@ -1,12 +1,12 @@
 ---
 title: The Jargon Buster
-summary: Sixty words that AWS documentation assumes you already know — server, instance, subnet, ARN, latency, stateless, egress — each explained the way you would explain it to a friend, then the way the exam means it.
+summary: Sixty-seven words that AWS documentation assumes you already know — server, instance, subnet, CIDR, NAT, ARN, latency, stateless, egress — each explained the way you would explain it to a friend, then the way the exam means it.
 exams: [CCP]
 track: reference
 order: 30
 minutes: 12
 hook: Nobody struggles with AWS because the ideas are hard. They struggle because every explanation of an easy idea contains four words nobody ever defined.
-updated: 2026-08-15
+updated: 2026-09-22
 ---
 
 import Glossary from '../../components/Glossary.astro';
@@ -50,6 +50,11 @@ the word is not in the term's name.
           term: 'Instance',
           plain: 'One running computer that AWS rents you. If you have three instances, you have three computers.',
           precise: 'A virtual machine running on AWS hardware. The word is used almost interchangeably with "server" on AWS, and <strong>EC2 instance</strong> is the common form.',
+        },
+        {
+          term: 'AMI',
+          plain: 'A saved photograph of a disk that new machines are stamped out from. Take the photo once with everything installed, and every server you launch from it is identical.',
+          precise: 'Amazon Machine Image — the template an EC2 instance boots from: operating system, software and configuration. AMIs are per-Region, so copy one before launching from it elsewhere.',
         },
         {
           term: 'Virtual machine (VM)',
@@ -127,6 +132,31 @@ the word is not in the term's name.
           precise: 'On AWS there are two: a <strong>security group</strong> at the instance (stateful, allow-only) and a <strong>network ACL</strong> at the subnet (stateless, allow and deny).',
         },
         {
+          term: 'CIDR block',
+          plain: "A way of writing 'this range of addresses' in one short string. <code>10.0.0.0/16</code> means a big range; <code>10.0.1.0/24</code> means a small one inside it.",
+          precise: 'Classless Inter-Domain Routing notation. The number after the slash is how many bits are fixed — so the <strong>bigger</strong> the number, the <strong>smaller</strong> the range. A /24 holds 256 addresses, a /16 holds 65,536.',
+        },
+        {
+          term: 'NAT',
+          plain: 'A one-way door out. It lets machines with no public address reach the internet — to download an update, say — while nothing on the internet can start a conversation with them.',
+          precise: 'Network Address Translation. On AWS a <strong>NAT gateway</strong> sits in a public subnet and rewrites outbound traffic from private subnets to its own address, so replies can find their way back. Outbound only, and it is charged per hour <em>and</em> per GB.',
+        },
+        {
+          term: 'Network ACL (NACL)',
+          plain: 'A guard on the edge of a whole neighbourhood, checking things on the way in and on the way out. The security group is the guard on each individual front door.',
+          precise: 'A <strong>stateless</strong> filter at the subnet boundary, with numbered Allow <em>and</em> Deny rules evaluated in order. Stateless means a reply is not automatically permitted — you need a rule for the return traffic too, which is the classic reason a NACL change half-works.',
+        },
+        {
+          term: 'Elastic network interface (ENI)',
+          plain: 'A virtual network card. It is the thing that actually holds an address and has security groups attached — instances just borrow one.',
+          precise: 'A virtual network interface in a VPC carrying a private IP, optionally a public one, and security group membership. It can be detached and moved to another instance, which is how some failover designs keep an address alive.',
+        },
+        {
+          term: 'DDoS',
+          plain: 'Thousands of machines hammering your site at once so real customers cannot get in. Not a break-in — a crowd blocking the door.',
+          precise: 'Distributed Denial of Service. AWS Shield Standard defends every account against the common network-layer kinds at no cost; Shield Advanced and WAF handle larger and more targeted ones.',
+        },
+        {
           term: 'Subnet',
           plain: 'A fenced-off section of your private network. You put things in different sections depending on whether the world should reach them.',
           precise: 'A range of IP addresses within a VPC, living in <strong>one</strong> Availability Zone. It is "public" only because its route table points at an internet gateway.',
@@ -180,6 +210,11 @@ the word is not in the term's name.
           term: 'Durability vs availability',
           plain: 'Durability is "will my data still exist?". Availability is "can I get at it right now?". They are different promises.',
           precise: 'S3 is designed for <strong>eleven nines (99.999999999%)</strong> of durability — the data survives. Availability is a separate, lower number about reachability.',
+        },
+        {
+          term: 'IOPS',
+          plain: 'How many separate reads or writes a disk can do per second. Different from speed: a disk can move a lot of data slowly, or a little data very often.',
+          precise: 'Input/output operations per second. It is the number that matters for databases, which do many small scattered reads; <strong>throughput</strong> (MB/s) is the one that matters for big sequential files. EBS volume types are sold on one or the other.',
         },
         {
           term: 'Snapshot',
