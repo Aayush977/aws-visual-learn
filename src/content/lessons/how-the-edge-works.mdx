@@ -1,0 +1,406 @@
+---
+title: How the Edge Works
+summary: Route 53 and CloudFront are both caches with their own clocks, and when a change refuses to appear it is nearly always one of them. Record types, the zone-apex trap, cache keys, invalidation, and locking a bucket so only CloudFront can read it.
+exams: [CCP, SAA]
+track: networking
+order: 15
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 3 — Design High-Performing Architectures'
+minutes: 14
+hook: The sale started at nine. At half past, the marketing lead was still looking at yesterday's price — and the developer next to her, on the same wifi, was looking at the new one. Nobody had deployed anything wrong.
+updated: 2026-09-22
+---
+
+import Diagram from '../../components/Diagram.astro';
+import { lessonUrl } from '../../lib/paths.ts';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Confusable from '../../components/Confusable.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The price that would not change
+
+Kettle & Fox put the enamel mugs into a sale at nine o'clock on a Monday. The price changed in
+the database, the page was redeployed, and the developer who shipped it refreshed and saw
+£14.00. Correct.
+
+The marketing lead, sitting four feet away on the same wifi, saw £22.00. She refreshed. Still
+£22.00. She refreshed eleven more times over twenty minutes, which is the single least useful
+thing anybody did that morning.
+
+By ten past, the picture was genuinely strange. Customers in Leeds were seeing the new price.
+Customers in Bristol were not. One person saw the new price on their phone and the old one on
+their laptop, in the same room, at the same second. Somebody said the word "caching" and
+somebody else said "let's just redeploy", and they redeployed, and nothing changed.
+
+Nothing was broken. **Two entirely separate caches were involved, each with its own clock,
+and nobody in the room could say which one was lying.** By half past they had guessed at
+three fixes and had no idea which of them had eventually worked.
+
+## Two caches, two clocks
+
+Here is the thing worth taking out of that morning, and it is the whole lesson:
+
+> Between a user and your content sit **two independent caches** — the DNS answer and the
+> object itself. They expire on different clocks, they are fixed in completely different
+> ways, and the symptoms look identical from a browser.
+
+Everything below is how each one decides what to keep, how long to keep it, and what actually
+forces it to let go. Play the diagram first: the two caches are steps 1–2 and step 4, and the
+reason Bristol and Leeds disagreed is that they were talking to different copies of both.
+
+<Diagram
+  title="Two caches sit between a user and the truth"
+  viewBox="0 0 1020 500"
+  autoplay
+  steps={[
+    {
+      title: 'The browser needs an address',
+      body: "Before anything is fetched, <code>shop.example.com</code> has to become a number. The browser asks a <strong>resolver</strong> — usually your ISP's or your company's — and the resolver very often already has the answer written down.",
+      flow: 'w-look',
+    },
+    {
+      title: 'Cache one: the resolver only asks when its TTL runs out',
+      body: "Every DNS answer carries a <strong>TTL</strong> — a number of seconds it may be reused. Until that runs out the resolver answers from memory and <strong>Route 53 is never contacted at all</strong>. This is why two people on different networks can disagree for hours: their resolvers started their clocks at different moments.",
+      flow: 'w-auth',
+      duration: 1600,
+    },
+    {
+      title: 'The request goes to that edge location',
+      body: "The address the resolver handed back points at a <strong>CloudFront edge location</strong> — one of hundreds worldwide, chosen for being near the user. Leeds and Bristol are not necessarily sent to the same one.",
+      flow: 'w-conn',
+    },
+    {
+      title: 'Cache two: hit or miss',
+      body: "The edge looks for this exact object in its own store. A <strong>hit</strong> is returned immediately and the origin never hears about the request. Only a <strong>miss</strong> travels on — and the edge then keeps a copy, on its own TTL, for the next person.",
+      flow: 'w-miss',
+      duration: 1600,
+    },
+    {
+      title: 'So which one was lying?',
+      body: "Both, at different times, to different people. A resolver still inside its TTL sends you to an edge; that edge still inside <em>its</em> TTL hands you an old object. Redeploying the application changes neither. Knowing which cache to reach for is the skill this lesson is about.",
+    },
+  ]}
+  caption="The origin is the only copy that is definitely current. Everything to the left of it is a copy with an expiry date on it."
+>
+  <Node x={110} y={110} w={160} h={84} label="Browser" icon="user" tone="muted" step={1} />
+  <Node x={400} y={110} w={240} h={84} label="DNS resolver" sub="answer + TTL" icon="dns" tone="purple" step={1} />
+  <Node x={740} y={110} w={190} h={84} label="Route 53" sub="authoritative" icon="dns" tone="purple" step={2} />
+
+  <Node x={400} y={360} w={240} h={100} label="CloudFront edge" sub="object + TTL" icon="cdn" tone="orange" step={3} />
+  <Node x={780} y={360} w={210} h={100} label="Origin" sub="S3 bucket or ALB" icon="bucket" tone="teal" step={4} />
+
+  <Wire id="w-look" from={[190, 110]} to={[280, 110]} tone="purple" step={1} />
+  <Wire id="w-auth" from={[520, 110]} to={[645, 110]} tone="purple" dashed step={2} label="only when TTL expires" labelDy={-14} />
+  <Wire id="w-conn" from={[110, 152]} to={[400, 310]} shape="elbow-v" mid={240} tone="orange" both step={3} label="fetch the object" labelDx={90} labelDy={-8} />
+  <Wire id="w-miss" from={[520, 360]} to={[675, 360]} tone="orange" dashed step={4} label="only on a miss" labelDy={-14} />
+</Diagram>
+
+## Route 53, and what a record actually is
+
+**Amazon Route 53** is AWS's DNS service. The "53" is the port DNS runs on, which is the kind
+of joke you only get to make once.
+
+A **hosted zone** is a domain you control — `example.com` — and inside it you create
+**records**. A record is a name, a type, a value and a TTL. That is genuinely all it is:
+
+```
+shop.example.com.   A       300    203.0.113.10
+```
+
+Name, type, TTL in seconds, value. The whole of DNS is that line, repeated a few billion times.
+
+### The record types worth knowing
+
+- **A** — a name to an IPv4 address. The common one.
+- **AAAA** — a name to an IPv6 address. Same job, longer addresses.
+- **CNAME** — a name to *another name*. `www.example.com` → `shop.example.com`, and the
+  resolver then has to look that one up too.
+- **ALIAS** — Route 53's own invention. Looks like a CNAME, behaves like an A record, and
+  points at an **AWS resource** — a CloudFront distribution, a load balancer, an S3 website
+  endpoint, another record in the same zone.
+- **MX** — where email for this domain goes. **TXT** — free text, which is how domain
+  ownership and email anti-spoofing are proved. **NS** — which name servers are authoritative.
+
+### The trap: you cannot CNAME the apex
+
+The **zone apex** is the bare domain with nothing in front of it: `example.com`, not
+`www.example.com`. And the DNS specification does not allow a CNAME there — an apex must carry
+its zone's NS and SOA records, and a CNAME is not permitted to coexist with them.
+
+So when someone puts a site behind CloudFront and wants `example.com` (not just
+`www.example.com`) to reach it, they hit a wall. CloudFront hands you a name like
+`d111111abcdef8.cloudfront.net`, not an address, so an A record has nothing to point at, and a
+CNAME is refused at the apex.
+
+**ALIAS is the answer, and it exists precisely for this.** It sits at the apex legally,
+resolves to the AWS resource's current addresses, and follows them when they change.
+
+<Confusable
+  title="ALIAS vs CNAME"
+  ask="They look like the same thing in the console — a name pointing at another name — and picking wrong is one of the most common ways a domain fails to go live."
+  options={[
+    {
+      name: 'ALIAS record',
+      tagline: "Route 53's own type. Points at an AWS resource and is resolved by Route 53 itself.",
+      when: [
+        'You need the <strong>zone apex</strong> — <code>example.com</code> with nothing in front',
+        'The target is a <strong>CloudFront distribution</strong>, load balancer, S3 website endpoint or API Gateway',
+        'You want queries to it to cost nothing',
+        'The target\'s addresses change and you would rather not find out',
+      ],
+      giveaway: ['"the root domain"', '"example.com without www"', '"point at the CloudFront distribution"'],
+    },
+    {
+      name: 'CNAME record',
+      tagline: 'Standard DNS. Points one name at another name, which the resolver then looks up as well.',
+      when: [
+        'The name has something in front of it — <code>www</code>, <code>api</code>, <code>shop</code>',
+        'The target is <strong>outside AWS</strong>, where ALIAS cannot reach',
+        'You are proving domain ownership to a third party that asked for a CNAME',
+      ],
+      giveaway: ['"www.example.com"', '"a subdomain"', '"an external provider"'],
+    },
+  ]}
+  rule="<strong>At the apex, ALIAS is the only option.</strong> Below the apex either works, and ALIAS is still preferable for an AWS target — it is free to query and it saves the resolver a second lookup."
+/>
+
+<Callout type="exam">
+If a question says <em>"the company wants users to reach the site at <code>example.com</code> as
+well as <code>www.example.com</code>"</em> and the target is a CloudFront distribution or a load
+balancer, the answer is an <strong>ALIAS record at the apex</strong>. Every option offering a
+CNAME for the root domain is wrong on a technicality the exam loves.
+</Callout>
+
+### TTL, and why your change took an hour
+
+The TTL is the promise you make to every resolver on the internet: *this answer is good for
+this many seconds.* Once handed out, **you cannot take it back.** There is no button that
+reaches into a resolver in Bristol and clears it.
+
+That is the first half of the Kettle & Fox morning. Their records carried the default TTL, so
+some resolvers were still inside a window that had started before the change and had every
+right to keep answering with the old address.
+
+The practical habit: **before a planned change, lower the TTL and wait.** Drop it to 60
+seconds, wait for the old TTL to fully elapse so every resolver has picked up the short one,
+then make the change — now the whole internet catches up in a minute. Raise it again
+afterwards, because a long TTL is faster and cheaper the rest of the time.
+
+<Callout type="gotcha">
+A short TTL is not free. Every expiry is another query, which means more latency for users and
+more Route 53 charges for you. A TTL is a trade between <em>how fast you can change your mind</em>
+and <em>how much the steady state costs</em>. Lower it deliberately before a change, not
+permanently out of anxiety.
+</Callout>
+
+### Routing policies and health checks, briefly
+
+Covered in more detail in <a href={lessonUrl("request-lifecycle")}>How a Request Reaches Your
+Application</a>,
+but the shape worth carrying here: a record does not have to return one fixed answer.
+**Simple** returns the same thing always. **Weighted** splits traffic by percentage, which is
+how a canary release works. **Latency-based** returns whichever Region is fastest for that
+user. **Failover** returns the backup only when a **health check** says the primary is down.
+**Geolocation** answers differently per country.
+
+Health checks are what make DNS-level failover possible at all — Route 53 probes the endpoint
+and simply stops handing out an address that has stopped answering. It is also the only
+mechanism here that can move traffic **between Regions**; a load balancer cannot.
+
+## CloudFront, and what "cached" actually means
+
+**CloudFront** is the CDN. Hundreds of edge locations, each keeping copies of your content, so
+the mug photograph is served from a building in Sydney rather than crossing the Pacific.
+
+The part people skip is *how the edge decides two requests are the same request.*
+
+### The cache key
+
+The edge stores objects under a **cache key**. By default that key is built from the
+distribution, the path, and whatever you have told CloudFront matters — selected query strings,
+headers and cookies.
+
+That default is deliberate and worth understanding as a rule with two edges:
+
+- **Include too little** and different content collides. Forward nothing, and
+  `/products?id=1` and `/products?id=2` become the same cached object — one customer sees
+  another's page. The bug reads as haunted and is a one-line configuration mistake.
+- **Include too much** and the cache stops working. Forward every header and every cookie and
+  each user's session cookie makes their request unique, so **every single request is a miss**.
+  You now have a CDN that does nothing except add a hop, and a bill for it.
+
+**Cache hit ratio** is the number to watch: the proportion of requests answered at the edge.
+Low ratio on content that ought to be cacheable nearly always means the cache key is carrying
+something it should not.
+
+<Callout type="gotcha">
+The most expensive version of this is forwarding <code>Cache-Control: no-cache</code> style
+behaviour by accident — through a cookie, a <code>Vary</code> header, or an origin that stamps
+every response as private. The distribution looks correctly configured and caches nothing.
+Check the hit ratio before believing the console.
+</Callout>
+
+### How long an object stays
+
+Three numbers, in priority order:
+
+1. **What the origin says.** A `Cache-Control: max-age=3600` header on the response is the
+   origin telling the edge how long it may keep this. Origin instructions win.
+2. **The distribution's default TTL**, used when the origin says nothing at all.
+3. **Minimum and maximum TTL**, which clamp the above — the floor and ceiling you are willing
+   to accept regardless of what the origin claims.
+
+The correct place to control caching is **the origin's headers**, because that keeps the
+decision next to the content. A distribution-wide default is the blunt instrument you use
+when you cannot change the origin.
+
+### Invalidation, and the better habit
+
+An **invalidation** tells every edge to drop an object now. It is the emergency exit: it takes
+a few minutes to propagate, it is charged beyond a small monthly free allowance, and reaching
+for it routinely is a sign the design is wrong.
+
+The habit that removes the need for it is **versioned filenames**. Ship
+`styles.a91f3c.css` rather than `styles.css`, and a deploy changes the *name*. A name the edge
+has never seen cannot be stale — it is a guaranteed miss, fetched fresh, and the old object
+simply ages out on its own. No invalidation, no waiting, no arguing about whose cache is wrong.
+
+Keep the HTML on a short TTL, since it is the thing that references the new names, and give the
+versioned assets a very long one. This is the standard static-site arrangement and it is what
+Kettle & Fox should have had.
+
+<Mnemonic
+  title="When a change will not appear, in order"
+  tone="orange"
+  items={[
+    { key: '1', term: 'Is it DNS?', note: 'compare a fresh resolver — try a different network or a public resolver. Same answer everywhere means DNS is fine' },
+    { key: '2', term: 'Is it the edge?', note: 'request the origin directly. If the origin is right and the edge is wrong, it is the CDN cache' },
+    { key: '3', term: 'Is it the browser?', note: 'a hard reload, or the same URL in a private window. Browsers cache too, and this one is free to rule out' },
+    { key: '4', term: 'Only then change something', note: 'and change exactly one thing, so you learn which cache it actually was' },
+  ]}
+/>
+
+## S3 as an origin, and the bucket nobody should be able to read
+
+The most common CloudFront origin is an S3 bucket, and there are two different ways to attach
+one — which is the other thing people get wrong.
+
+**The S3 website endpoint** is the one that supports index documents and redirect rules. It
+speaks plain HTTP and it is, necessarily, public.
+
+**The S3 REST endpoint** is the bucket's normal API address. It supports HTTPS and, crucially,
+it can be locked so that **only your CloudFront distribution may read it**.
+
+That lock is **Origin Access Control (OAC)**. CloudFront signs its requests to the bucket; a
+bucket policy accepts requests from that distribution and nothing else. The bucket stays fully
+private, every public request is refused, and the only route to the content is through
+CloudFront — which is also where WAF, Shield, TLS and your cache behaviours live.
+
+<Callout type="exam">
+"Serve static content through CloudFront while keeping the S3 bucket private" is a standard
+exam item, and the answer is <strong>Origin Access Control with a bucket policy that allows
+only the distribution</strong>. Making the bucket public and putting CloudFront in front of it
+is offered as a distractor in nearly every version of this question: it works, and it leaves
+the bucket reachable directly, which defeats the point.
+</Callout>
+
+<Callout type="note" title="OAC replaced OAI">
+Older material — and plenty of blog posts — say <strong>Origin Access Identity (OAI)</strong>.
+That is the previous generation of the same idea. OAC is the current mechanism and supports
+things OAI never did, including SSE-KMS encrypted objects. If you meet OAI in a question, it
+means the same thing; if you are building something today, use OAC.
+</Callout>
+
+<Quiz
+  question="A company hosts a static website in an S3 bucket behind a CloudFront distribution. Security requires that the objects cannot be retrieved by going to the S3 URL directly. What should a solutions architect do?"
+  choose={1}
+  options={[
+    {
+      text: 'Configure Origin Access Control and update the bucket policy to allow only the CloudFront distribution',
+      correct: true,
+      why: 'OAC makes CloudFront sign its requests to the origin, and the bucket policy accepts only those. The bucket can stay entirely private and every direct request is denied.',
+    },
+    {
+      text: 'Enable S3 static website hosting and restrict the bucket policy to the CloudFront IP ranges',
+      why: 'The website endpoint has to be public to work, and pinning a policy to published CloudFront IP ranges is brittle — the ranges change, and the bucket is still fundamentally reachable.',
+    },
+    {
+      text: 'Make the bucket public and rely on the CloudFront URL being the only one published',
+      why: 'An unpublished URL is not a control. The bucket address is predictable and is routinely discovered by scanning. This is the distractor the question is built around.',
+    },
+    {
+      text: 'Put the bucket in a private subnet of the VPC',
+      why: 'S3 is not a VPC resource and has no subnet. A VPC endpoint changes how traffic reaches S3, but it is not what governs whether the public endpoint answers.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="A team lowers the price on a product page and redeploys. Some users still see the old price forty minutes later, while others see the new one immediately. The origin returns the correct price when queried directly. What is the most likely cause?"
+  choose={1}
+  options={[
+    {
+      text: 'CloudFront edge locations are still serving the cached object until its TTL expires',
+      correct: true,
+      why: 'The origin is provably correct, so the stale copy is downstream of it. Different users hit different edges, and each edge has its own independent expiry — which is exactly why some users see the change and others do not.',
+    },
+    {
+      text: 'The deployment failed on some of the EC2 instances',
+      why: 'That would produce inconsistency too, but the question states the origin returns the correct price. A partial deploy would show up when querying the origin directly.',
+    },
+    {
+      text: 'Route 53 is returning the wrong address for the domain',
+      why: 'A DNS problem sends users to the wrong place entirely — they would see an error or a different site, not a correctly rendered page with a stale number on it.',
+    },
+    {
+      text: 'The RDS read replica has not caught up with the primary',
+      why: 'Replica lag is real and causes this shape of bug, but it is measured in seconds, not forty minutes, and it would not correlate with which edge location a user reached.',
+    },
+  ]}
+/>
+
+<Scenario
+  who="A hospital group publishing patient information leaflets"
+  problem="Aldgate Health serves several thousand PDF leaflets, some of them large, to patients across the country. They are on a single web server, which is slow for anyone far from the data centre and falls over whenever a leaflet is mentioned on local radio. A previous attempt at a CDN was abandoned after a clinician found the same leaflets served from a publicly listable bucket address that bypassed the site entirely."
+  solution="Leaflets move to a private S3 bucket with CloudFront in front, attached to the REST endpoint using Origin Access Control — the bucket policy allows the distribution and nothing else, so the direct address returns Access Denied. Filenames carry a content hash, so a corrected leaflet is a new object rather than an invalidation. The HTML index gets a sixty-second TTL; the PDFs get a year. Route 53 holds an ALIAS record at the apex pointing at the distribution."
+  outcome="Retrieval is fast nationwide because the file is served from a nearby edge, the origin sees a tiny fraction of the traffic, and the radio mention is now uneventful. The direct bucket URL no longer resolves to anything a patient or anyone else can read."
+>
+Note which problem each piece solved. **OAC** answered the security objection that killed the
+first attempt; **versioned filenames** removed invalidation from the deploy process entirely;
+the **split TTL** is what lets a correction go live in a minute while the heavy files still
+cache for a year. None of those is CloudFront being clever — they are three separate decisions
+about who is allowed to hold a copy, and for how long.
+</Scenario>
+
+<Takeaways
+  items={[
+    'Two caches sit between a user and your content: the <strong>DNS answer</strong> (TTL, held by resolvers you do not control) and the <strong>object</strong> (TTL, held by CloudFront edges).',
+    'A DNS record is <strong>name, type, value, TTL</strong>. <strong>A</strong> → IPv4 · <strong>CNAME</strong> → another name · <strong>ALIAS</strong> → an AWS resource, and the only thing legal at the zone apex.',
+    'You cannot CNAME <code>example.com</code>. For the bare domain in front of CloudFront or a load balancer, the answer is always <strong>ALIAS</strong>.',
+    'A TTL you have handed out cannot be recalled. <strong>Lower it before a planned change and wait</strong>, then raise it again.',
+    'The <strong>cache key</strong> decides what counts as the same request. Too little and users see each other\'s content; too much and nothing ever hits.',
+    'Cache lifetime comes from the <strong>origin\'s Cache-Control header</strong> first, the distribution default second, clamped by min and max TTL.',
+    '<strong>Versioned filenames beat invalidation.</strong> A new name is always a miss, so there is nothing stale to clear.',
+    'To keep an S3 origin private, use <strong>Origin Access Control</strong> plus a bucket policy naming only the distribution. OAC replaced the older OAI.',
+  ]}
+/>
+
+---
+
+Kettle & Fox never did find out which of their three fixes worked, because they made all three
+at once — and that is the real cost of not knowing how the edge works. It is not the forty
+minutes of wrong prices. It is that they learned nothing from the forty minutes, and would
+have been exactly as lost the next time.
+
+The next sale, they dropped the record TTL the night before, gave the HTML sixty seconds and
+the images a year, and put a hash in every asset filename. Nobody watched the prices at nine
+o'clock, because there was nothing to watch.
+
+A cache is not a mysterious force. It is a copy, held by somebody specific, for a length of
+time you agreed to.

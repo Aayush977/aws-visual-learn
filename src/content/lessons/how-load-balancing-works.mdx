@@ -1,0 +1,341 @@
+---
+title: How a Load Balancer Actually Decides
+summary: Listeners, rules, target groups and health checks — what a load balancer does with each request, why a healthy-looking instance can still be broken, and why putting two servers behind one address quietly forbids storing anything on them.
+exams: [CCP, SAA]
+track: networking
+order: 17
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 2 — Design Resilient Architectures'
+minutes: 13
+hook: They added a second server for resilience, and the support queue filled with people being logged out halfway through a claim. The second server was working perfectly. That was the problem.
+updated: 2026-09-22
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Boundary from '../../components/svg/Boundary.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Confusable from '../../components/Confusable.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The second server that broke everything
+
+Brightwell's claims portal ran on one server, and everyone agreed that was a risk. So they did
+the obvious, responsible thing: they added a second one and put a load balancer in front.
+
+The support queue filled up within an hour.
+
+Customers were being logged out in the middle of a claim. Not all of them, and not
+consistently — a form would submit fine, then the next page would bounce them to the login
+screen, then the page after that would work again. One customer got three quarters of the way
+through uploading photographs of a flooded kitchen and lost the lot.
+
+The engineers checked both servers. Both were up. Both were serving pages. Both had the
+correct code. The load balancer reported two healthy targets and was cheerfully splitting
+traffic between them, which is precisely what they had asked it to do and exactly what was
+destroying every session.
+
+**Nothing had failed. The second server was working perfectly — and that was the problem.**
+
+## One address in front of many machines
+
+A load balancer is a single, stable address that stands in front of a changing set of machines
+and hands each arriving request to one of them.
+
+Everything awkward about it follows from that one sentence. If a request can go to *any*
+machine, then **no machine is allowed to be special** — and a server holding the only copy of
+your session is very special indeed. Brightwell's sessions were stored on local disk. Half the
+requests landed on a server that had never heard of that customer, and the only honest thing
+for it to do was ask them to log in again.
+
+That is the shape of nearly every load balancer problem: something that used to be safe to keep
+on one machine is no longer safe to keep on one machine.
+
+<Diagram
+  title="Listener, rules, target groups, targets"
+  viewBox="0 0 1020 520"
+  autoplay
+  steps={[
+    {
+      title: 'The client only ever sees one address',
+      body: "Everything below is invisible from outside. The DNS name of the load balancer is the entire public surface — instances can be added, removed or replaced without a single client noticing.",
+      flow: 'w-in',
+    },
+    {
+      title: 'A listener waits on a port',
+      body: "A <strong>listener</strong> is the door: a protocol and a port the load balancer accepts traffic on, most often HTTPS on 443. This is also where the TLS certificate lives, which is why the certificate is attached to the balancer and not to each server.",
+    },
+    {
+      title: 'Rules decide where it goes',
+      body: "An <strong>Application Load Balancer</strong> reads the request and routes on its content — path, hostname, header, even the HTTP method. <code>/api/*</code> can go to one set of machines and everything else to another, through one address and one certificate.",
+      flow: ['w-r1', 'w-r2'],
+      duration: 1500,
+    },
+    {
+      title: 'A target group holds the machines',
+      body: "A <strong>target group</strong> is the list of things that can answer, plus — importantly — <strong>the health check configuration</strong>. The health check belongs to the group, not to the load balancer, so different groups can be judged by different rules.",
+      flow: ['w-w1', 'w-w2', 'w-a1', 'w-a2'],
+      duration: 1600,
+    },
+    {
+      title: 'A failing target is simply skipped',
+      body: "The group probes every target on a fixed interval. Fail enough checks in a row and it is marked unhealthy and stops receiving requests — no alarm, no outage, just quietly removed from rotation until it passes again.",
+    },
+    {
+      title: 'Which is why nothing may live on a target',
+      body: "Any request can land on any healthy target, and a target can vanish between one request and the next. <strong>Sessions, uploads and files therefore cannot live on the instance</strong> — that is not a rule someone invented, it is a direct consequence of the picture above.",
+    },
+  ]}
+  caption="Listener → rule → target group → target. Four words that describe every Application Load Balancer you will ever configure."
+>
+  <Node x={95} y={80} w={150} h={80} label="Client" icon="user" tone="muted" step={1} />
+  <Node x={400} y={80} w={280} h={90} label="Application Load Balancer" sub="listener :443" icon="balancer" tone="blue" step={1} />
+
+  <Node x={290} y={260} w={240} h={80} label="Target group: web" sub="health check /healthz" icon="scale" tone="purple" step={4} />
+  <Node x={760} y={260} w={240} h={80} label="Target group: api" sub="health check /api/health" icon="scale" tone="purple" step={4} />
+
+  <Boundary x={90} y={370} w={400} h={130} label="two Availability Zones" icon="zone" tone="teal" step={4} />
+  <Boundary x={560} y={370} w={400} h={130} label="two Availability Zones" icon="zone" tone="teal" step={4} />
+
+  <Node x={190} y={440} w={170} h={80} label="web-a" sub="healthy" icon="server" tone="teal" step={4} />
+  <Node x={390} y={440} w={170} h={80} label="web-b" sub="failing checks" icon="server" tone="red" step={5} />
+  <Node x={660} y={440} w={170} h={80} label="api-a" sub="healthy" icon="server" tone="teal" step={4} />
+  <Node x={860} y={440} w={170} h={80} label="api-b" sub="healthy" icon="server" tone="teal" step={4} />
+
+  <Wire id="w-in" from={[170, 80]} to={[260, 80]} tone="blue" step={1} />
+  <Wire id="w-r1" from={[400, 125]} to={[290, 220]} shape="elbow-v" mid={190} tone="purple" step={3} label="/ → web" labelDx={-70} labelDy={-6} />
+  <Wire id="w-r2" from={[400, 125]} to={[760, 220]} shape="elbow-v" mid={190} tone="purple" step={3} label="/api/* → api" labelDx={80} labelDy={-6} />
+
+  <Wire id="w-w1" from={[290, 300]} to={[190, 400]} shape="elbow-v" mid={350} tone="teal" step={4} />
+  <Wire id="w-w2" from={[290, 300]} to={[390, 400]} shape="elbow-v" mid={350} tone="red" dashed step={5} />
+  <Wire id="w-a1" from={[760, 300]} to={[660, 400]} shape="elbow-v" mid={350} tone="teal" step={4} />
+  <Wire id="w-a2" from={[760, 300]} to={[860, 400]} shape="elbow-v" mid={350} tone="teal" step={4} />
+</Diagram>
+
+## Health checks, and what "healthy" should mean
+
+The health check is the most under-thought setting in AWS, and it decides whether your outage
+lasts thirty seconds or all afternoon.
+
+A target group probes each target on a schedule. Four numbers control it:
+
+- **Interval** — how often to probe.
+- **Timeout** — how long to wait for an answer before calling it a failure.
+- **Unhealthy threshold** — how many consecutive failures before the target is pulled out.
+- **Healthy threshold** — how many consecutive successes before it is allowed back in.
+
+Plus a **path** and a **success matcher** (which HTTP codes count as a pass).
+
+### The trap: checking the wrong thing
+
+Point the health check at `/` and you are usually asking the *web server* whether it is alive.
+It will happily say yes while the application behind it cannot reach the database, cannot read
+its configuration, and is returning an error page to every real customer — with a 200 status,
+because the error page rendered successfully.
+
+The load balancer has no way to know. It asked a question and got the answer it was told to
+accept.
+
+**Point the health check at an endpoint that exercises the thing that actually matters.** A
+`/healthz` that checks it can reach the database and returns 503 when it cannot is worth more
+than any monitoring you can buy, because the load balancer acts on it automatically and
+instantly.
+
+<Callout type="gotcha">
+The opposite mistake is just as common: a health check that is <em>too</em> thorough. If
+<code>/healthz</code> queries the database and the database has a slow minute, <strong>every
+target fails at once</strong> and the load balancer takes the entire fleet out of service over
+a problem that would have resolved itself. Check what this instance needs to serve a request —
+not the health of every downstream system it has ever spoken to.
+</Callout>
+
+### Draining, so nobody is cut off mid-request
+
+When a target is removed — a scale-in, a deploy, a manual deregistration — it stops receiving
+*new* requests but is given time to finish the ones it already has. This is the
+**deregistration delay**, sometimes called connection draining, and it defaults to five
+minutes.
+
+Too short and you cut people off mid-upload. Too long and every deploy crawls. Set it to
+slightly longer than your slowest normal request, not your slowest imaginable one.
+
+### Cross-zone load balancing
+
+Targets live in more than one Availability Zone, and there is a question about whether a
+balancer node in one zone may send traffic to targets in another.
+
+- **Application Load Balancer:** cross-zone is **always on**. Traffic is spread evenly across
+  all healthy targets regardless of zone.
+- **Network Load Balancer:** it is **off by default**. Each zone's node sends only to targets
+  in its own zone, which means uneven zones get uneven load — four targets in one AZ and one in
+  another means that single target receives the same share as the other four combined.
+
+<Callout type="exam">
+"Traffic is not evenly distributed across instances" with an NLB in the question is nearly
+always <strong>cross-zone load balancing being disabled</strong>, or unequal numbers of targets
+per Availability Zone. With an ALB, look elsewhere — it cannot be the cause, because it is
+always enabled there.
+</Callout>
+
+## Sessions: the real fix and the plaster
+
+Back to Brightwell. There are two ways out of the logged-out problem, and the exam cares that
+you know which is which.
+
+**The plaster is sticky sessions.** The load balancer issues a cookie that pins a customer to
+the same target for a period. The logouts stop immediately, which is why this is what almost
+everyone reaches for first.
+
+It also brings back every problem the load balancer existed to solve. That target is now
+special again: when it fails, everyone pinned to it loses their session anyway. Scaling out
+does not help existing customers, because they are already attached elsewhere. And load goes
+lopsided, because customers do not distribute themselves evenly.
+
+**The real fix is to move the state off the instance**, so no target is ever special:
+
+- Sessions into **ElastiCache for Redis** or **DynamoDB**, where every instance can reach them.
+- Uploaded files into **S3**, not local disk.
+- Anything written during a request into a **database**, not a temporary directory.
+
+Now an instance can be destroyed mid-afternoon and nobody notices. That property — a machine
+being disposable — is what makes auto scaling, rolling deploys and self-healing possible at
+all. Sticky sessions buy you an afternoon; statelessness buys you the architecture.
+
+<Callout type="exam">
+When a question describes users losing sessions behind a load balancer and asks for the
+<strong>most scalable</strong> or <strong>most resilient</strong> answer, it wants the session
+store — ElastiCache or DynamoDB. Sticky sessions will be offered, and it is the right answer
+only when the question explicitly rules out changing the application.
+</Callout>
+
+## Which load balancer
+
+<Confusable
+  title="ALB vs NLB vs Gateway Load Balancer"
+  ask="Three load balancers, and the question that sorts them is what the traffic is and how deeply you need it understood."
+  options={[
+    {
+      name: 'Application Load Balancer',
+      tagline: 'Layer 7. Reads the HTTP request and can route on what is inside it.',
+      when: [
+        'The traffic is <strong>HTTP or HTTPS</strong>',
+        'You want to route by <strong>path, hostname or header</strong> — microservices behind one address',
+        'Targets include <strong>containers or Lambda functions</strong>, not only instances',
+        'You want <strong>AWS WAF</strong> attached, or user authentication at the balancer',
+      ],
+      giveaway: ['"path-based routing"', '"host-based"', '"microservices"', '"HTTP header"'],
+    },
+    {
+      name: 'Network Load Balancer',
+      tagline: 'Layer 4. Forwards TCP and UDP at very high speed without reading the contents.',
+      when: [
+        'The protocol is <strong>not HTTP</strong> — a database, a game server, MQTT, HL7',
+        'You need a <strong>static IP address per Availability Zone</strong>, or an Elastic IP',
+        'Extreme throughput or the lowest possible latency',
+        'The backend needs the <strong>client\'s real source IP</strong>',
+      ],
+      giveaway: ['"static IP"', '"millions of requests"', '"ultra-low latency"', '"TCP"', '"allowlist our IP"'],
+    },
+    {
+      name: 'Gateway Load Balancer',
+      tagline: 'For putting third-party virtual appliances — firewalls, intrusion detection — in the traffic path.',
+      when: [
+        'Traffic must pass <strong>through an inspection appliance</strong> before reaching the application',
+        'You are deploying a vendor\'s virtual firewall fleet and need it scaled and health-checked',
+      ],
+      giveaway: ['"third-party appliance"', '"traffic inspection"', '"virtual firewall"'],
+    },
+  ]}
+  rule="<strong>Does it need to understand HTTP?</strong> Yes → ALB. No, just move packets fast, or a static IP is required → NLB. It is not the destination but an inspection step on the way → Gateway Load Balancer."
+/>
+
+<Quiz
+  question="A company runs a web application behind an Application Load Balancer across two Availability Zones. Users report being logged out at random. The application stores session data on the local filesystem of each EC2 instance. Which solution is the most scalable?"
+  choose={1}
+  options={[
+    {
+      text: 'Store session data in Amazon ElastiCache for Redis',
+      correct: true,
+      why: 'The session moves off the instances entirely, so every target can serve every customer. Instances stay disposable, which keeps auto scaling and rolling deploys working.',
+    },
+    {
+      text: 'Enable sticky sessions on the target group',
+      why: 'It stops the symptom immediately, and it is the answer only when the application cannot be changed. It reintroduces the original problem — losing an instance still loses its customers\' sessions, and load becomes uneven.',
+    },
+    {
+      text: 'Use an EFS filesystem mounted on both instances for session files',
+      why: 'It does make the sessions shared, so it technically works. It is a slower and more expensive way to reach a solved problem, and session data is exactly the small, hot, short-lived data an in-memory store is built for.',
+    },
+    {
+      text: 'Replace the ALB with a Network Load Balancer',
+      why: 'The load balancer is not the problem — the application storing state locally is. An NLB distributes traffic just the same, so the logouts would continue.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="An Auto Scaling group behind an ALB keeps launching and terminating instances every few minutes, even though traffic is steady. The application takes about 90 seconds to start and begin serving requests. What is the most likely cause?"
+  choose={1}
+  options={[
+    {
+      text: 'The health check grace period is shorter than the application startup time, so new instances are marked unhealthy before they are ready',
+      correct: true,
+      why: 'The instance is killed for failing a check it was never given time to pass, a replacement is launched, and the cycle repeats. Classic startup-time-versus-grace-period mismatch.',
+    },
+    {
+      text: 'Cross-zone load balancing is disabled on the ALB',
+      why: 'It cannot be — cross-zone is always enabled on an Application Load Balancer and cannot be turned off. It would also cause uneven load, not a launch-terminate loop.',
+    },
+    {
+      text: 'The deregistration delay is set too high',
+      why: 'A long deregistration delay makes scale-in and deploys slow to complete. It does not cause healthy instances to be terminated in the first place.',
+    },
+    {
+      text: 'The instances are in a private subnet',
+      why: 'That is the normal and recommended arrangement for application instances behind a load balancer. It has no bearing on the health check, which the balancer performs from inside the VPC.',
+    },
+  ]}
+/>
+
+<Scenario
+  who="A hospital group connecting to a national pathology network"
+  problem="Aldgate Health receives lab results over HL7, a decades-old protocol that runs straight over TCP and knows nothing about HTTP. Two things make an ALB impossible: the traffic is not HTTP so there is nothing to route on, and the national network's firewall team will only allowlist fixed IP addresses — they will not accept a DNS name that resolves to changing addresses. The current single integration server is a named point of failure in an NHS resilience audit."
+  solution="A Network Load Balancer fronts a pair of integration servers across two Availability Zones, with an Elastic IP attached in each zone so the partner can allowlist two addresses that never change. The NLB forwards TCP without inspecting it, and preserves the source IP so the integration engine can still tell which sending facility a message came from. Cross-zone load balancing is switched on deliberately, because the two zones do not hold equal numbers of servers. The target group's health check opens a TCP connection to the HL7 port rather than probing a web page that does not exist."
+  outcome="The named single point of failure is gone from the audit, the partner's allowlist never has to change again, and a server can now be patched during the day by draining it out of the target group."
+>
+Every one of those choices came from a constraint, not a preference. **Not HTTP** ruled out the
+ALB. **A partner firewall** demanded the static addresses only an NLB offers. **Unequal zones**
+made cross-zone worth enabling. Read a scenario question the same way: the service is chosen by
+the sentence that forbids the alternatives.
+</Scenario>
+
+<Takeaways
+  items={[
+    'The path is always <strong>listener → rule → target group → target</strong>. The listener holds the port and the TLS certificate; the target group holds the machines <em>and</em> the health check.',
+    'A health check pointed at <code>/</code> usually asks the web server, not the application. Point it at an endpoint that <strong>fails when the app genuinely cannot serve</strong>.',
+    'Too thorough a health check is its own outage: if it depends on a shared downstream system, <strong>every target can fail at once</strong>.',
+    '<strong>Deregistration delay</strong> (draining) lets a leaving target finish in-flight requests. Default five minutes.',
+    'Cross-zone load balancing is <strong>always on for ALB</strong> and <strong>off by default for NLB</strong> — the usual explanation for uneven traffic behind an NLB.',
+    'Behind a load balancer, <strong>no instance may be special</strong>. Sessions go to ElastiCache or DynamoDB, files go to S3.',
+    '<strong>Sticky sessions are a plaster</strong>, correct only when the application cannot be changed. They bring back the single point of failure they were meant to remove.',
+    '<strong>ALB</strong> understands HTTP and routes on it · <strong>NLB</strong> moves TCP/UDP fast and offers static IPs · <strong>Gateway Load Balancer</strong> puts an inspection appliance in the path.',
+  ]}
+/>
+
+---
+
+Brightwell's second server was never broken. It was doing exactly what a second server does,
+and it exposed an assumption nobody knew they had made: that the machine which started a
+customer's session would be the machine that finished it.
+
+That assumption was invisible for as long as there was only one machine to make it on. This is
+what people mean when they say the cloud requires a different way of thinking — not that the
+servers are different, but that **you are no longer allowed to know which one you are talking
+to**, and anything you were quietly keeping on it has to go somewhere every server can reach.
+
+Adding the second server did not cause the bug. It revealed one that had been there since the
+first day.

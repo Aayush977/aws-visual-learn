@@ -1,6 +1,6 @@
 # Writing a lesson
 
-Everything here is a convention the existing 39 lessons already follow. Follow it and a new
+Everything here is a convention the existing 43 lessons already follow. Follow it and a new
 lesson reads as part of one course; ignore it and the site reads as 40 separate articles by
 40 different people, which is the failure mode this document exists to prevent.
 
@@ -113,6 +113,33 @@ Each component encodes a teaching decision. Reach for them in roughly this order
 | `<SourceRepo>` | Projects only. Always name the licence. |
 
 Diagrams are drawn from scratch, never pasted from AWS's own architecture icons.
+
+**Two enums fail only at build time**, with an unhelpful `Cannot read properties of undefined`:
+
+- `<Callout type>` — exactly `exam`, `gotcha`, `analogy`, `cost`, `note`.
+- `icon=` on `<Node>` and `<Boundary>` — must be a key in `src/lib/glyphs.ts`. There is no
+  `warning`; the nearest are `deny` and `shield`. Check the file rather than guessing, and if
+  the icon you want is missing, add the glyph there rather than picking a misleading one.
+
+`<Node>` and `<Boundary>` also differ in what their coordinates mean: a Node's `x`/`y` is its
+**centre**, a Boundary's is its **top-left**. Mixing them up is the usual reason a diagram
+looks subtly off.
+
+## Linking to another lesson
+
+Markdown link syntax writes the href verbatim, and the site is served from `/aws-visual-learn/`
+— so `[text](/lessons/slug)` builds a link that works locally and 404s in production. Import
+the helper and use a JSX anchor:
+
+```mdx
+import { lessonUrl } from '../../lib/paths.ts';
+
+<a href={lessonUrl("request-lifecycle")}>How a Request Reaches Your Application</a>
+```
+
+Same rule for images and downloads — `how-iam-decides` imports the same module as
+`url as asset` for exactly this. Check a built page if unsure: the href should start
+`/aws-visual-learn/`.
 
 ## Jargon
 

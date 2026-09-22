@@ -22,7 +22,7 @@ rather than recall?
 
 | | |
 |---|---|
-| **39 lessons** | across 11 tracks, from "what is cloud computing" to ten full architectures |
+| **43 lessons** | across 11 tracks, from "what is cloud computing" to ten full architectures |
 | **A 67-term jargon buster** | each word in pub English first, then the way the exam means it |
 | **87 quiz questions** | written in exam style, every option carrying a `why` — including the wrong ones |
 | **23 practice exams** | 1,142 questions, built from a public MIT-licensed bank (see below) |
