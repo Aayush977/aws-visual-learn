@@ -7,7 +7,7 @@ order: 25
 domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 2 — Design Resilient Architectures'
-minutes: 14
+minutes: 19
 hook: One patient received the same appointment reminder fourteen times between two and six in the morning. The system was not broken, was not looping, and had no bug in it. It was doing exactly what it had been told.
 updated: 2026-09-22
 ---
@@ -17,6 +17,8 @@ import Node from '../../components/svg/Node.astro';
 import Wire from '../../components/svg/Wire.astro';
 import Callout from '../../components/Callout.astro';
 import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import { lessonUrl } from '../../lib/paths.ts';
 import Mnemonic from '../../components/Mnemonic.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
@@ -335,6 +337,108 @@ The part worth stealing is the **archive**. SNS and SQS both move an event forwa
 is gone; EventBridge can be asked for it again. A consumer that did not exist when the event
 happened is exactly the case nothing else here can serve.
 </Scenario>
+
+## Build it yourself
+
+There is a workshop that happens to be built around exactly the two patterns this lesson
+spends most of its time on, in exactly that order.
+
+<SourceRepo
+  repo="aws-samples/asynchronous-messaging-workshop"
+  url="https://github.com/aws-samples/asynchronous-messaging-workshop"
+  licence="MIT-0"
+  stars="~97"
+  effort="15–30 minutes per lab"
+  blurb="Five independent labs on asynchronous messaging, each self-contained with no dependency on the others, built around a fictional unicorn ride-hailing company. Lab 1 is SNS fan-out with subscription filters; Lab 2 adds a queue in front of every subscriber. Each can be done through the console or with AWS SAM. The labs live in code/lab-N and the walkthrough is at async-messaging.workshop.aws."
+/>
+
+### Lab 1 — fan-out and message filtering
+
+A ride-completion event has to reach three services that each want something different: a
+customer notification service, a customer accounting service, and an "extraordinary rides"
+service that only cares about rides above a certain fare or distance.
+
+That last one is the reason this lab exists. It is the case for **filter policies** — the
+third service subscribes to the same topic as the other two and receives only the messages it
+wants, rather than receiving everything and discarding most of it in an `if` statement.
+
+**What it teaches, mapped back:**
+
+| In the lab | In this lesson |
+|---|---|
+| Creating the SNS topic and adding Lambda subscriptions | *SNS: push, to everyone at once* |
+| A subscription filter on the extraordinary-rides service | Filter policies, and the work they save |
+| Three subscribers on one topic | Each subscriber getting its own copy |
+
+### Lab 2 — topic-queue chaining
+
+The same three services, with an SQS queue inserted between the topic and each one.
+
+The workshop's own justification is worth quoting almost directly, because it is the exam
+answer: one of these services **could be taken offline for maintenance**, or could hit an
+exception, and either way it would miss topic messages. Buffering each subscriber behind its
+own queue means nothing is lost while it is away.
+
+This is the **SNS → SQS fan-out** section of this lesson, and it is also, almost word for
+word, the second quiz question above. Doing the lab and then re-reading that question is a
+good way to find out whether you learned the pattern or memorised the answer.
+
+The lab also makes the second, less obvious point: a queue in front of a subscriber is a
+**buffering load balancer**. Because each message goes to exactly one consumer process, you
+can scale that subscriber out and the messages distribute themselves — and a scaling event
+loses nothing, because the queue is holding everything until a consumer is ready.
+
+**What it teaches, mapped back:**
+
+| In the lab | In this lesson |
+|---|---|
+| Adding an SQS queue between topic and consumer | Why SNS alone converts "delivered" into "lost" |
+| SQS as an event source for Lambda | Event source mapping — Lambda polls the queue |
+| Scaling consumers behind one queue | One message, one consumer |
+
+### Step by step
+
+1. Start with **Lab 0**, the prerequisites — it sets up the shared environment the others use.
+2. Do **Lab 1**, then **Lab 2**. They are the two this lesson covers and they build on the same
+   story, so doing them in order is worth it even though the workshop says each is independent.
+3. Labs 3 and 4 (scatter-gather, and orchestration with Step Functions) go beyond this lesson.
+   They are good, and they are the natural next thing once queues make sense.
+4. **Do the clean-up section.** Each lab has one, and they exist because this workshop leaves
+   topics, queues and functions behind.
+
+### Break it on purpose
+
+The workshop is a happy path. These are the experiments that turn it into understanding:
+
+1. **Receive a message and do not delete it.** Use the console's *Poll for messages*, watch the
+   message appear, then walk away. Poll again after the visibility timeout and it is back. This
+   is the single most important behaviour in this lesson and it takes ninety seconds to see.
+2. **Watch the receive count.** The console shows *Approximate receive count* per message.
+   Poll the same message repeatedly and watch it climb toward the redrive threshold, then find
+   it in the dead-letter queue.
+3. **Break one subscriber only.** Point one of the three Lambda subscriptions at code that
+   throws, and confirm the other two are completely unaffected. Then check its queue depth
+   climbing while the others stay at zero — the isolation is the whole argument for topic-queue
+   chaining.
+4. **Delete a filter policy** and watch the extraordinary-rides service start receiving every
+   ride. Cheap to do, and it makes the cost of *not* filtering concrete.
+5. **Send the same message twice** and see that nothing stops you. Then add the idempotency
+   check — record the id, return early if seen — and see that the second one does nothing.
+
+### Want just the pattern, without the workshop?
+
+`aws-samples/serverless-patterns` (MIT-0, cited in
+<a href={lessonUrl("how-serverless-runs")}>How Serverless Actually Runs</a>) has deployable
+one-command versions of each of these: `sns-sqs-fanout-cdk-java`, `eventbridge-sqs-cdk`,
+`sqs-lambda-ddb-sam-ts` and about a thousand others. Less narrative, much faster, and a good
+reference once you know what you are looking for.
+
+<Callout type="cost" title="Clean up, and mind the fan-out">
+SQS and SNS are billed per request and are very cheap at lab volumes. The thing to watch is
+that a fan-out multiplies: one published message becomes three deliveries and three Lambda
+invocations. That is fine for a lab and worth remembering before pointing a loop at a topic.
+Each lab has a clean-up page — use it.
+</Callout>
 
 <Takeaways
   items={[

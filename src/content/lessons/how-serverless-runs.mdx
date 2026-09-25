@@ -7,7 +7,7 @@ order: 15
 domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 3 — Design High-Performing Architectures'
-minutes: 15
+minutes: 20
 hook: The first report of the morning took eight seconds. The second took two hundred milliseconds. Same function, same data, same code — and for three weeks the team optimised the wrong thing entirely.
 updated: 2026-09-22
 ---
@@ -17,6 +17,7 @@ import Node from '../../components/svg/Node.astro';
 import Wire from '../../components/svg/Wire.astro';
 import Callout from '../../components/Callout.astro';
 import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
 import Mnemonic from '../../components/Mnemonic.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
@@ -378,6 +379,103 @@ long-running happens while a caller waits, the spike lands somewhere designed to
 the retry behaviour is safe because the function was written to tolerate being run twice.
 Almost every serverless scenario question is asking you to assemble those three.
 </Scenario>
+
+## Build it yourself
+
+Two labs here, because this lesson made two different kinds of claim. The first builds the
+architecture from the scenario above; the second measures the memory-is-a-CPU-dial claim
+instead of asking you to believe it.
+
+### Lab 1 — accept, queue, process
+
+<SourceRepo
+  repo="aws-samples/serverless-patterns"
+  url="https://github.com/aws-samples/serverless-patterns/tree/main/apigw-sqs-lambda-ddb"
+  licence="MIT-0"
+  stars="~1.8k"
+  effort="half an hour"
+  blurb="A collection of around a thousand deployable serverless patterns, each a small SAM or CDK template with a README. The one to start with is apigw-sqs-lambda-ddb: API Gateway accepts a POST, puts it on a queue, returns immediately, and a Lambda function drains the queue into DynamoDB — with a dead-letter queue already wired up. It is the Kettle & Fox scenario above, deployable in one command."
+/>
+
+**Steps**
+
+1. `git clone https://github.com/aws-samples/serverless-patterns`
+2. `cd apigw-sqs-lambda-ddb`
+3. `sam deploy --guided` — you will need the AWS SAM CLI installed and credentials configured.
+   Accept the prompts; it will offer to create the IAM roles.
+4. POST to the endpoint it prints. You get a response **immediately** — before the work has
+   happened. That is the `202`-shaped pattern from the scenario, and feeling the speed of that
+   response is the point.
+5. Look in DynamoDB a moment later and find the record.
+
+**Then open `template.yaml`, because it is a checklist of this lesson:**
+
+| In the template | In this lesson |
+|---|---|
+| `RedrivePolicy` with `maxReceiveCount: 5` | A dead-letter queue, so a poison message stops after five attempts |
+| Lambda `Timeout: 3` | The function timeout that everything else has to be sized against |
+| `BatchSize: 10` on the event source mapping | Event source mapping — Lambda polls, and one invocation gets ten messages |
+| No `VisibilityTimeout` on the queue | It inherits the SQS default of 30 seconds |
+
+That last row is the one to stare at. The queue does not set a visibility timeout, so it gets
+30 seconds; the function times out at 3. Thirty is comfortably more than six times three, so
+**this template is safe by accident** — the defaults happen to satisfy the rule.
+
+### Break it on purpose
+
+1. **Change the function `Timeout` from 3 to 30** and redeploy. The queue still has its 30-second
+   default. Now add a `time.sleep` so the function takes 25 seconds, and send one message.
+   Watch it get processed more than once. You have built Aldgate's fourteen texts on purpose, in
+   one line of configuration.
+2. **Fix it properly** by setting the queue's `VisibilityTimeout` to 180 — six times the function
+   timeout — and confirm the duplicates stop.
+3. **Make the function throw every time** and watch the message move to the dead-letter queue
+   after five receives. Then look at the DLQ and note that the message is *still there*, waiting
+   for a human. That is what a DLQ is for.
+4. **Throw an error but keep the function under the timeout**, and see the difference between
+   *failing* and *timing out* — both retry, only one leaves a useful log.
+
+### Lab 2 — prove the memory dial
+
+<SourceRepo
+  repo="alexcasalboni/aws-lambda-power-tuning"
+  url="https://github.com/alexcasalboni/aws-lambda-power-tuning"
+  licence="Apache-2.0"
+  stars="~6k"
+  effort="twenty minutes"
+  eyebrow="Go and measure it"
+  blurb="A Step Functions state machine that invokes one of your functions at a range of memory settings, reads the execution logs, and draws you a graph of cost against speed. It is the standard answer to 'what should this function's memory be', and it turns the claim in this lesson into a chart about your own code."
+/>
+
+**Steps**
+
+1. Deploy it from the AWS Serverless Application Repository — the README has the link and it is
+   a few clicks.
+2. Run the state machine with the ARN of a function you want to tune, and a list of memory
+   values to try (`128, 256, 512, 1024, 1536`).
+3. It invokes your function at each setting, in your account, for real. Read the visualisation
+   it returns.
+
+**What you are looking for** is the shape of the curve, and which of the two shapes you get:
+
+- A **compute-bound** function gets dramatically faster with more memory, and the cost line
+  often goes *down* as well. The project's own README shows a function going from 35 seconds at
+  128 MB to under 3 seconds at 1.5 GB while being cheaper to run. That is the claim in this
+  lesson, measured.
+- An **IO-bound** function — one waiting on a database or an API — flattens almost immediately.
+  More memory buys nothing, and you are paying more per millisecond for the same number of
+  milliseconds.
+
+Run it against both kinds and keep the two charts. Knowing which shape you are looking at is
+the whole skill, and it is much easier to remember a picture of your own function than a rule
+about someone else's.
+
+<Callout type="cost" title="Both labs are cheap, but not free">
+Serverless bills for what you use, and these labs use very little — a few thousand invocations
+and a small DynamoDB table. Power tuning deliberately invokes your function many times, so
+point it at something trivial rather than at something that calls a paid third-party API on
+every run. Delete the SAM stack with <code>sam delete</code> when you are finished.
+</Callout>
 
 <Takeaways
   items={[

@@ -7,7 +7,7 @@ order: 17
 domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
   SAA: 'Domain 2 — Design Resilient Architectures'
-minutes: 13
+minutes: 17
 hook: They added a second server for resilience, and the support queue filled with people being logged out halfway through a claim. The second server was working perfectly. That was the problem.
 updated: 2026-09-22
 ---
@@ -18,6 +18,7 @@ import Boundary from '../../components/svg/Boundary.astro';
 import Wire from '../../components/svg/Wire.astro';
 import Callout from '../../components/Callout.astro';
 import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
 import Quiz from '../../components/Quiz.astro';
 import Scenario from '../../components/Scenario.astro';
 import Takeaways from '../../components/Takeaways.astro';
@@ -312,6 +313,98 @@ ALB. **A partner firewall** demanded the static addresses only an NLB offers. **
 made cross-zone worth enabling. Read a scenario question the same way: the service is chosen by
 the sentence that forbids the alternatives.
 </Scenario>
+
+## Build it yourself
+
+This lesson is mostly about things you cannot see from outside — a health check probe, a target
+being pulled from rotation, a session that exists on one machine and not another. The way to
+see them is to build two load balancers and then deliberately break one target.
+
+<SourceRepo
+  repo="aws-samples/aws-three-tier-web-architecture-workshop"
+  url="https://github.com/aws-samples/aws-three-tier-web-architecture-workshop"
+  licence="MIT-0"
+  stars="~140"
+  effort="half a day, done by hand"
+  blurb="AWS's three-tier workshop, built by clicking rather than by template — which is the point, because you configure every target group and health check yourself instead of watching a stack do it. It creates two Application Load Balancers: an internet-facing one in front of Nginx web servers, and an internal one in front of the Node.js application tier, with an Auto Scaling group behind each."
+/>
+
+The repository holds the application code and the architecture diagram; the walkthrough itself
+lives in <a href="https://catalog.us-east-1.prod.workshops.aws/workshops/85cd2bb2-7f79-4e96-bdee-8078e469752a/en-US" rel="noopener">AWS Workshop Studio</a>, linked from the README.
+
+### Why this one, when it is not a load balancer workshop
+
+Because it builds **two** load balancers doing genuinely different jobs, and the contrast is
+what makes the concept stick:
+
+- The **external** ALB is internet-facing, in public subnets, and is the only public surface.
+- The **internal** ALB is not reachable from the internet at all. The web tier calls it by its
+  DNS name to reach the application tier.
+
+Most tutorials show you one load balancer in front of one thing, which teaches the shape but
+not the idea. Two makes it obvious that a load balancer is a *seam between tiers*, not a front
+door.
+
+### Step by step, in the order the concepts appear above
+
+1. **Network first** — VPC, public and private subnets across two Availability Zones. Nothing
+   in this lesson works without two zones, because there is nothing to spread across.
+2. **Launch the app tier instances** into private subnets and confirm they are unreachable from
+   the internet. This is the property the load balancer exists to preserve.
+3. **Create the internal target group and health check.** This is the moment that matters —
+   you choose the path and the thresholds by hand. Point it at the application's own health
+   endpoint, not at `/`.
+4. **Create the internal ALB** and register the target group. Watch the targets go from
+   `initial` to `healthy` in the console. That transition is the health check passing for the
+   first time.
+5. **Configure Nginx on the web tier** to proxy `/api` to the internal load balancer's DNS
+   name. Note that it uses a *name*, not an address — the whole point of the seam.
+6. **Repeat for the web tier**: target group, health check, internet-facing ALB.
+7. **Auto Scaling groups at both tiers**, attached to the target groups. Registration and
+   deregistration now happen without you.
+
+### Where each step appears in this lesson
+
+| In the workshop | In this lesson |
+|---|---|
+| Choosing the health check path and thresholds | *Health checks, and what "healthy" should mean* |
+| Targets showing `initial` then `healthy` | The health check passing its healthy threshold |
+| Nginx pointing at the internal ALB's DNS name | One address in front of many machines |
+| Auto Scaling attached to a target group | Draining, and why a target may vanish between requests |
+| Two AZs at every tier | Cross-zone load balancing |
+
+### Break it on purpose
+
+The workshop ends with a working site. That is where the actual lesson starts.
+
+1. **Stop the application process on one instance** but leave the instance running. The health
+   check fails, the target is marked unhealthy, and the site keeps working — you have just
+   watched automatic failover happen with no alarm and no human.
+2. **Now point the health check at `/` instead** and repeat. The target stays `healthy` while
+   serving nothing, and half your requests break. This is the single most valuable five minutes
+   in the whole lab: it is the difference between a health check and a *useful* health check.
+3. **Set the unhealthy threshold to 10 with a 30-second interval** and kill a target. Count how
+   long the broken instance keeps receiving traffic. Then set it to 2 and do it again.
+4. **Store something in memory on one instance** — even a counter in the app — and refresh
+   repeatedly. Watch the number jump around as you land on different targets. That is
+   Brightwell's bug, reproduced in thirty seconds.
+5. **Terminate an instance mid-request** with the deregistration delay set to 0, then to 60.
+   The difference is whether a user sees an error or does not notice.
+
+<Callout type="cost" title="This one runs real instances">
+Unlike most labs on this site, this leaves EC2 instances, two load balancers and an Aurora
+database running, and load balancers are charged per hour whether or not anybody uses them.
+<strong>Delete it the same day.</strong> Work backwards: Auto Scaling groups first (or they
+will helpfully replace the instances you just terminated), then the load balancers, then the
+database, then the VPC.
+</Callout>
+
+<Callout type="note" title="A smaller alternative">
+If half a day is too much, the same ideas fit in a much smaller exercise: two <code>t3.micro</code>
+instances each serving a page that prints its own instance id, one target group, one ALB.
+Refresh and watch the id change. Stop one and watch it stop appearing. That is genuinely most
+of this lesson, for about twenty minutes and a few pence.
+</Callout>
 
 <Takeaways
   items={[

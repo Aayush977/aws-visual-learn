@@ -62,14 +62,22 @@ teaches the wrong thing confidently. So each one's verdict comes from a **pure f
 `src/lib`, with a plain `node:assert` self-check beside it. No test framework.
 
 ```sh
-pnpm check:iam      # src/lib/iam.ts        — policy evaluation order
+pnpm check:iam      # src/lib/iam.ts          — policy evaluation order
 pnpm check:vpc      # src/lib/reachability.ts — packet reachability
-pnpm check:review   # src/lib/review.ts     — SM-2 scheduler
-pnpm check:all      # all three
+pnpm check:review   # src/lib/review.ts       — SM-2 scheduler
+pnpm check:content  # lints the lesson MDX (see below)
+pnpm check:all      # all four
 ```
 
 If you change a rule in one of those files, the check next to it is the thing that has to keep
 passing.
+
+`check:content` is a different kind of check: it lints every lesson for the mistakes that
+otherwise surface as an unhelpful `Cannot read properties of undefined` halfway through a
+build, or — worse — do not surface at all. It catches an invalid `<Callout type>`, an `icon=`
+that is not in `lib/glyphs.ts`, a `<SourceRepo>` with no licence, and a markdown link to
+another lesson, which builds clean and then 404s in production because the site is served
+from a base path.
 
 ## Layout
 

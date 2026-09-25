@@ -193,9 +193,14 @@ and its licence.
 ## Before you commit
 
 ```sh
-pnpm check:all    # the simulator and scheduler self-checks
+pnpm check:all    # self-checks, plus check:content linting every lesson
 pnpm build        # validates frontmatter, catches MDX errors and bad links
 ```
+
+`pnpm check:content` catches the four things in this document that are easy to get wrong and
+hard to diagnose: an invalid `<Callout type>`, an unknown `icon=`, a bare markdown link to
+another lesson, and a `<SourceRepo>` missing its licence. Run it before the build — it names
+the lesson and the attribute, which the build does not.
 
 (`pnpm check` is currently broken upstream — see the README. `pnpm build` is the real gate,
 and it will reject an invalid `track`, a missing `summary` or an unknown `<Callout type>`.)
