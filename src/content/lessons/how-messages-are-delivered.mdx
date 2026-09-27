@@ -1,0 +1,469 @@
+---
+title: How a Message Actually Gets Delivered
+summary: Receiving a message from a queue does not remove it. That one fact explains duplicate processing, the visibility timeout, dead-letter queues and why every consumer has to be idempotent — plus what SNS and EventBridge do differently.
+exams: [CCP, SAA]
+track: architecture
+order: 25
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 2 — Design Resilient Architectures'
+minutes: 19
+hook: One patient received the same appointment reminder fourteen times between two and six in the morning. The system was not broken, was not looping, and had no bug in it. It was doing exactly what it had been told.
+updated: 2026-09-22
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import { lessonUrl } from '../../lib/paths.ts';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## Fourteen texts before breakfast
+
+Aldgate Health send appointment reminders overnight. A queue holds the reminders, a worker
+picks them up and hands them to an SMS provider, and for two years it had been the least
+interesting system in the building.
+
+Then one Tuesday a patient received the same reminder **fourteen times between 02:00 and
+06:00**. Fourteen identical texts about a dermatology appointment, arriving roughly every
+seventeen minutes, through the night.
+
+The complaint reached a team who checked the obvious things. There was no loop in the code. The
+reminder existed once in the database. The worker had not crashed and restarted — its logs
+showed it processing the message calmly, fourteen separate times, each one apparently the first.
+
+The SMS provider had been slow that night. Not down — slow. Each send was taking a little over
+half a minute instead of the usual two seconds.
+
+**Nothing was broken.** The queue was doing precisely what a queue is specified to do, and
+every one of those fourteen texts was correct behaviour by a system nobody in the room fully
+understood.
+
+## Receiving is not removing
+
+Here is the sentence the whole lesson rests on:
+
+> **Taking a message off a queue does not delete it.** You receive a *copy*. The message is
+> hidden for a while, and if you do not explicitly delete it before that window closes, it
+> comes back and somebody else gets it.
+
+That is not a quirk of SQS. It is the only safe design: if receiving deleted the message, then
+a consumer that crashed halfway through would take the work with it, permanently. The queue
+protects against a dying consumer by assuming *every* consumer might be dying, and taking the
+message back if it does not hear otherwise.
+
+Aldgate's worker was taking 35 seconds to send a text. Their visibility timeout was 30. So at
+second 30 the message reappeared, the worker picked it up again, sent the text again, and the
+cycle repeated until the message finally aged out.
+
+Play it through — the loop is steps 3 and 4.
+
+<Diagram
+  title="The life of one message"
+  viewBox="0 0 1020 520"
+  autoplay
+  steps={[
+    {
+      title: 'A producer sends the message',
+      body: "The producer's job ends here. It does not know who will process the message, when, or whether that consumer is even running yet — which is the entire point of putting a queue in the middle.",
+      flow: 'w-send',
+    },
+    {
+      title: 'A consumer receives a copy',
+      body: "The consumer polls and gets the message. <strong>It is still in the queue.</strong> Nothing has been removed by this call — the consumer has been handed a copy and a deadline.",
+      flow: 'w-recv',
+    },
+    {
+      title: 'The message goes invisible, and a clock starts',
+      body: "For the length of the <strong>visibility timeout</strong> the message is hidden, so no other consumer can collect it. This is the window you have been given to finish the work and say so.",
+      flow: 'w-timer',
+      duration: 1600,
+    },
+    {
+      title: 'Finish in time, and delete it',
+      body: "<code>DeleteMessage</code> is a separate, explicit call, and it is the <em>only</em> thing that removes a message. Miss the deadline instead and the message becomes visible again — and the next consumer has no idea it is the second attempt.",
+      flow: 'w-del',
+      duration: 1600,
+    },
+    {
+      title: 'Fail enough times and it is set aside',
+      body: "Every receive increments a counter. Past a threshold you set, the queue moves the message to a <strong>dead-letter queue</strong> instead of releasing it again — so one poisonous message cannot be retried forever while the rest of the work waits behind it.",
+      flow: 'w-dlq',
+    },
+  ]}
+  caption="The only two ways out of a queue are DeleteMessage and the dead-letter queue. Everything else is a loop."
+>
+  <Node x={110} y={110} w={170} h={80} label="Producer" sub="sends and forgets" icon="code" tone="muted" step={1} />
+  <Node x={390} y={110} w={220} h={90} label="SQS queue" sub="holds the message" icon="queue" tone="purple" step={1} />
+  <Node x={720} y={110} w={200} h={90} label="Consumer" sub="polls for work" icon="server" tone="teal" step={2} />
+
+  <Node x={390} y={280} w={250} h={85} label="In flight" sub="invisible, on a clock" icon="clock" tone="orange" step={3} />
+  <Node x={720} y={280} w={200} h={85} label="Deleted" sub="the only clean exit" icon="allow" tone="green" step={4} />
+
+  <Node x={390} y={440} w={250} h={85} label="Dead-letter queue" sub="set aside for a human" icon="deny" tone="red" step={5} />
+
+  <Wire id="w-send" from={[195, 110]} to={[280, 110]} tone="purple" step={1} />
+  <Wire id="w-recv" from={[500, 110]} to={[620, 110]} tone="teal" step={2} label="receive — a copy" labelDy={-14} />
+  <Wire id="w-timer" from={[390, 155]} to={[390, 237]} tone="orange" both step={3} label="invisible… then back" labelDx={-95} />
+  <Wire id="w-del" from={[720, 155]} to={[720, 237]} tone="green" step={4} label="DeleteMessage" labelDx={80} />
+  <Wire id="w-dlq" from={[390, 322]} to={[390, 397]} tone="red" dashed step={5} label="after N receives" labelDx={-80} />
+</Diagram>
+
+## The SQS settings that decide your behaviour
+
+**Visibility timeout** — how long a received message stays hidden. Default 30 seconds, maximum
+12 hours. It must be **longer than your slowest successful processing time**, or you have built
+Aldgate's system. For a Lambda consumer the guidance is at least six times the function
+timeout.
+
+**Message retention** — how long an undelivered message survives in the queue at all. Four days
+by default, up to fourteen. This is your margin when a consumer has been down over a weekend.
+
+**maxReceiveCount and the dead-letter queue** — a redrive policy saying "after this many
+receives, move it aside". Without one, a message that always fails is retried until it expires,
+burning capacity the whole time. **A queue without a dead-letter queue is a queue that hides
+its failures.**
+
+**Long polling** — the setting almost everyone should change. Short polling returns
+immediately, empty or not, so an idle consumer spends its life asking a question and being told
+no, at a cost. Long polling waits up to 20 seconds for a message to appear. Fewer empty
+responses, lower cost, and lower latency when work does arrive.
+
+**Message size** — up to 256 KB. Anything larger belongs in S3 with the message carrying a
+pointer to it. Queues are for notifications about data, not for the data.
+
+<Callout type="gotcha">
+The fix for Aldgate looks like "raise the visibility timeout", and that is necessary but not
+sufficient. Raise it to 5 minutes and a night where the provider takes 6 minutes produces the
+same bug, just more rarely and more confusingly. <strong>The durable fix is an idempotent
+consumer</strong> — one that records the reminder id before sending and refuses to send it
+twice. Then a redelivery is harmless, whatever the timeout is set to.
+</Callout>
+
+### Standard and FIFO
+
+Two kinds of queue, and the difference is what they promise.
+
+- **Standard** — effectively unlimited throughput, best-effort ordering, and
+  **at-least-once** delivery. A message can arrive more than once even when nothing has gone
+  wrong. This is the default and the right answer for most work.
+- **FIFO** — strict ordering within a **message group**, and exactly-once *processing* through
+  deduplication. Lower throughput than standard, though a high-throughput mode exists. Use it
+  when order genuinely matters — a sequence of updates to one account, where applying them out
+  of order produces a wrong answer.
+
+The **message group id** is the part people miss: FIFO guarantees order *within* a group, not
+across the queue. Use the customer id or account id as the group, and you get strict ordering
+per customer while different customers still process in parallel. One group for everything
+means one consumer at a time, and a queue that cannot keep up.
+
+<Callout type="exam">
+"Messages must be processed in the exact order they were sent" → <strong>FIFO queue</strong>.
+"The application must handle duplicate messages" or "high throughput" with no ordering
+requirement → <strong>standard queue</strong>. If both order and scale are demanded, the answer
+is a FIFO queue with a sensible <strong>message group id</strong>, not a bigger consumer.
+</Callout>
+
+## SNS: push, to everyone at once
+
+A queue holds one message for one consumer to collect. **Amazon SNS** does the opposite: a
+**topic** receives a message and **pushes a copy to every subscriber immediately.**
+
+Subscribers can be SQS queues, Lambda functions, HTTPS endpoints, email addresses, SMS numbers
+or mobile push. Nobody polls — SNS delivers.
+
+**Filter policies** are the feature worth knowing and the one most often missed. A subscription
+can carry a filter on the message's attributes, so a subscriber receives only the messages it
+cares about. Without filters, everyone gets everything and each consumer starts with an `if`
+statement discarding most of its traffic — work you are paying for, in a place where nobody
+can see it.
+
+### Fan-out: SNS in front of SQS
+
+The pattern that turns up constantly, and the reason these two are taught together:
+
+**SNS topic → several SQS queues → a consumer behind each.**
+
+SNS gives every interested system its own copy. Each queue then buffers for its own consumer, at
+its own pace, with its own retries and its own dead-letter queue. A slow consumer falls behind
+in its own queue without affecting anyone else, and one that is down catches up when it
+returns rather than losing the events.
+
+SNS alone cannot do that: push to an endpoint that is down retries for a while and then gives
+up. Putting a queue behind each subscriber converts "delivered or lost" into "waiting".
+
+<Callout type="exam">
+"Multiple systems must each process every message, and one of them is sometimes unavailable"
+is the <strong>SNS fan-out to SQS</strong> pattern, every time. SNS on its own is the answer
+only when the subscriber is always available, or when the destination is a human — an email or
+a text.
+</Callout>
+
+## EventBridge: routing on what the event says
+
+**Amazon EventBridge** is an event bus. Events arrive; **rules** inspect their *content* and
+send matching ones to targets.
+
+Three things it does that SNS does not:
+
+- **It already receives events from AWS itself.** An instance changing state, a deployment
+  finishing, an S3 object being created, a Config rule going non-compliant — these land on the
+  default bus whether you asked or not. Reacting to what AWS did is EventBridge's home ground.
+- **It matches on content, not just attributes.** A rule can select events where the detail
+  says `status: FAILED` and the amount is over a threshold, and route those somewhere
+  different from everything else.
+- **It can archive and replay.** Events can be kept and re-delivered later — which means a
+  consumer you deploy next month can be fed last month's events, and a bug that dropped events
+  can be recovered from rather than apologised for.
+
+It also takes events from **third-party SaaS products** and can run **scheduled** events, which
+is the modern answer to a cron job with nowhere to live.
+
+The trade is latency and throughput: SNS is the leaner, faster pipe. EventBridge is the one
+that understands what it is carrying.
+
+<Confusable
+  title="SQS vs SNS vs EventBridge, by mechanism"
+  ask="The comparison everyone learns as 'queue, topic, bus'. Here it is by what actually happens to a message, which is what scenario questions test."
+  options={[
+    {
+      name: 'Amazon SQS',
+      tagline: 'A holding pen. The consumer pulls, and the message waits until somebody explicitly deletes it.',
+      when: [
+        'Work must <strong>not be lost</strong> if the consumer is down or slow',
+        'You want a <strong>spike to become a backlog</strong> rather than an outage',
+        'One message should be handled by <strong>exactly one</strong> worker',
+        'You want to scale consumers on <strong>queue depth</strong>',
+      ],
+      giveaway: ['"decouple"', '"buffer"', '"must not be lost"', '"process later"'],
+    },
+    {
+      name: 'Amazon SNS',
+      tagline: 'A megaphone. Every subscriber is pushed its own copy, immediately, and nothing is stored.',
+      when: [
+        '<strong>Several systems</strong> each need the same event',
+        'The destination is a <strong>human</strong> — email, SMS, push',
+        'You are fanning out to <strong>SQS queues</strong> so each consumer gets a durable copy',
+      ],
+      giveaway: ['"notify multiple"', '"fan-out"', '"send an alert"', '"every subscriber"'],
+    },
+    {
+      name: 'Amazon EventBridge',
+      tagline: 'A sorting office. Rules read the event and decide where it goes.',
+      when: [
+        'Reacting to something <strong>AWS itself did</strong>',
+        'Routing depends on the <strong>content</strong> of the event',
+        'The source is a <strong>third-party SaaS</strong> product',
+        'You need <strong>scheduled</strong> events, or to <strong>replay</strong> past ones',
+      ],
+      giveaway: ['"event-driven"', '"based on the content"', '"third-party SaaS"', '"scheduled"', '"replay"'],
+    },
+  ]}
+  rule="<strong>Who should get it, and who decides?</strong> One worker, when it is ready → SQS. Everyone, right now → SNS. Whoever the rule says, based on what is inside → EventBridge."
+/>
+
+<Mnemonic
+  title="Designing any queue, in four questions"
+  tone="purple"
+  items={[
+    { key: 'V', term: 'Visibility longer than the work?', note: 'if not, you have built a duplicate generator' },
+    { key: 'I', term: 'Is the consumer idempotent?', note: 'delivery is at-least-once, so assume it runs twice' },
+    { key: 'D', term: 'Dead-letter queue attached?', note: 'without one, a poison message retries until it expires' },
+    { key: 'O', term: 'Order actually required?', note: 'only then FIFO — and then pick the message group id carefully' },
+  ]}
+/>
+
+<Quiz
+  question="An application processes orders from an SQS queue. During a period when a downstream payment API was responding slowly, several customers were charged twice. The queue is a standard queue with a 30-second visibility timeout, and processing normally takes 5 seconds. What is the root cause?"
+  choose={1}
+  options={[
+    {
+      text: 'Processing exceeded the visibility timeout, so the message became visible again and was picked up by another consumer',
+      correct: true,
+      why: 'When the API slowed, processing passed 30 seconds. The message reappeared, a second consumer collected it and charged the card again. The first worker was still running and had no idea.',
+    },
+    {
+      text: 'Standard queues deliver messages out of order',
+      why: 'Standard queues do make only a best effort at ordering, but out-of-order delivery would not cause the same card to be charged twice. The duplicate is the problem here, not the sequence.',
+    },
+    {
+      text: 'The dead-letter queue was not configured, so messages were retried indefinitely',
+      why: 'A missing dead-letter queue lets a failing message retry until it expires. These messages were succeeding — twice — so a DLQ would never have been involved.',
+    },
+    {
+      text: 'The consumer was not calling ReceiveMessage with long polling enabled',
+      why: 'Long polling affects how efficiently a consumer waits for work and how much empty polling costs. It has no bearing on whether a message is redelivered.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="A company publishes an event each time an order ships. Three internal systems must each receive every event. One of them is taken offline for maintenance most weekends, and no events may be lost while it is down. What should a solutions architect recommend?"
+  choose={1}
+  options={[
+    {
+      text: 'Publish to an SNS topic with an SQS queue subscribed for each system, and have each system consume from its own queue',
+      correct: true,
+      why: 'SNS gives each system its own copy; the queue in front of each consumer holds messages while it is offline. The weekend system drains its backlog on Monday and the other two are unaffected.',
+    },
+    {
+      text: 'Publish to an SNS topic with all three systems subscribed as HTTPS endpoints',
+      why: 'SNS retries a failing endpoint for a limited period and then gives up. A system offline for a whole weekend would lose events, which the question forbids.',
+    },
+    {
+      text: 'Publish to a single SQS queue that all three systems poll',
+      why: 'A message from a queue goes to one consumer. The three systems would compete and each event would be processed once in total rather than once per system.',
+    },
+    {
+      text: 'Write the events to an S3 bucket and have each system scan it periodically',
+      why: 'It would technically work and it is how this was done before managed messaging existed. It means polling, tracking position, and handling partial reads in three places instead of using a service built for it.',
+    },
+  ]}
+/>
+
+<Scenario
+  who="An insurer routing claim events to systems that each care about something different"
+  problem="Brightwell raise an event for every change to a claim — opened, assessed, approved, paid, disputed. Four systems need some of them: fraud analytics wants high-value claims only, the customer portal wants anything that changes what a customer sees, the regulatory reporting system wants approvals and payments, and a new machine-learning team wants a year of history they do not have. Today one service calls all four in turn, so adding the fifth consumer means editing the claim service again."
+  solution="Claim events go to an EventBridge bus. Four rules match on content rather than on a topic name: fraud analytics takes events where the amount exceeds a threshold, the portal takes the status changes it renders, reporting takes approvals and payments. Each rule delivers to an SQS queue in front of its consumer, so a slow or offline system builds a backlog instead of losing events. The bus archives every event, which is how the machine-learning team gets its year of history — replayed onto a queue of their own without the claim service being touched."
+  outcome="The claim service no longer knows who its consumers are. The fifth consumer was added by writing a rule, with no deployment to the claim service at all, and the archive turned a year of lost history into an afternoon's replay."
+>
+The part worth stealing is the **archive**. SNS and SQS both move an event forward and then it
+is gone; EventBridge can be asked for it again. A consumer that did not exist when the event
+happened is exactly the case nothing else here can serve.
+</Scenario>
+
+## Build it yourself
+
+There is a workshop that happens to be built around exactly the two patterns this lesson
+spends most of its time on, in exactly that order.
+
+<SourceRepo
+  repo="aws-samples/asynchronous-messaging-workshop"
+  url="https://github.com/aws-samples/asynchronous-messaging-workshop"
+  licence="MIT-0"
+  stars="~97"
+  effort="15–30 minutes per lab"
+  blurb="Five independent labs on asynchronous messaging, each self-contained with no dependency on the others, built around a fictional unicorn ride-hailing company. Lab 1 is SNS fan-out with subscription filters; Lab 2 adds a queue in front of every subscriber. Each can be done through the console or with AWS SAM. The labs live in code/lab-N and the walkthrough is at async-messaging.workshop.aws."
+/>
+
+### Lab 1 — fan-out and message filtering
+
+A ride-completion event has to reach three services that each want something different: a
+customer notification service, a customer accounting service, and an "extraordinary rides"
+service that only cares about rides above a certain fare or distance.
+
+That last one is the reason this lab exists. It is the case for **filter policies** — the
+third service subscribes to the same topic as the other two and receives only the messages it
+wants, rather than receiving everything and discarding most of it in an `if` statement.
+
+**What it teaches, mapped back:**
+
+| In the lab | In this lesson |
+|---|---|
+| Creating the SNS topic and adding Lambda subscriptions | *SNS: push, to everyone at once* |
+| A subscription filter on the extraordinary-rides service | Filter policies, and the work they save |
+| Three subscribers on one topic | Each subscriber getting its own copy |
+
+### Lab 2 — topic-queue chaining
+
+The same three services, with an SQS queue inserted between the topic and each one.
+
+The workshop's own justification is worth quoting almost directly, because it is the exam
+answer: one of these services **could be taken offline for maintenance**, or could hit an
+exception, and either way it would miss topic messages. Buffering each subscriber behind its
+own queue means nothing is lost while it is away.
+
+This is the **SNS → SQS fan-out** section of this lesson, and it is also, almost word for
+word, the second quiz question above. Doing the lab and then re-reading that question is a
+good way to find out whether you learned the pattern or memorised the answer.
+
+The lab also makes the second, less obvious point: a queue in front of a subscriber is a
+**buffering load balancer**. Because each message goes to exactly one consumer process, you
+can scale that subscriber out and the messages distribute themselves — and a scaling event
+loses nothing, because the queue is holding everything until a consumer is ready.
+
+**What it teaches, mapped back:**
+
+| In the lab | In this lesson |
+|---|---|
+| Adding an SQS queue between topic and consumer | Why SNS alone converts "delivered" into "lost" |
+| SQS as an event source for Lambda | Event source mapping — Lambda polls the queue |
+| Scaling consumers behind one queue | One message, one consumer |
+
+### Step by step
+
+1. Start with **Lab 0**, the prerequisites — it sets up the shared environment the others use.
+2. Do **Lab 1**, then **Lab 2**. They are the two this lesson covers and they build on the same
+   story, so doing them in order is worth it even though the workshop says each is independent.
+3. Labs 3 and 4 (scatter-gather, and orchestration with Step Functions) go beyond this lesson.
+   They are good, and they are the natural next thing once queues make sense.
+4. **Do the clean-up section.** Each lab has one, and they exist because this workshop leaves
+   topics, queues and functions behind.
+
+### Break it on purpose
+
+The workshop is a happy path. These are the experiments that turn it into understanding:
+
+1. **Receive a message and do not delete it.** Use the console's *Poll for messages*, watch the
+   message appear, then walk away. Poll again after the visibility timeout and it is back. This
+   is the single most important behaviour in this lesson and it takes ninety seconds to see.
+2. **Watch the receive count.** The console shows *Approximate receive count* per message.
+   Poll the same message repeatedly and watch it climb toward the redrive threshold, then find
+   it in the dead-letter queue.
+3. **Break one subscriber only.** Point one of the three Lambda subscriptions at code that
+   throws, and confirm the other two are completely unaffected. Then check its queue depth
+   climbing while the others stay at zero — the isolation is the whole argument for topic-queue
+   chaining.
+4. **Delete a filter policy** and watch the extraordinary-rides service start receiving every
+   ride. Cheap to do, and it makes the cost of *not* filtering concrete.
+5. **Send the same message twice** and see that nothing stops you. Then add the idempotency
+   check — record the id, return early if seen — and see that the second one does nothing.
+
+### Want just the pattern, without the workshop?
+
+`aws-samples/serverless-patterns` (MIT-0, cited in
+<a href={lessonUrl("how-serverless-runs")}>How Serverless Actually Runs</a>) has deployable
+one-command versions of each of these: `sns-sqs-fanout-cdk-java`, `eventbridge-sqs-cdk`,
+`sqs-lambda-ddb-sam-ts` and about a thousand others. Less narrative, much faster, and a good
+reference once you know what you are looking for.
+
+<Callout type="cost" title="Clean up, and mind the fan-out">
+SQS and SNS are billed per request and are very cheap at lab volumes. The thing to watch is
+that a fan-out multiplies: one published message becomes three deliveries and three Lambda
+invocations. That is fine for a lab and worth remembering before pointing a loop at a topic.
+Each lab has a clean-up page — use it.
+</Callout>
+
+<Takeaways
+  items={[
+    '<strong>Receiving a message does not delete it.</strong> Only <code>DeleteMessage</code> does. Everything else about queues follows from this.',
+    '<strong>Visibility timeout must exceed your slowest successful processing</strong>, or the message reappears mid-work and gets handled twice. At least 6× the function timeout for Lambda.',
+    'Delivery is <strong>at-least-once</strong>. The durable fix for duplicates is an <strong>idempotent consumer</strong>, not a bigger timeout.',
+    'A <strong>dead-letter queue</strong> plus maxReceiveCount stops a poison message retrying forever. A queue without one hides its failures.',
+    'Turn on <strong>long polling</strong>. Short polling pays for empty answers and adds latency.',
+    '<strong>Standard</strong> = unlimited throughput, best-effort order, duplicates possible. <strong>FIFO</strong> = strict order within a <strong>message group</strong>, lower throughput.',
+    '<strong>SNS pushes a copy to every subscriber</strong>; nothing is stored. <strong>Filter policies</strong> stop subscribers receiving what they do not want.',
+    '<strong>SNS → SQS fan-out</strong> is the answer when several systems each need every message and one of them may be down.',
+    '<strong>EventBridge</strong> routes on event content, already receives AWS service events, takes SaaS sources, schedules, and can <strong>archive and replay</strong>.',
+  ]}
+/>
+
+---
+
+Nobody at Aldgate had done anything wrong. They had built a queue the way queues are built,
+and it worked for two years, and then a third party was slow for one night and the design
+handed a patient fourteen identical texts.
+
+The visibility timeout went up the next morning. What actually fixed it, a week later, was four
+lines that wrote the reminder id to a table before the send and checked it on the way in — so
+the fifteenth delivery of the same message does nothing at all.
+
+That is the habit worth taking from this lesson. **A message system does not promise to deliver
+your message once. It promises not to lose it** — and those are very different promises, with
+the gap between them filled by code you have to write.

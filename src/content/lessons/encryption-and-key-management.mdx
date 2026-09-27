@@ -33,10 +33,17 @@ every bucket and every database, ticked and evidenced.
 
 The second question took four weeks. *Then prove he can no longer read it.*
 
-Nobody could. Not because anything was wrong — the encryption was real, the ciphertext was
-genuinely unreadable without a key — but because the data was encrypted under **AWS managed
-keys**, which are handed out to whoever the IAM policies say can use them, and those policies
-were spread across a dozen roles that eighteen months of urgent tickets had quietly widened.
+Nobody could. Not because anything was wrong — the encryption was real, and the ciphertext was
+genuinely unreadable to anybody without a key.
+
+The problem was *where the key lived*. Their data used **AWS managed keys**: the default,
+one-click option, where AWS creates the key for you and you cannot edit the list of who may use
+it. So there is no single list to go and read. Permission to decrypt is instead scattered across
+every IAM policy in the account — which meant answering "can he still decrypt this?" required
+reading all twelve roles the contractor had ever touched, plus every group and policy attached
+to them. Eighteen months of urgent tickets had quietly widened most of them.
+
+Four weeks of reading, to answer a question that should have taken one screen.
 
 "Is it encrypted?" and "who can decrypt it?" felt like the same question. They are not remotely
 the same question, and only the second one has ever protected anybody.
@@ -113,7 +120,8 @@ Anything crossing a network should be encrypted in transit, which in practice me
 (the protocol people still call SSL). You need a certificate to do it, and **AWS Certificate
 Manager (ACM)** issues them:
 
-- **Free** for use with AWS services — load balancers, CloudFront, API Gateway.
+- **Free**, but only while the certificate stays attached to an AWS service that integrates
+  with ACM — a load balancer, CloudFront, API Gateway.
 - **Renewed automatically**, which quietly eliminates one of the most common causes of
   self-inflicted outages.
 - Certificates are **Regional**, and a certificate used by CloudFront must live in
@@ -312,14 +320,16 @@ it into a new instance. Any answer that just enables encryption on the running d
 />
 
 <Scenario
-  who="A fintech that has to prove a departing contractor can no longer read customer data"
-  problem="A contractor with broad access left under a cloud. The data sits in S3 and RDS, encrypted with the default AWS managed keys. Legal asked the team to demonstrate that the contractor's access had been revoked — and the honest answer was that nobody could prove it, because access was scattered across a dozen IAM policies and the encryption was invisible to them either way."
-  solution="They re-encrypted the sensitive buckets and databases under a customer managed KMS key whose key policy names exactly three roles. Database credentials moved to Secrets Manager with 30-day rotation, which invalidated every password the contractor could have seen. CloudTrail now logs every Decrypt call against that key."
-  outcome="Revoking access is now a single change to one key policy, and the CloudTrail log of Decrypt calls is the evidence legal asked for."
+  who="A recruitment agency building a candidate portal that holds CVs, passports and salary histories"
+  problem="Every item on the security checklist said 'encrypt it', and four AWS services with 'key' or 'secret' in the description looked interchangeable. Nobody on the team could say which of KMS, CloudHSM, Certificate Manager and Secrets Manager they actually needed — and an external reviewer had written 'use an HSM' on the report without explaining why."
+  solution="They stopped comparing the services and asked what each thing being protected actually was. The portal's web address needed a certificate, so ACM issued one free and renews it automatically. The documents in S3 and the records in RDS needed to be unreadable without permission the agency controlled, so those moved to a customer managed KMS key whose key policy names two roles. The database password the application logs in with is not a key at all — it is a credential — so it went into Secrets Manager on 30-day rotation. CloudHSM was rejected: no regulator had asked for single-tenant hardware, and if the agency lost those keys AWS could not recover them."
+  outcome="Four services, four different jobs, settled in an afternoon — and the reviewer's 'use an HSM' turned out to mean 'stop using the default key'."
 >
-The insight worth carrying into the exam: with a customer managed key, the <strong>key policy
-becomes a single, auditable chokepoint</strong> for access to the data. That is why questions
-about revoking or proving access point at KMS rather than at bucket policies.
+The question that sorts them is never "which is most secure", it is **what is being protected**.
+A <strong>connection</strong> → ACM. <strong>Data sitting on a disk</strong> → KMS.
+A <strong>password or token</strong> → Secrets Manager. <strong>A rule demanding single-tenant
+hardware</strong> → CloudHSM. CloudHSM is the one people over-choose: it is the answer only when
+something forces it, never when a team simply wants to feel more in control.
 </Scenario>
 
 <Quiz

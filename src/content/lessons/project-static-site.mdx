@@ -6,12 +6,13 @@ track: projects
 order: 10
 domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
-minutes: 9
+minutes: 12
 hook: There is no server in this architecture. Nothing to patch, nothing to scale, nothing to fall over on the Tuesday you end up on television — and it costs about the price of a coffee.
-updated: 2026-08-16
+updated: 2026-09-27
 ---
 
 import Diagram from '../../components/Diagram.astro';
+import { lessonUrl } from '../../lib/paths.ts';
 import Node from '../../components/svg/Node.astro';
 import Wire from '../../components/svg/Wire.astro';
 import Confusable from '../../components/Confusable.astro';
@@ -119,10 +120,107 @@ Here is the same site with none of that.
   rule="If every visitor receives <strong>identical bytes</strong>, you do not need a computer to send them — you need storage that speaks HTTP."
 />
 
-**Route 53** is here for one specific reason: an ordinary DNS `CNAME` cannot sit at the root of
-a domain, so `kettleandfox.co.uk` (as opposed to `www.`) cannot point at CloudFront that way.
-Route 53's **alias record** is an AWS-specific record type that solves exactly this, at no extra
-query cost. It is a small detail that appears on the exam more often than it deserves to.
+**Route 53** is here for one specific reason, and the quickest way to understand it is to try
+the obvious thing and watch DNS stop you.
+
+1. **You own `kettleandfox.co.uk` and you want CloudFront to serve it.** So you go looking for
+   CloudFront's address — and CloudFront does not give you one. It gives you a **name**:
+
+   ```
+   d111abcdef8.cloudfront.net
+   ```
+
+   There is no fixed number to hand you, because the site is answered from hundreds of edge
+   locations whose addresses change constantly.
+
+2. **Pointing a name at another name is a `CNAME` record.** So that is what you try to add:
+
+   ```
+   kettleandfox.co.uk.   CNAME   d111abcdef8.cloudfront.net
+   ```
+
+3. **It is refused.** And not by AWS — by any DNS provider you attempt it with.
+
+**Why.** The bare name, with nothing in front of it, is called the **apex** of the domain. The
+apex already has to hold the records that say who runs the domain: `NS`, naming the
+authoritative name servers, and `SOA`. And a `CNAME` is not allowed to share a name with any
+other record — because a `CNAME` means *"everything about this name is answered elsewhere"*,
+which cannot be true of a name that is also holding its own `NS` records.
+
+The apex must have those records. So the apex can never be a `CNAME`. It is in the DNS
+specification, which is why every provider refuses it and why no amount of looking for the
+right setting will help.
+
+**The fix is Route 53's `ALIAS` record.** It answers like an `A` record — a name to a number,
+which *is* legal at the apex — but you configure it by pointing at an AWS resource, and Route 53
+looks up CloudFront's current addresses at the moment of the query. Legal where the rules are
+looking, flexible where you need it.
+
+<Diagram
+  title="The same destination, attempted three ways"
+  viewBox="0 0 1020 470"
+  autoplay
+  steps={[
+    {
+      title: 'www works with an ordinary CNAME',
+      body: "<code>www.kettleandfox.co.uk</code> has something in front of it, so it is an ordinary name with no obligations. It may point at CloudFront's name, and any DNS provider in the world will let you.",
+      flow: ['w-a1', 'w-a2'],
+      duration: 1500,
+    },
+    {
+      title: 'The same record at the bare domain',
+      body: "Now try it at the apex — <code>kettleandfox.co.uk</code>, nothing in front. Same record type, same destination, and this is step 2 of the attempt above.",
+      flow: ['w-b1', 'w-b2'],
+      duration: 1600,
+    },
+    {
+      title: 'Refused, because NS and SOA already live there',
+      body: "The apex is obliged to hold the records naming its own name servers. A <code>CNAME</code> claims the whole name is answered somewhere else, so the two cannot coexist. <strong>This is the DNS specification refusing you, not AWS.</strong>",
+    },
+    {
+      title: 'ALIAS, at the same apex',
+      body: "An <strong>alias record</strong> is AWS-specific. From the outside it answers like an <code>A</code> record — a name to an address — which is perfectly legal at the apex. Inside, it holds a pointer to an AWS resource.",
+      flow: ['w-c1', 'w-c2'],
+      duration: 1700,
+    },
+    {
+      title: 'Which is why it works',
+      body: "Route 53 resolves CloudFront's current addresses when the question is asked, so nothing needs updating when they change. Queries to an alias pointing at an AWS resource are also <strong>free</strong>, where ordinary queries are charged.",
+    },
+  ]}
+  caption="Rows one and three end up in the same place. Only the third is both legal at the apex and able to follow a name that moves."
+>
+  <Node x={165} y={80} w={290} h={78} label="www.kettleandfox.co.uk" sub="something in front" icon="dns" tone="teal" step={1} />
+  <Node x={505} y={80} w={140} h={64} label="CNAME" icon="file" tone="teal" step={1} />
+  <Node x={840} y={80} w={290} h={78} label="d111abcdef8.cloudfront.net" sub="allowed" icon="cdn" tone="teal" step={1} />
+
+  <Node x={165} y={235} w={290} h={78} label="kettleandfox.co.uk" sub="the apex — nothing in front" icon="dns" tone="orange" step={2} />
+  <Node x={505} y={235} w={140} h={64} label="CNAME" icon="file" tone="red" step={2} />
+  <Node x={840} y={235} w={290} h={88} label="Refused" sub="NS and SOA already live here" icon="deny" tone="red" step={3} />
+
+  <Node x={165} y={390} w={290} h={78} label="kettleandfox.co.uk" sub="the same apex" icon="dns" tone="purple" step={4} />
+  <Node x={505} y={390} w={140} h={64} label="ALIAS" sub="answers as an A" icon="allow" tone="green" step={4} />
+  <Node x={840} y={390} w={290} h={78} label="CloudFront distribution" sub="allowed, and free to query" icon="cdn" tone="green" step={4} />
+
+  <Wire id="w-a1" from={[310, 80]} to={[435, 80]} tone="teal" step={1} />
+  <Wire id="w-a2" from={[575, 80]} to={[695, 80]} tone="teal" step={1} />
+
+  <Wire id="w-b1" from={[310, 235]} to={[435, 235]} tone="orange" step={2} />
+  <Wire id="w-b2" from={[575, 235]} to={[695, 235]} tone="red" dashed step={3} />
+
+  <Wire id="w-c1" from={[310, 390]} to={[435, 390]} tone="purple" step={4} />
+  <Wire id="w-c2" from={[575, 390]} to={[695, 390]} tone="green" step={4} />
+</Diagram>
+
+<Callout type="exam">
+If a question says the site must work at <code>example.com</code> <em>as well as</em>
+<code>www.example.com</code>, and the target is CloudFront or a load balancer, the answer is a
+<strong>Route 53 alias record</strong>. Options offering a CNAME for the root domain are wrong,
+and one is offered every time.
+</Callout>
+
+The record types, TTLs and the caching behaviour behind all of this are covered properly in
+<a href={lessonUrl("how-the-edge-works")}>How the Edge Works</a>.
 
 **CloudFront** is doing two jobs at once, and beginners usually notice only the first.
 *Latency*: a visitor in Sydney gets the page from Sydney. *Origin protection*: the bucket

@@ -1,0 +1,424 @@
+---
+title: What Happens When You Press Enter
+summary: Before any of this is about AWS, it is about the internet. Follow one address from the keyboard to the screen — DNS delegation, the three handshakes, packets and routers — and pick up every piece of jargon on the way.
+exams: [CCP]
+track: networking
+order: 5
+minutes: 15
+hook: 'They changed the address at 09:00 and watched the new site load. At 15:00 their biggest customer sent a screenshot of the old one. Nothing was broken, and nobody could explain it.'
+updated: 2026-08-21
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## 09:00 — the change half the world ignored
+
+Meridian moved their marketing site to a new host on a Tuesday morning. The job took eleven
+minutes: copy the files across, point the domain at the new address, refresh. Two of the four of
+them saw the new site straight away. They told their biggest customer it was live and went to
+lunch.
+
+At 15:00 the customer replied with a screenshot of the old site.
+
+They changed the record again. Same result — new site on their laptops, old site in the
+customer's office. Somebody suggested the change had not saved. Somebody else said, not entirely
+as a joke, that the internet was broken.
+
+It was not broken. It was doing precisely what it had been told, months earlier, by them. The
+old record carried a **TTL of 86400** — a number nobody had chosen or looked at, sitting in a
+field nobody had opened. Eighty-six thousand four hundred seconds is twenty-four hours. They had
+asked every machine on the internet to remember the old address for a full day, and the internet
+had politely obliged.
+
+> Nothing on the internet asks *"where is meridian.io?"* and waits for the true answer. It asks
+> once, remembers the reply for exactly as long as it was told to, and serves that memory to
+> everyone who asks in the meantime.
+
+That single sentence explains more support tickets than any other fact in this lesson. But to
+see why it has to work that way, you have to follow the whole journey — because the address
+lookup is only the first of two completely separate jobs.
+
+## Two jobs, not one
+
+Pressing Enter starts two things that have nothing to do with each other, and almost every
+confusion about the internet comes from treating them as one:
+
+1. **Find the machine.** Turn a name a human can remember into a number a network can route to.
+   This is DNS, and it happens before your browser has spoken to the website at all.
+2. **Talk to the machine.** Open a connection, agree how to encrypt it, and only then ask for
+   the page. This is TCP, TLS and HTTP, in that order, every time.
+
+Job one can succeed while job two fails, and vice versa. "The site is down" is nearly always one
+or the other, and knowing which halves the time it takes to find out.
+
+## The address itself
+
+Before anything travels anywhere, the browser takes the address apart. Every piece is an
+instruction to a different piece of machinery:
+
+```
+https://www.example.com:443/pricing?plan=pro#faq
+```
+
+| Part | Name | Who reads it |
+| --- | --- | --- |
+| `https` | **scheme** | The browser. Says which language to speak, and implies port 443 |
+| `www` | **subdomain** | DNS. A label the domain's owner invented, pointing wherever they like |
+| `example` | **domain** | The registry. The part actually registered and paid for |
+| `.com` | **top-level domain** | The root servers. Decides which registry is asked |
+| `:443` | **port** | The server's operating system. Almost always left out, because the scheme implies it |
+| `/pricing` | **path** | **The web server** — the first part it ever sees |
+| `?plan=pro` | **query string** | The application. Extra parameters, visible in logs |
+| `#faq` | **fragment** | Nobody but your browser. It is **never sent to the server** |
+
+Read that column on the right again. **Everything up to the port is used to find a machine.
+Everything from the path onwards is the only part that machine ever hears.** The site has no
+idea which subdomain you typed unless the browser tells it separately — which it does, in a
+header, precisely because it would otherwise be lost.
+
+<Diagram
+  title="One address, from the keyboard to the screen"
+  viewBox="0 0 1000 540"
+  mode="build"
+  autoplay
+  steps={[
+    {
+      title: 'You press Enter',
+      body: 'The browser splits the address into a <strong>host</strong> to find and a <strong>path</strong> to ask for. First it checks its own memory — a name looked up recently is answered instantly, and none of the next four steps happen at all.',
+    },
+    {
+      title: 'Ask the resolver',
+      body: 'Your machine asks <strong>one</strong> server — usually your internet provider’s, or a public one like <code>1.1.1.1</code>. That server takes on the whole job of finding the answer. It is called a <strong>resolver</strong>, and it does the legwork so your laptop does not have to.',
+      flow: 'w-ask',
+    },
+    {
+      title: 'Root: “not me — try the .com servers”',
+      body: 'The resolver starts at the top. The <strong>root servers</strong> hold no website addresses whatsoever. They know one thing: which registry is responsible for each ending. So they answer with a redirection, not an address.',
+      flow: 'w-root',
+    },
+    {
+      title: '.com: “not me — try their nameserver”',
+      body: 'The <strong>registry</strong> for <code>.com</code> knows who was appointed to answer for <code>example.com</code>, because that is what registering a domain does. It hands back the name of that server. Still not the website’s address.',
+      flow: 'w-tld',
+    },
+    {
+      title: 'The authoritative answer, and back to you',
+      body: 'This last server is the one the domain’s owner controls, so its answer is final — it is <strong>authoritative</strong>. It returns the <strong>A record</strong>: an actual IP address. The resolver remembers it for the length of the TTL, then passes it back.',
+      flow: ['w-auth', 'w-answer'],
+      duration: 1500,
+    },
+    {
+      title: 'Now the real connection — two handshakes',
+      body: 'Only now does your browser speak to the website. Data is cut into <strong>packets</strong> and passed router to router. First <strong>TCP</strong> agrees that both ends are listening; then <strong>TLS</strong> checks the certificate and agrees the encryption. Neither has asked for the page yet.',
+      flow: ['w-t1', 'w-t2', 'w-t3', 'w-t4'],
+      duration: 1600,
+    },
+    {
+      title: 'The request, the answer, and a hundred more',
+      body: 'Finally: <code>GET /pricing</code>. The server replies with a status code and the HTML — which turns out to be a shopping list, so the browser immediately asks for every stylesheet, script, font and image it mentions.',
+      flow: ['w-t1', 'w-t2', 'w-t3', 'w-t4'],
+      duration: 1600,
+    },
+  ]}
+  caption="Dashed arrows are the name lookup; solid arrows carry your data. The resolver does all the asking — your laptop only ever speaks to it once."
+>
+  <Wire id="w-ask" from={[100, 386]} to={[160, 180]} shape="elbow-v" mid={180} tone="purple" dashed step={2} />
+  <Wire id="w-root" from={[340, 168]} to={[580, 70]} tone="purple" dashed step={3} />
+  <Wire id="w-tld" from={[340, 180]} to={[580, 155]} tone="purple" dashed step={4} />
+  <Wire id="w-auth" from={[340, 196]} to={[580, 245]} tone="purple" dashed step={5} />
+  <Wire id="w-answer" from={[250, 220]} to={[100, 386]} shape="elbow-v" mid={320} tone="teal" dashed step={5} />
+
+  <Node x={250} y={180} w={180} h={80} label="Resolver" sub="your ISP, or 1.1.1.1" icon="dns" tone="purple" step={2} />
+  <Node x={740} y={70} w={320} h={64} label="Root servers" sub="13 addresses, worldwide" icon="globe" tone="navy" step={3} />
+  <Node x={740} y={155} w={320} h={64} label=".com registry" sub="the top-level domain" icon="globe" tone="navy" step={4} />
+  <Node x={740} y={245} w={320} h={68} label="Authoritative" sub="ns1.example.com" icon="dns" tone="teal" step={5} />
+
+  <Wire id="w-t1" from={[175, 430]} to={[230, 430]} tone="orange" step={6} />
+  <Wire id="w-t2" from={[370, 430]} to={[405, 430]} tone="orange" step={6} />
+  <Wire id="w-t3" from={[535, 430]} to={[575, 430]} tone="orange" step={6} />
+  <Wire id="w-t4" from={[725, 430]} to={[765, 430]} tone="orange" step={6} />
+
+  <Node x={100} y={430} w={150} h={88} label="Your browser" sub="the laptop in front of you" icon="user" tone="blue" step={1} />
+  <Node x={300} y={430} w={140} h={88} label="Home router" sub="one public address" icon="router" tone="muted" step={6} />
+  <Node x={470} y={430} w={130} h={88} label="Your ISP" sub="first hop out" icon="router" tone="muted" step={6} />
+  <Node x={650} y={430} w={150} h={88} label="The backbone" sub="exchanges and cables" icon="cloud" tone="muted" step={6} />
+  <Node x={860} y={430} w={190} h={88} label="Web server" sub="93.184.216.34" icon="server" tone="orange" step={6} />
+</Diagram>
+
+## Finding the machine: DNS is delegation, not a directory
+
+Here is the idea that makes DNS click, and it is not the one most people are given.
+
+**There is no list.** No machine anywhere holds a directory of every domain on the internet. The
+system works by *delegation* — each level knows only who to ask next:
+
+| Asked | Knows | Answers with |
+| --- | --- | --- |
+| **Root servers** | Which registry runs each ending | "The `.com` servers handle that" |
+| **`.com` registry** | Which nameserver each domain appointed | "Ask `ns1.example.com`" |
+| **Authoritative nameserver** | The actual records for that one domain | `93.184.216.34` |
+
+Three questions, each narrowing the field, and only the last one returns an address. That is why
+registering a domain is really the act of telling a registry *which nameservers to point people
+at* — and why changing hosting means changing a record on those nameservers rather than telling
+anybody's browser anything.
+
+The **resolver** is the machine that walks that chain on your behalf. Your laptop never talks to
+the root servers; it asks one resolver and waits. Because that resolver serves thousands of
+people, the answer it caches is reused by all of them — which is the entire reason the internet
+can survive its own popularity, and also the entire reason Meridian's afternoon went the way it
+did.
+
+<Callout type="gotcha" title="TTL — the number that decides how long you are wrong for">
+Every DNS record carries a <strong>TTL</strong> (time to live) in seconds: how long anyone may
+remember the answer before asking again. Set it to <code>86400</code> and you have asked the
+world to ignore your next change for a day.
+<br /><br />
+<strong>The fix is always the same and it has to happen in advance:</strong> lower the TTL to
+something like 300 (five minutes) at least a full old-TTL before you move anything. Then make
+the change, watch it take effect in minutes, and put the TTL back up. You cannot lower it
+retroactively — the old value is already out there being obeyed.
+</Callout>
+
+<Callout type="exam">
+An <strong>A record</strong> maps a name to an IPv4 address; <strong>AAAA</strong> does the same
+for IPv6; a <strong>CNAME</strong> points one name at another name. On AWS, Route 53 adds an
+<strong>alias record</strong>, which behaves like a CNAME but can sit at the root of your domain
+and costs nothing to query — which is why exam answers about pointing <code>example.com</code>
+itself at a load balancer or CloudFront are almost always "alias record".
+</Callout>
+
+## Talking to the machine: three handshakes, in a fixed order
+
+Your browser now has an address. It still cannot ask for the page, because three conversations
+have to finish first. They always happen in this order, and each one exists for a different
+reason.
+
+**1. TCP — "are you there, and are you listening?"** Three short messages: your machine sends
+`SYN`, the server replies `SYN-ACK`, your machine sends `ACK`. Nothing useful has been exchanged
+— this is purely both ends agreeing that a connection exists. **TCP** is also the part that
+numbers your packets, notices when one goes missing, and asks for it again, which is why you can
+download a file over a flaky connection and still get an intact file.
+
+**2. TLS — "prove you are who you claim, and let us agree a secret."** The server presents a
+**certificate**. Your browser checks two things: that it was signed by a **certificate
+authority** it already trusts, and that it names the domain you actually typed. Then both sides
+agree a one-off session key, and everything after this point is unreadable to anyone in between.
+This is the padlock, and it is the `S` in HTTPS.
+
+**3. HTTP — the actual request.** Only now does the browser say what it wants:
+
+```
+GET /pricing HTTP/2
+Host: www.example.com
+Accept: text/html
+```
+
+And the server answers, starting with its three-digit verdict:
+
+```
+HTTP/2 200 OK
+Content-Type: text/html
+Content-Length: 41822
+```
+
+<Callout type="gotcha" title="The padlock does not mean the site is safe">
+It means exactly two things: the connection is encrypted, and somebody verified that this server
+controls this domain name. It says nothing about whether the people running the site are honest.
+A criminal can get a perfectly valid certificate for their own domain in about ninety seconds,
+and most phishing sites now have one.
+</Callout>
+
+<Mnemonic
+  title="The four things that must finish before any of the page arrives"
+  phrase="Dinner Takes Two Hours"
+  tone="teal"
+  items={[
+    { key: 'D', term: 'DNS', note: 'turn the name into an address — or find it already cached' },
+    { key: 'T', term: 'TCP', note: 'agree a connection exists. SYN, SYN-ACK, ACK' },
+    { key: 'T', term: 'TLS', note: 'check the certificate, agree the encryption. The padlock' },
+    { key: 'H', term: 'HTTP', note: 'finally ask for the page, and get a status code back' },
+  ]}
+/>
+
+## The road itself: packets, routers and hops
+
+Your request does not travel as one piece, and it does not travel along a route anybody planned.
+
+It is cut into **packets** — small chunks, each wrapped in labels saying where it came from and
+where it is going. Each packet is handed to a **router**, a machine whose entire job is to read
+the destination, decide which neighbour is closer to it, and pass it on. That is one **hop**.
+Ten to thirty hops later the packets arrive, possibly by different paths and out of order, and
+TCP puts them back in sequence.
+
+**No machine on that path knows the whole route.** Each router knows only its neighbours and,
+via **BGP**, which addresses those neighbours claim they can reach. The route emerges from a few
+thousand local decisions, which is why the internet keeps working when a cable is cut.
+
+You can watch it happen. `traceroute` (or `tracert` on Windows) prints every hop:
+
+```
+traceroute to 93.184.216.34
+ 1  192.168.1.1        1 ms     ← your home router
+ 2  isp-gateway        9 ms     ← your ISP
+ 3  lon-ix            11 ms     ← an internet exchange in London
+ 4  ae-12.core1       78 ms     ← across the Atlantic
+ 5  93.184.216.34     84 ms     ← the server
+```
+
+Two pieces of jargon fall out of that listing. Hop 1 is doing **NAT** — network address
+translation — which is how every device in your house shares one public address. Hop 3 is an
+**IXP**, an internet exchange point: a physical building where networks plug into each other,
+which is a surprisingly literal answer to "where is the internet".
+
+## Where the time actually goes
+
+This is the part that matters for everything you will learn about AWS afterwards. A typical
+first visit from the UK to a server in the United States:
+
+| Stage | Roughly | What it is |
+| --- | --- | --- |
+| DNS lookup | 0–20 ms | Usually zero — somebody already asked |
+| TCP handshake | ~80 ms | **One round trip** before a single byte of your request moves |
+| TLS handshake | ~160 ms | **One or two more round trips** |
+| Request and first byte back | ~80 ms | **One more round trip**, plus the server's own work |
+| Everything else | ~400 ms | The CSS, JavaScript, fonts and images the HTML asked for |
+
+Almost none of that is data moving. It is **round trips** — messages that must travel all the
+way there and all the way back before the next one can begin. And a round trip is limited by
+physics: light in glass covers roughly 200 km per millisecond, and London to Virginia and back
+is about 11,000 km whatever you pay.
+
+**Therefore the only real lever is distance.** You cannot make the round trip faster; you can
+only make it shorter, by putting a copy of the thing nearer the person asking. That single
+sentence is the reason AWS has Regions in dozens of countries, the reason CloudFront exists, and
+the reason "put it closer to the user" is the correct answer to a startling number of exam
+questions.
+
+<Scenario
+  who="A UK stationery shop whose Australian customers kept abandoning their baskets"
+  problem="The site felt instant in Leeds and sluggish in Sydney, and nobody could find a slow query to blame. The server was not busy, the database was not struggling, and the pages were not large. The team assumed they needed a faster server."
+  solution="They measured instead of guessing. Each product page made four round trips before anything appeared — DNS, TCP, TLS, then the request — and from Sydney each one cost about 280 ms simply crossing the planet. Over a second was spent on messages that carried almost no data. A faster server would have improved none of it, because the server was never the thing taking the time."
+  outcome="Putting the images and stylesheets on a CDN with a copy in Sydney, and reusing one connection instead of opening several, cut first-paint from 2.4 seconds to under 700 ms. The server was never touched."
+>
+The habit worth taking from this: when something is slow across a distance, ask <strong>how many
+round trips</strong> before you ask how fast the server is. Latency is a distance problem, and
+distance problems are solved by moving a copy — which is exactly what the next lesson is about.
+</Scenario>
+
+<Quiz
+  question="A company lowers the TTL on their DNS record from 86400 to 300, then immediately changes the record to point at a new server. Some visitors still reach the old server the next day. Why?"
+  choose={1}
+  options={[
+    {
+      text: 'Resolvers that cached the record before the TTL was lowered are still honouring the old 24-hour value',
+      correct: true,
+      why: 'A TTL is handed out with the answer. Anyone who asked while it still said 86400 was told to remember it for a day, and lowering it afterwards cannot reach back and change their mind. The lower TTL must be published at least one full old-TTL before the change.',
+    },
+    {
+      text: 'The new server has not finished starting up',
+      why: 'Visitors are reaching the old server, which means their traffic is not arriving at the new one at all. This is a name resolution problem, not a server problem.',
+    },
+    {
+      text: 'DNS changes must be approved by the registry, which takes 24 hours',
+      why: 'No approval step exists for changing a record on your own nameservers. The delay people remember as "propagation" is caching, not approval.',
+    },
+    {
+      text: 'The old record was an A record and the new one is a CNAME',
+      why: 'Both resolve to a destination and neither type causes a day-long delay. The record type is not what governs how long an answer is remembered — the TTL is.',
+    },
+  ]}
+  explain="There is no such thing as DNS <em>propagation</em>, despite everyone saying it. Nothing is pushed anywhere. Old answers simply expire, one cache at a time, on the schedule <strong>you</strong> published."
+/>
+
+<Quiz
+  question="A user reports that a website loads but shows a browser warning about the connection not being private. Which stage of the journey failed?"
+  choose={1}
+  options={[
+    {
+      text: 'The TLS handshake — the certificate was expired, self-signed, or issued for a different domain name',
+      correct: true,
+      why: 'The name was resolved and the connection opened, or nothing would have loaded at all. The browser is reporting that it could not verify the certificate presented during TLS.',
+    },
+    {
+      text: 'DNS — the name could not be resolved',
+      why: 'A failed lookup produces "server not found" and no page at all. Reaching the point of a certificate warning proves the address was found and the connection was made.',
+    },
+    {
+      text: 'TCP — packets were lost in transit',
+      why: 'Lost packets cause slowness or a timeout, not a warning about privacy. TCP re-sends what goes missing and has no opinion about identity.',
+    },
+    {
+      text: 'HTTP — the server returned a 500 error',
+      why: 'A 500 is the server admitting it broke while building the page. It is delivered over an already-trusted connection and produces an error page, not a certificate warning.',
+    },
+  ]}
+  explain="Work the four stages in order — <strong>DNS, TCP, TLS, HTTP</strong> — and the symptom tells you which one stopped. Name not found → DNS. Hangs forever → TCP. Privacy warning → TLS. An error page with a number → HTTP."
+/>
+
+<Quiz
+  question="Which statements about how a request travels are correct? (Choose TWO.)"
+  choose={2}
+  options={[
+    {
+      text: 'The fragment of a URL, such as #faq, is never sent to the server',
+      correct: true,
+      why: 'The browser keeps it and uses it to scroll to a position on the page after the response arrives. Server logs never see it.',
+    },
+    {
+      text: 'Root DNS servers hold the address of every registered domain',
+      why: 'They hold none of them. They know only which registry is responsible for each top-level domain, and answer with a referral.',
+    },
+    {
+      text: 'Data is split into packets that may take different routes and arrive out of order',
+      correct: true,
+      why: 'Each router chooses the next hop independently, so packets from one request can follow different paths. TCP numbers them and reassembles them in sequence at the far end.',
+    },
+    {
+      text: 'The padlock icon confirms that the website is operated by a legitimate business',
+      why: 'It confirms encryption and that somebody verified control of the domain name. It makes no claim at all about the honesty of whoever runs the site.',
+    },
+    {
+      text: 'The TLS handshake happens before the TCP handshake',
+      why: 'The order is fixed and the other way round: TCP opens the connection, then TLS secures it. You cannot encrypt a conversation that has not started.',
+    },
+  ]}
+/>
+
+<Takeaways
+  items={[
+    'Pressing Enter starts <strong>two separate jobs</strong>: find the machine (DNS), then talk to it (TCP, TLS, HTTP). Most "the site is down" reports are one or the other.',
+    'Everything before the path finds a <strong>machine</strong>; the path onwards is all the server ever sees. The <strong>fragment</strong> is never sent at all.',
+    '<strong>DNS is delegation, not a directory.</strong> Root knows who runs <code>.com</code> · <code>.com</code> knows who runs the domain · only the <strong>authoritative</strong> nameserver knows the address.',
+    '<strong>TTL decides how long your old answer keeps being served.</strong> Lower it days before a move — you cannot lower it retroactively. "Propagation" is just caches expiring.',
+    'Remember the order with <strong>Dinner Takes Two Hours</strong>: DNS, TCP, TLS, HTTP.',
+    'Data travels as <strong>packets</strong>, hop by hop, by routes no single machine knows in full. TCP is what puts them back in order.',
+    'The padlock means <strong>encrypted and domain-verified</strong>. It is not a statement that the site is trustworthy.',
+    'Almost all the waiting is <strong>round trips</strong>, and a round trip is limited by distance. You cannot speed it up — you can only shorten it by moving a copy closer.',
+  ]}
+/>
+
+---
+
+Meridian's fix took thirty seconds and had to happen a day early: drop the TTL to 300, wait out
+the old twenty-four hours, then move. Their next migration went live everywhere within about
+four minutes.
+
+What actually changed was not their configuration. It was that somebody on the team could finally
+say what the internet was *doing* — that no change is ever pushed to anybody, that every machine
+in the chain is answering from memory on a schedule they themselves had published, and that the
+customer's office had not been wrong or stale or broken. It had been correct, according to
+instructions Meridian gave it in a field they had never opened.
+
+Almost everything ahead of you on this site is AWS putting its own machinery into this journey:
+Route 53 becomes the authoritative nameserver, CloudFront becomes a copy of your site sitting
+closer to the person asking, a load balancer becomes the thing on the far end of that TCP
+handshake. None of it replaces the journey. It just moves pieces of it nearer to whoever pressed
+Enter.

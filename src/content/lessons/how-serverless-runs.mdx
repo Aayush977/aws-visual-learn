@@ -1,0 +1,508 @@
+---
+title: How Serverless Actually Runs
+summary: There is a server, you just do not own it. The execution environment, what a cold start really costs, why memory is secretly a CPU dial, how concurrency and throttling work, and the API Gateway settings that decide whether any of it reaches a user.
+exams: [CCP, SAA]
+track: compute
+order: 15
+domains:
+  CCP: 'Domain 3 — Cloud Technology and Services'
+  SAA: 'Domain 3 — Design High-Performing Architectures'
+minutes: 20
+hook: The first report of the morning took eight seconds. The second took two hundred milliseconds. Same function, same data, same code — and for three weeks the team optimised the wrong thing entirely.
+updated: 2026-09-22
+---
+
+import Diagram from '../../components/Diagram.astro';
+import Node from '../../components/svg/Node.astro';
+import Wire from '../../components/svg/Wire.astro';
+import Callout from '../../components/Callout.astro';
+import Confusable from '../../components/Confusable.astro';
+import SourceRepo from '../../components/SourceRepo.astro';
+import Mnemonic from '../../components/Mnemonic.astro';
+import Quiz from '../../components/Quiz.astro';
+import Scenario from '../../components/Scenario.astro';
+import Takeaways from '../../components/Takeaways.astro';
+
+## The first report of the morning
+
+Meridian's customers pull a dashboard report each morning. It is a Lambda function: read some
+data, do some arithmetic, return some JSON. It had been live for months and nobody had thought
+about it once.
+
+Then a customer complained that the mornings felt slow.
+
+The engineer who picked it up did the sensible thing and measured. The 09:00 report took
+**8.1 seconds**. The 09:03 report took **190 milliseconds**. The 09:04 report took 180. The
+11:40 report, after a quiet hour, took 7.6 seconds again.
+
+Same function. Same customer. Same query, against the same data, returning the same number of
+rows. A factor of forty, correlated with nothing except how long it had been since anybody
+last asked.
+
+So they optimised the query. Then they added an index. Then they cached the result. The fast
+requests got slightly faster. **The slow ones stayed exactly as slow**, because none of the
+three weeks of work touched the thing that was actually taking the eight seconds — which was
+not their code running, but their code *arriving*.
+
+## There is a server. You just do not own it.
+
+"Serverless" is a billing and operations promise, not a physics claim. Your code runs on a
+machine. What you are excused from is choosing it, patching it, scaling it and paying for it
+while it idles.
+
+What you get instead is an **execution environment**: a small sandbox that AWS creates for your
+function, keeps around for a while, and eventually throws away. Everything strange about
+Lambda — cold starts, the variable that mysteriously persists, the concurrency limits — comes
+from that environment's lifecycle.
+
+Play it through once. The eight seconds is steps 1 to 3.
+
+<Diagram
+  title="The life of an execution environment"
+  viewBox="0 60 1020 340"
+  autoplay
+  steps={[
+    {
+      title: 'A request arrives and nothing exists yet',
+      body: "There is no idle server waiting with your code on it. If no environment is available, one has to be built — and the caller waits while that happens. This is a <strong>cold start</strong>.",
+      flow: 'w-c1',
+    },
+    {
+      title: 'Download the code, start the runtime',
+      body: "AWS fetches your deployment package and starts the language runtime. A large package with dependencies you do not use makes this measurably worse, which is the cheapest cold-start fix there is.",
+      flow: ['w-c2', 'w-c3'],
+      duration: 1500,
+    },
+    {
+      title: 'Initialisation code runs — once',
+      body: "Anything <em>outside</em> your handler runs here: imports, reading configuration, opening a database connection, constructing an SDK client. In a heavy framework this is usually the largest slice of the cold start.",
+      flow: 'w-c4',
+    },
+    {
+      title: 'Now, finally, the handler',
+      body: "Your handler is called with the <strong>event</strong> (what happened) and the <strong>context</strong> (how long you have left, who you are). This part — the code you have been optimising — is often the smallest number on the page.",
+    },
+    {
+      title: 'The next request skips all of it',
+      body: "The environment is kept. A request arriving while it is still around goes <strong>straight to the handler</strong>: no download, no runtime start, no init. This is a <strong>warm start</strong>, and it is why the 09:03 report took 190 milliseconds.",
+      flow: 'w-warm',
+      duration: 1500,
+    },
+    {
+      title: 'Frozen, then eventually gone',
+      body: "Between requests the environment is <strong>frozen</strong> — not deleted, but not running either. After a period of inactivity AWS reclaims it, and the next request after that pays the cold start again. You do not control that timer and cannot rely on it.",
+      flow: 'w-freeze',
+    },
+  ]}
+  caption="The cold path is steps 1–3 and happens once per environment. The warm path is step 5 and happens for every other request that environment ever serves."
+>
+  <Node x={110} y={130} w={180} h={80} label="First request" sub="nothing exists" icon="user" tone="muted" step={1} />
+  <Node x={340} y={130} w={190} h={80} label="Download code" icon="archive" tone="orange" step={2} />
+  <Node x={570} y={130} w={190} h={80} label="Start runtime" icon="gear" tone="orange" step={2} />
+  <Node x={800} y={130} w={190} h={80} label="Run init code" sub="outside the handler" icon="code" tone="orange" step={3} />
+
+  <Node x={110} y={300} w={180} h={80} label="Later request" sub="environment exists" icon="user" tone="muted" step={5} />
+  <Node x={570} y={300} w={230} h={90} label="Your handler" sub="event + context" icon="lambda" tone="green" step={4} />
+  <Node x={840} y={300} w={180} h={90} label="Frozen" sub="then reclaimed" icon="clock" tone="muted" step={6} />
+
+  <Wire id="w-c1" from={[200, 130]} to={[245, 130]} tone="orange" step={1} />
+  <Wire id="w-c2" from={[435, 130]} to={[475, 130]} tone="orange" step={2} />
+  <Wire id="w-c3" from={[665, 130]} to={[705, 130]} tone="orange" step={2} />
+  <Wire id="w-c4" from={[800, 170]} to={[570, 255]} shape="elbow-v" mid={215} tone="orange" step={3} label="cold path" labelDx={-60} labelDy={-8} />
+
+  <Wire id="w-warm" from={[200, 300]} to={[455, 300]} tone="green" step={5} label="warm: straight to the handler" labelDy={-14} />
+  <Wire id="w-freeze" from={[685, 300]} to={[750, 300]} tone="muted" dashed step={6} />
+</Diagram>
+
+## What a cold start is actually made of
+
+Four things, roughly in order of how much they usually cost:
+
+1. **Your initialisation code.** Imports, framework bootstrapping, reading secrets, building
+   clients. Usually the biggest slice and the one entirely within your control.
+2. **Package size.** Everything in the deployment package is downloaded. A bundle carrying
+   unused dependencies is paying for them on every cold start.
+3. **Runtime.** Interpreted runtimes generally start faster than ones that have to warm a
+   virtual machine first.
+4. **Networking setup** when the function is attached to a VPC.
+
+What is *not* in the list is your handler's logic — which is what Meridian spent three weeks
+on.
+
+### The one you exploit deliberately
+
+Because init runs once per environment and the environment is reused, **anything you set up
+outside the handler is shared by every subsequent invocation on that environment.** That is
+the single most useful performance trick in Lambda:
+
+```js
+// Outside the handler — runs once per environment, reused by every invocation.
+const db = new DatabaseClient({ endpoint: process.env.DB_ENDPOINT });
+
+export const handler = async (event) => {
+  // Inside — runs on every invocation. Keep it to the actual work.
+  return db.query(event.customerId);
+};
+```
+
+Move the connection, the SDK client and the configuration read *outside*. Warm invocations then
+skip all of it.
+
+<Callout type="gotcha">
+The same reuse is a genuine source of bugs. A variable outside the handler <strong>persists
+between invocations</strong>, so a counter, a cache or a half-written buffer left there leaks
+one customer's request into the next one's. It is also non-deterministic: it happens only when
+the environment is reused, so it passes every test and fails in production. Outside the handler
+is for things that are <em>safe to share</em> — clients and configuration, never request data.
+Files written to <code>/tmp</code> survive the same way.
+</Callout>
+
+### Fixing cold starts, in order of how lazy you can be
+
+- **Trim the package.** Free, and helps every cold start.
+- **Move work out of the handler** into init — or, better, delete it.
+- **Provisioned concurrency** keeps a set number of environments initialised and waiting, so
+  requests never meet a cold start. It costs money whether or not they are used, which makes it
+  the answer when *latency is a requirement* rather than an annoyance.
+- **Do nothing.** For an asynchronous job — a nightly batch, a file landing in S3 — an extra
+  second before it starts is genuinely irrelevant. Cold starts matter when a human is waiting.
+
+<Callout type="exam">
+"A serverless API must respond with consistently low latency, including for the first request"
+means <strong>provisioned concurrency</strong>. Warming functions by pinging them on a schedule
+is a folk remedy that predates the feature and is offered as a distractor.
+</Callout>
+
+## Memory is a CPU dial
+
+This one surprises everybody, and it is worth real money.
+
+You configure a Lambda function's **memory**. What you are actually buying is a proportional
+share of **CPU** — more memory means more CPU, and above a threshold, more cores. You are not
+allowed to set them separately.
+
+So a compute-bound function set to 128 MB can be *cheaper to run at 512 MB*: it gets several
+times the CPU, finishes in a fraction of the time, and you are billed for duration. Paying four
+times as much per millisecond for a fifth of the milliseconds is a saving.
+
+**Measure, do not assume.** The relationship flattens — at some point more memory buys nothing
+because the function is waiting on the network, not on CPU, and you are simply paying more.
+
+<Callout type="cost">
+The corollary: a function that spends its life waiting on an API call gains nothing from extra
+memory, because CPU was never the constraint. Compute-bound functions scale with the dial;
+IO-bound ones do not. Knowing which of the two you have is the whole optimisation.
+</Callout>
+
+## Concurrency: how it scales, and how it stops
+
+**One execution environment serves one request at a time.** There is no threading model to
+reason about — two simultaneous requests mean two environments.
+
+**Concurrent executions** is simply how many are in flight at once. Traffic doubles, Lambda
+creates more environments. That is the scaling story, and it is genuinely automatic.
+
+It is not infinite. An account has a concurrency limit per Region — **1,000 by default**,
+raisable on request — shared by *every function in that account*. Two controls carve it up:
+
+- **Reserved concurrency** sets aside part of the pool for one function. It is a floor
+  (nothing else can take it) and a ceiling (the function cannot exceed it). Use it to stop one
+  runaway function starving everything else — and to protect a fragile downstream database from
+  a thousand simultaneous connections.
+- **Provisioned concurrency** is different in kind: it keeps environments *initialised and
+  waiting*, which is about cold starts, not about limits.
+
+When the limit is reached, further invocations are **throttled** — a `429`. What happens next
+depends entirely on how the function was invoked, which is the next section and the part that
+catches people out.
+
+## Three ways a function gets invoked
+
+The invocation model decides what happens to a request that fails or is throttled. It is the
+most commonly missed detail in serverless design.
+
+- **Synchronous** — API Gateway, an Application Load Balancer, a direct `Invoke`. The caller
+  waits and receives the result. **A throttle or an error goes straight back to the caller**,
+  and nothing retries unless the caller does.
+- **Asynchronous** — S3 events, SNS, EventBridge. The event is queued by Lambda and the caller
+  is told only that it was accepted. Lambda then **retries a failed invocation twice** before
+  giving up, and a failed event can be routed to a **dead-letter queue** or an on-failure
+  destination so it is not silently lost.
+- **Event source mapping** — SQS, Kinesis, DynamoDB Streams. Here **Lambda polls the source**
+  and calls your function with a batch. Failures return the messages to the queue; after enough
+  attempts they go to the queue's dead-letter queue.
+
+<Callout type="gotcha">
+With SQS, set the queue's <strong>visibility timeout to at least six times the function
+timeout</strong>. Too short, and the message becomes visible again while your function is still
+processing it — so a second invocation picks up the same message and does the work twice. This
+is the most common duplicate-processing bug in serverless, and it looks like a mysterious data
+problem rather than a configuration one.
+</Callout>
+
+### Which means your function must tolerate duplicates
+
+Every one of those models is **at-least-once**, not exactly-once. Retries exist, and a retry of
+a function that already half-succeeded runs it again.
+
+So a Lambda that charges a card, sends an email or increments a total must be **idempotent** —
+safe to run twice with the same input. In practice: record the event's id before doing the
+work, and return early if you have seen it. This is not a nicety; it is the price of a system
+that retries on your behalf.
+
+## API Gateway: the front door
+
+Lambda has no address. Something has to accept an HTTP request and invoke it, and for an API
+that is usually **Amazon API Gateway**.
+
+It is a managed front door that does the work you would otherwise write yourself:
+
+- **Routes** a method and path to a backend — a Lambda function, an HTTP endpoint, or an AWS
+  service directly.
+- **Stages** (`dev`, `prod`) are deployed versions of the same API, each with its own URL and
+  settings — this is how a change is tested without touching production.
+- **Authorizers** decide who may call: IAM, a Cognito user pool, or a **Lambda authorizer**
+  running your own logic. Auth happens *before* your function is invoked, so rejected traffic
+  never costs you an execution.
+- **Throttling and usage plans** cap requests per caller, protecting both your function and
+  your bill. With API keys, this is how you give different customers different rate limits.
+- **Request validation** rejects malformed input at the gateway rather than inside your code.
+- **Caching** can return a response without invoking the backend at all.
+
+<Confusable
+  title="REST API vs HTTP API"
+  ask="API Gateway offers two kinds and the console does not make the choice obvious. They are not versions of each other — the newer one is deliberately smaller."
+  options={[
+    {
+      name: 'HTTP API',
+      tagline: 'The newer, leaner, cheaper one. Built for the common case: a JWT-protected API in front of Lambda.',
+      when: [
+        'You want <strong>lower cost and lower latency</strong>, and the common features are enough',
+        'Auth is a <strong>JWT</strong> — Cognito, or any OIDC provider',
+        'You are proxying to Lambda or an HTTP backend and want no ceremony',
+      ],
+      giveaway: ['"lowest cost"', '"simple REST API"', '"JWT"'],
+    },
+    {
+      name: 'REST API',
+      tagline: 'The original, with the long feature list. Reach for it when you need something HTTP APIs left out.',
+      when: [
+        'You need <strong>API keys and usage plans</strong> for per-customer rate limits',
+        'You need <strong>request/response transformation</strong>, or WAF attached',
+        'You need <strong>response caching</strong> at the gateway',
+        'The API must be <strong>private</strong>, reachable only from inside a VPC',
+      ],
+      giveaway: ['"usage plans"', '"API keys"', '"cache the response"', '"private API"', '"AWS WAF"'],
+    },
+  ]}
+  rule="<strong>Start with HTTP API.</strong> Move to REST API when you need a named feature it does not have — usage plans, caching, transformation, WAF or a private endpoint."
+/>
+
+<Callout type="gotcha" title="29 seconds versus 15 minutes">
+A Lambda function may run for <strong>15 minutes</strong>. An API Gateway integration waits
+<strong>29 seconds</strong> by default and then returns a <code>504</code> — while your function
+carries on running, and billing, invisible to the caller who has already given up.
+
+Anything slower than a few seconds should not be answered synchronously at all. Accept the
+request, return <code>202 Accepted</code> with an id, do the work asynchronously, and let the
+caller poll or be notified. If a question describes a long-running job behind an API, that
+pattern is the answer.
+</Callout>
+
+<Mnemonic
+  title="Reading a serverless scenario"
+  tone="green"
+  items={[
+    { key: 'W', term: 'Who waits?', note: 'a human waiting → cold starts matter. A queue → they do not' },
+    { key: 'H', term: 'How is it invoked?', note: 'sync returns errors to the caller; async retries twice; a source mapping returns it to the queue' },
+    { key: 'A', term: 'And if it runs twice?', note: 'every model is at-least-once, so the function must be idempotent' },
+    { key: 'T', term: 'Too long?', note: 'over ~29 seconds it cannot be a synchronous API call — accept it and work asynchronously' },
+  ]}
+/>
+
+<Quiz
+  question="A serverless API backed by Lambda has unpredictable response times. Most requests complete in under 200 ms, but the first request after a quiet period takes several seconds. The business requires consistently low latency. What should a solutions architect recommend?"
+  choose={1}
+  options={[
+    {
+      text: 'Configure provisioned concurrency on the function',
+      correct: true,
+      why: 'Provisioned concurrency keeps execution environments initialised and waiting, so requests do not pay for downloading code, starting the runtime and running init. It is the feature built for exactly this requirement.',
+    },
+    {
+      text: 'Increase the function timeout',
+      why: 'The timeout is the maximum a function may run before being killed. It has no effect on how long it takes to start, and raising it changes nothing about latency.',
+    },
+    {
+      text: 'Create a CloudWatch Events rule that invokes the function every five minutes to keep it warm',
+      why: 'The folk remedy that predates provisioned concurrency. It keeps roughly one environment alive, so it fails the moment two requests arrive at once, and it does not actually guarantee anything.',
+    },
+    {
+      text: 'Increase the reserved concurrency for the function',
+      why: 'Reserved concurrency carves out part of the account limit — a floor and a ceiling on how many can run at once. It does not pre-initialise anything, so the first request still starts cold.',
+    },
+  ]}
+/>
+
+<Quiz
+  question="A Lambda function is triggered by an SQS queue and occasionally processes the same message twice, creating duplicate records. The function takes up to 3 minutes to run. What is the most likely cause?"
+  choose={1}
+  options={[
+    {
+      text: "The queue's visibility timeout is shorter than the function's execution time",
+      correct: true,
+      why: 'When the visibility timeout expires the message becomes visible again and another invocation collects it, while the first is still working. The guidance is a visibility timeout of at least six times the function timeout.',
+    },
+    {
+      text: 'The function is not configured with enough memory',
+      why: 'Low memory makes a function slower, which can make it more likely to exceed a visibility timeout — but it is a contributing factor, not the cause. The mechanism producing the duplicate is the timeout itself.',
+    },
+    {
+      text: 'SQS standard queues guarantee exactly-once delivery, so this indicates a service fault',
+      why: 'The opposite is true. Standard queues are at-least-once by design and can deliver a message more than once, which is why consumers are expected to be idempotent.',
+    },
+    {
+      text: 'The dead-letter queue is not configured',
+      why: 'A dead-letter queue catches messages that repeatedly fail. It would not prevent a message being processed twice, and the messages here are succeeding — twice.',
+    },
+  ]}
+/>
+
+<Scenario
+  who="A retailer replacing a nightly stock file with something customers can see"
+  problem="Kettle & Fox publish stock levels to their website from a file generated overnight, so the site is wrong all day — it has sold out-of-stock mugs during a television mention more than once. They want live stock, but the warehouse system can only push an update when something changes, the traffic is spiky and mostly zero, and there is no appetite for running servers to wait for events that arrive a few hundred times a day."
+  solution="The warehouse posts each change to an HTTP API on API Gateway, authorised with an API key and throttled with a usage plan so a misbehaving script cannot flood it. The gateway puts the event on an SQS queue and returns 202 immediately, so the warehouse never waits. A Lambda function is triggered by the queue, writes the level to DynamoDB, and is idempotent on the warehouse's change id — a redelivered message overwrites with the same value rather than double-counting. The queue's visibility timeout is set well above the function timeout, and a dead-letter queue holds anything that fails repeatedly."
+  outcome="Stock on the site is accurate within seconds. Nothing runs, or is billed, between updates. The television spike is absorbed by the queue rather than by a database, and the handful of messages that have ever failed are sitting in the dead-letter queue where somebody can look at them."
+>
+Note the shape: **the API accepts, the queue absorbs, the function processes.** Nothing
+long-running happens while a caller waits, the spike lands somewhere designed to hold it, and
+the retry behaviour is safe because the function was written to tolerate being run twice.
+Almost every serverless scenario question is asking you to assemble those three.
+</Scenario>
+
+## Build it yourself
+
+Two labs here, because this lesson made two different kinds of claim. The first builds the
+architecture from the scenario above; the second measures the memory-is-a-CPU-dial claim
+instead of asking you to believe it.
+
+### Lab 1 — accept, queue, process
+
+<SourceRepo
+  repo="aws-samples/serverless-patterns"
+  url="https://github.com/aws-samples/serverless-patterns/tree/main/apigw-sqs-lambda-ddb"
+  licence="MIT-0"
+  stars="~1.8k"
+  effort="half an hour"
+  blurb="A collection of around a thousand deployable serverless patterns, each a small SAM or CDK template with a README. The one to start with is apigw-sqs-lambda-ddb: API Gateway accepts a POST, puts it on a queue, returns immediately, and a Lambda function drains the queue into DynamoDB — with a dead-letter queue already wired up. It is the Kettle & Fox scenario above, deployable in one command."
+/>
+
+**Steps**
+
+1. `git clone https://github.com/aws-samples/serverless-patterns`
+2. `cd apigw-sqs-lambda-ddb`
+3. `sam deploy --guided` — you will need the AWS SAM CLI installed and credentials configured.
+   Accept the prompts; it will offer to create the IAM roles.
+4. POST to the endpoint it prints. You get a response **immediately** — before the work has
+   happened. That is the `202`-shaped pattern from the scenario, and feeling the speed of that
+   response is the point.
+5. Look in DynamoDB a moment later and find the record.
+
+**Then open `template.yaml`, because it is a checklist of this lesson:**
+
+| In the template | In this lesson |
+|---|---|
+| `RedrivePolicy` with `maxReceiveCount: 5` | A dead-letter queue, so a poison message stops after five attempts |
+| Lambda `Timeout: 3` | The function timeout that everything else has to be sized against |
+| `BatchSize: 10` on the event source mapping | Event source mapping — Lambda polls, and one invocation gets ten messages |
+| No `VisibilityTimeout` on the queue | It inherits the SQS default of 30 seconds |
+
+That last row is the one to stare at. The queue does not set a visibility timeout, so it gets
+30 seconds; the function times out at 3. Thirty is comfortably more than six times three, so
+**this template is safe by accident** — the defaults happen to satisfy the rule.
+
+### Break it on purpose
+
+1. **Change the function `Timeout` from 3 to 30** and redeploy. The queue still has its 30-second
+   default. Now add a `time.sleep` so the function takes 25 seconds, and send one message.
+   Watch it get processed more than once. You have built Aldgate's fourteen texts on purpose, in
+   one line of configuration.
+2. **Fix it properly** by setting the queue's `VisibilityTimeout` to 180 — six times the function
+   timeout — and confirm the duplicates stop.
+3. **Make the function throw every time** and watch the message move to the dead-letter queue
+   after five receives. Then look at the DLQ and note that the message is *still there*, waiting
+   for a human. That is what a DLQ is for.
+4. **Throw an error but keep the function under the timeout**, and see the difference between
+   *failing* and *timing out* — both retry, only one leaves a useful log.
+
+### Lab 2 — prove the memory dial
+
+<SourceRepo
+  repo="alexcasalboni/aws-lambda-power-tuning"
+  url="https://github.com/alexcasalboni/aws-lambda-power-tuning"
+  licence="Apache-2.0"
+  stars="~6k"
+  effort="twenty minutes"
+  eyebrow="Go and measure it"
+  blurb="A Step Functions state machine that invokes one of your functions at a range of memory settings, reads the execution logs, and draws you a graph of cost against speed. It is the standard answer to 'what should this function's memory be', and it turns the claim in this lesson into a chart about your own code."
+/>
+
+**Steps**
+
+1. Deploy it from the AWS Serverless Application Repository — the README has the link and it is
+   a few clicks.
+2. Run the state machine with the ARN of a function you want to tune, and a list of memory
+   values to try (`128, 256, 512, 1024, 1536`).
+3. It invokes your function at each setting, in your account, for real. Read the visualisation
+   it returns.
+
+**What you are looking for** is the shape of the curve, and which of the two shapes you get:
+
+- A **compute-bound** function gets dramatically faster with more memory, and the cost line
+  often goes *down* as well. The project's own README shows a function going from 35 seconds at
+  128 MB to under 3 seconds at 1.5 GB while being cheaper to run. That is the claim in this
+  lesson, measured.
+- An **IO-bound** function — one waiting on a database or an API — flattens almost immediately.
+  More memory buys nothing, and you are paying more per millisecond for the same number of
+  milliseconds.
+
+Run it against both kinds and keep the two charts. Knowing which shape you are looking at is
+the whole skill, and it is much easier to remember a picture of your own function than a rule
+about someone else's.
+
+<Callout type="cost" title="Both labs are cheap, but not free">
+Serverless bills for what you use, and these labs use very little — a few thousand invocations
+and a small DynamoDB table. Power tuning deliberately invokes your function many times, so
+point it at something trivial rather than at something that calls a paid third-party API on
+every run. Delete the SAM stack with <code>sam delete</code> when you are finished.
+</Callout>
+
+<Takeaways
+  items={[
+    'Serverless means an <strong>execution environment</strong> AWS builds, reuses and eventually discards — every Lambda oddity comes from that lifecycle.',
+    'A <strong>cold start</strong> is download + runtime start + your init code. Your handler is usually the smallest part, which is why optimising it does not help.',
+    'Code <strong>outside the handler</strong> runs once per environment and is reused. Excellent for clients and configuration; a real bug if you leave request data there.',
+    '<strong>Memory is a CPU dial.</strong> A compute-bound function can cost less at higher memory because it finishes sooner. IO-bound functions gain nothing.',
+    'One environment serves <strong>one request at a time</strong>. Concurrency is how many are in flight; the account default is 1,000 per Region.',
+    '<strong>Reserved</strong> concurrency carves out a floor and a ceiling. <strong>Provisioned</strong> concurrency pre-warms environments — different problems.',
+    'Invocation model decides failure behaviour: <strong>sync</strong> returns the error to the caller · <strong>async</strong> retries twice then dead-letters · <strong>event source mapping</strong> returns messages to the queue.',
+    'Everything is <strong>at-least-once</strong>. Functions that charge, send or increment must be idempotent.',
+    'With SQS, visibility timeout should be <strong>at least six times the function timeout</strong>, or the same message gets processed twice.',
+    'API Gateway waits <strong>29 seconds</strong>; Lambda runs for <strong>15 minutes</strong>. Anything slow must be accepted and processed asynchronously.',
+  ]}
+/>
+
+---
+
+Meridian's eight seconds was not in their code. It was the environment being built around their
+code, one request in every few hundred, at the exact moment a customer was watching.
+
+They fixed it in an afternoon once they knew that: the SDK clients moved outside the handler,
+the deployment package lost a dependency tree nobody had used since the first month, and the
+function that a customer waits on got provisioned concurrency during business hours. The
+09:00 report now takes 210 milliseconds.
+
+Three weeks had gone into making the fast requests faster. The lesson is not that they were
+careless — it is that **you cannot optimise a system whose shape you have not learned**, and
+the shape of Lambda is an environment with a life of its own, which your code is only briefly
+a guest in.

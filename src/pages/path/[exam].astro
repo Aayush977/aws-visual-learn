@@ -2,6 +2,8 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import LessonCard from '../../components/LessonCard.astro';
 import { lessonsForExam, groupByTrack } from '../../lib/lessons';
+import { PRACTICE_EXAMS, TOTAL_QUESTIONS } from '../../lib/practice-exams';
+import { url } from '../../lib/paths';
 import { EXAMS, EXAM_META, TRACK_META } from '../../content.config';
 
 export function getStaticPaths() {
@@ -13,6 +15,12 @@ const meta = EXAM_META[exam];
 const lessons = await lessonsForExam(exam);
 const groups = groupByTrack(lessons);
 const totalMinutes = lessons.reduce((sum, l) => sum + l.data.minutes, 0);
+
+/**
+ * The mock papers are Cloud Practitioner only, so the path picks up one extra
+ * numbered step at the end for CCP and finishes on the lessons for SAA.
+ */
+const showMocks = exam === 'CCP';
 
 const BLURB: Record<typeof exam, string> = {
   CCP: 'The entry-level exam. It asks what AWS services do, when you would reach for them, how the pricing and support model works, and who is responsible for what. Breadth over depth — you are not expected to configure anything.',
@@ -67,6 +75,49 @@ const BLURB: Record<typeof exam, string> = {
             </ul>
           </section>
         ))
+      )
+    }
+
+    {
+      showMocks && (
+        <section class="trk">
+          <div class="trk__head">
+            <h2>
+              <span class="trk__num">{String(groups.length + 1).padStart(2, '0')}</span>
+              Sit a mock exam
+            </h2>
+            <p>
+              Reading the lessons and holding your nerve for ninety minutes are different skills.
+              This is where you find out which one you have.
+            </p>
+          </div>
+
+          <div class="mock">
+            <p class="mock__lead">
+              {PRACTICE_EXAMS.length} full-length papers, {TOTAL_QUESTIONS} questions, scored and
+              broken down by exam domain. Work through the{' '}
+              <a href={url('/quiz/ccp')}>practice questions</a> first — every wrong option there is
+              explained — then use these for stamina and to find the domain that is quietly costing
+              you marks.
+            </p>
+            <ul class="mock__list">
+              {PRACTICE_EXAMS.slice(0, 3).map((e) => (
+                <li>
+                  <a class="mock__paper" href={url(`/practice/${e.n}`)}>
+                    Exam {e.n}
+                    <span>{e.questions.length} questions</span>
+                  </a>
+                </li>
+              ))}
+              <li>
+                <a class="mock__paper mock__paper--all" href={url('/practice')}>
+                  All {PRACTICE_EXAMS.length} papers
+                  <span>Pick the next unsat number</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </section>
       )
     }
   </div>
@@ -130,6 +181,51 @@ const BLURB: Record<typeof exam, string> = {
     gap: var(--sp-3);
     padding: 0;
     margin: 0;
+  }
+
+  .mock {
+    padding: var(--sp-4);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--aws-orange);
+    border-radius: var(--radius-lg);
+    background: var(--bg-raised);
+  }
+  .mock__lead {
+    margin: 0 0 var(--sp-4);
+    font-size: var(--step--1);
+    color: var(--text-muted);
+    max-width: 46rem;
+  }
+  .mock__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .mock__paper {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: inherit;
+    text-decoration: none;
+    font-weight: 650;
+  }
+  .mock__paper:hover {
+    border-color: var(--accent);
+  }
+  .mock__paper span {
+    font-size: var(--step--1);
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  .mock__paper--all {
+    border-style: dashed;
   }
 
   .rd {

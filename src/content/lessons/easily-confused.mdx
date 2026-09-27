@@ -1,12 +1,12 @@
 ---
 title: The Pairs Everyone Mixes Up
-summary: The twelve service comparisons that decide more exam marks than any single lesson — SQS vs SNS, EBS vs EFS vs S3, security groups vs NACLs, WAF vs Shield and eight more, each with the wording that gives it away.
+summary: The thirteen service comparisons that decide more exam marks than any single lesson — SQS vs SNS, EBS vs EFS vs S3, security groups vs NACLs, WAF vs Shield, Bedrock vs SageMaker and eight more, each with the wording that gives it away.
 exams: [CCP, SAA]
 track: reference
 order: 10
-minutes: 16
+minutes: 18
 hook: You will not fail this exam because you have never heard of a service. You will fail it because two services sound identical and you picked the wrong one under time pressure.
-updated: 2026-08-15
+updated: 2026-09-22
 ---
 
 import Confusable from '../../components/Confusable.astro';
@@ -29,7 +29,7 @@ The exam is built this way on purpose. A question with three obviously wrong ans
 nothing. Almost every real item is a **discrimination test between two services that overlap**,
 and the discriminating detail is usually one clause in the middle of the paragraph.
 
-So this page is not another list. It is the twelve pairs that do the damage, each one laid out
+So this page is not another list. It is the thirteen pairs that do the damage, each one laid out
 the same way: what each service actually is, when you reach for it, and — the part worth more
 than everything else — **the exact wording in a question that points at it**.
 
@@ -485,6 +485,47 @@ appears often enough to be worth its own line in your memory.
     },
   ]}
   rule="<strong>How many decisions do you want?</strong> Almost none, at a fixed price → Lightsail. Give it code, let it decide → Elastic Beanstalk. Decide everything → EC2."
+/>
+
+## 13 · Generative AI
+
+<Confusable
+  title="Bedrock vs SageMaker vs Amazon Q"
+  ask="Three services that all get described as 'AI on AWS'. The question that sorts them is how much of the model is yours."
+  options={[
+    {
+      name: 'Amazon Bedrock',
+      tagline: "Somebody else's foundation model, through one API. Nothing to train, nothing to host.",
+      when: [
+        'You want a <strong>generative</strong> feature — summarise, draft, classify, converse',
+        'A chatbot that answers from <strong>your own documents</strong>, without training anything',
+        'You want to compare models from several providers behind <strong>one API</strong>',
+        'There must be <strong>nothing running</strong>, and nothing to pay, between calls',
+      ],
+      giveaway: ['"generative AI"', '"foundation model"', '"without managing infrastructure"', '"our own documents"'],
+    },
+    {
+      name: 'Amazon SageMaker',
+      tagline: 'The platform for building, training and deploying a model that does not exist yet.',
+      when: [
+        'The model is <strong>custom</strong> — your data, your problem, nothing off the shelf fits',
+        'There is a <strong>data science team</strong>, a labelled dataset, and training runs',
+        'You need control of the algorithm, the training job or the inference endpoint',
+      ],
+      giveaway: ['"custom model"', '"train"', '"data scientists"', '"machine learning pipeline"'],
+    },
+    {
+      name: 'Amazon Q',
+      tagline: 'The finished assistant. You subscribe and point it at your data — you build nothing.',
+      when: [
+        '<strong>Employees</strong> want to ask questions of company documents in a chat window',
+        'Developers want help writing, explaining or upgrading code in the IDE',
+        'The scenario describes <strong>using</strong> an AI assistant rather than building one',
+      ],
+      giveaway: ['"AI assistant"', '"for employees"', '"in the IDE"', '"no development effort"'],
+    },
+  ]}
+  rule="<strong>How much of the model is yours?</strong> None, it is a finished product → Amazon Q. Someone else's, driven by your data → Bedrock. All of it, built from scratch → SageMaker."
 />
 
 ## Now test the ones that catch people

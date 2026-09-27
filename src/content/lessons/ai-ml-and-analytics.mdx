@@ -6,9 +6,9 @@ track: services
 order: 10
 domains:
   CCP: 'Domain 3 — Cloud Technology and Services'
-minutes: 12
+minutes: 15
 hook: Twelve thousand support calls a month, recorded, archived, and heard by nobody except a supervisor sampling forty of them. The answer to why customers were angry was already in the building.
-updated: 2026-08-15
+updated: 2026-09-22
 ---
 
 import Diagram from '../../components/Diagram.astro';
@@ -88,7 +88,7 @@ Almost all of these are **pre-trained**: you call an API, you do not build a mod
     },
     {
       title: 'Generative AI',
-      body: '<strong>Amazon Q</strong> is the AI assistant for business and for building on AWS. Generative services are the newest additions to the blueprint — recognise the names and what they are for.',
+      body: '<strong>Amazon Bedrock</strong> rents you somebody else\'s foundation model through one API — nothing to train, nothing to host. <strong>Amazon Q</strong> is the finished assistant built on top. Generative services are the newest additions to the blueprint — recognise the names and what they are for.',
       flow: 'w-gen',
     },
   ]}
@@ -108,7 +108,8 @@ Almost all of these are **pre-trained**: you call an API, you do not build a mod
   <Node x={520} y={520} w={220} h={70} label="Lex · Kendra" sub="chatbots · search" icon="users" tone="purple" step={4} />
 
   <Node x={880} y={300} w={220} h={90} label="SageMaker" sub="build your own model" icon="gear" tone="green" step={5} />
-  <Node x={880} y={450} w={220} h={80} label="Amazon Q" sub="generative assistant" icon="lambda" tone="red" step={6} />
+  <Node x={880} y={450} w={220} h={70} label="Bedrock" sub="rent a foundation model" icon="lambda" tone="red" step={6} />
+  <Node x={880} y={545} w={220} h={70} label="Amazon Q" sub="the finished assistant" icon="users" tone="red" step={6} />
 
   <Wire id="w-img" from={[215, 110]} to={[405, 110]} tone="orange" step={1} />
   <Wire id="w-stt" from={[215, 215]} to={[405, 200]} tone="blue" step={2} />
@@ -134,6 +135,7 @@ Almost all of these are **pre-trained**: you call an API, you do not build a mod
     { key: 'L', term: 'Lex', note: 'chatbots and voice interfaces' },
     { key: 'K', term: 'Kendra', note: 'intelligent search across your own documents' },
     { key: 'S', term: 'SageMaker', note: 'build, train and deploy your own custom models' },
+    { key: 'B', term: 'Bedrock', note: 'call a ready-made foundation model through one API' },
     { key: 'Q', term: 'Amazon Q', note: 'generative AI assistant for business and for building' },
   ]}
 />
@@ -143,6 +145,46 @@ Three pairs the exam deliberately confuses:
 <br />· <strong>Rekognition vs Textract</strong> — a photograph of the world vs a scanned document.
 <br />· <strong>Transcribe vs Polly</strong> — speech to text vs text to speech.
 <br />· <strong>Comprehend vs Kendra</strong> — analyse a piece of text vs search a whole corpus.
+</Callout>
+
+### Bedrock, SageMaker or Amazon Q?
+
+These three are the newest names on the syllabus and the easiest to blur together, because all
+three can be described as "AI on AWS". One question separates them for good:
+
+> **How much of the model is yours?**
+
+**None of it — you want the finished product.** That is **Amazon Q**. It is an assistant you
+subscribe to and point at your data: Q Business answers questions from your company's documents,
+Q Developer helps write and understand code. You are not building anything. If the question
+describes employees *using* an AI assistant, it is Q.
+
+**Somebody else's model, driven by your data.** That is **Amazon Bedrock**. Bedrock is a single
+API in front of foundation models from several providers — Anthropic's Claude, Meta's Llama,
+Mistral, Amazon's own Nova among them. You do not train them, you do not patch a server, and
+there is nothing running when you are not calling it. You can ground a model in your own
+documents (retrieval), or fine-tune one on your own examples, without ever owning the model
+itself. If the question says *generative*, *foundation model*, *chatbot over our own documents*
+or *summarise these tickets*, it is Bedrock.
+
+**All of it — the model does not exist yet.** That is **SageMaker**, exactly as before. A data
+science team, a labelled dataset, training runs, and a model nobody else has. Real need,
+real cost, real people.
+
+<Callout type="gotcha" title="The trap is reaching for SageMaker">
+It is the same trap as the rest of this lesson, wearing newer clothes. "We want a chatbot that
+answers questions about our policy documents" sounds like machine learning, so people pick
+SageMaker — and SageMaker is the answer to <em>building a model</em>, which nobody in that
+sentence asked for. A ready-made model plus your documents is <strong>Bedrock</strong>. If the
+scenario wants it off the shelf with no build at all, it is <strong>Amazon Q</strong>.
+</Callout>
+
+<Callout type="cost">
+The money follows the same line. Bedrock bills per token in and out, with nothing to pay while
+idle — the generative equivalent of the pre-trained services above. SageMaker bills for the
+training runs and for every hour an inference endpoint is left running, which is where the
+surprise bills in this part of AWS actually come from: a forgotten endpoint costs money all
+night whether anybody calls it or not.
 </Callout>
 
 ## The analytics services — moving from raw data to an answer
@@ -262,6 +304,7 @@ canonical exam scenario, so it is worth being able to reconstruct it.
     'Learn each AI service as <strong>one sentence</strong>. The exam describes the task and asks for the name.',
     '<strong>Rekognition</strong> images · <strong>Transcribe</strong> speech→text · <strong>Polly</strong> text→speech · <strong>Comprehend</strong> understands text · <strong>Translate</strong> languages · <strong>Textract</strong> scanned documents.',
     '<strong>Lex</strong> chatbots · <strong>Kendra</strong> enterprise search · <strong>SageMaker</strong> custom models · <strong>Amazon Q</strong> generative assistant.',
+    'Generative AI, by <strong>how much of the model is yours</strong>: none → <strong>Amazon Q</strong> · somebody else\'s, with your data → <strong>Bedrock</strong> · all of it → <strong>SageMaker</strong>.',
     'The confusable pairs: <strong>Rekognition vs Textract</strong>, <strong>Transcribe vs Polly</strong>, <strong>Comprehend vs Kendra</strong>.',
     'Analytics pipeline: <strong>Kinesis</strong> (streaming) → <strong>S3</strong> (lake) → <strong>Glue</strong> (ETL and catalog) → <strong>Athena</strong> or <strong>Redshift</strong> → <strong>QuickSight</strong>.',
     '<strong>Athena</strong> for occasional queries over S3 · <strong>Redshift</strong> when analysts query all day · <strong>EMR</strong> for Hadoop and Spark · <strong>OpenSearch</strong> for search and logs.',
